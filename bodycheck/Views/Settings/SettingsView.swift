@@ -29,19 +29,18 @@ struct SettingsView: View {
         }
         .tint(AppTheme.brandTeal)
         #else
-        NavigationStack {
-            Form {
-                generalSection
-                #if os(iOS)
-                healthSection
-                #endif
-                syncSection
-                privacySection
-                aboutSection
-            }
-            .navigationTitle("设置")
-            .tint(AppTheme.brandTeal)
+        Form {
+            generalSection
+            #if os(iOS)
+            healthSection
+            #endif
+            syncSection
+            privacySection
+            aboutSection
         }
+        .navigationTitle("设置")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(AppTheme.brandTeal)
         #endif
     }
 

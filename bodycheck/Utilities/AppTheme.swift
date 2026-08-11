@@ -45,11 +45,45 @@ enum AppTheme {
     static let activityGreen = Color(light: Color(red: 0.345, green: 0.455, blue: 0.282),
                                      dark: Color(red: 0.498, green: 0.612, blue: 0.420))
 
-    static let cardCornerRadius: CGFloat = 12
-    static let contentInset: CGFloat = 24
+    /// Platform-aware card radius (softer on iPhone).
+    static var cardCornerRadius: CGFloat {
+        #if os(iOS)
+        16
+        #else
+        12
+        #endif
+    }
+
+    /// Page horizontal/vertical inset for scroll content.
+    static var contentInset: CGFloat {
+        #if os(iOS)
+        16
+        #else
+        24
+        #endif
+    }
+
     static let contentMaxWidth: CGFloat = 1120
     static let spaceL: CGFloat = 16
     static let spaceXL: CGFloat = 24
+
+    /// Hero weight number size (latest weight).
+    static var heroWeightSize: CGFloat {
+        #if os(iOS)
+        48
+        #else
+        44
+        #endif
+    }
+
+    /// Inner padding for primary surface cards.
+    static var cardPadding: CGFloat {
+        #if os(iOS)
+        16
+        #else
+        22
+        #endif
+    }
 }
 
 enum MacLayout {
@@ -70,6 +104,35 @@ enum MacLayout {
     /// Below this content width, hide inspector by default / use compact columns.
     static let compactContentWidth: CGFloat = 640
 }
+
+// MARK: - Open settings (iOS)
+
+#if os(iOS)
+private struct OpenSettingsActionKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var openSettings: () -> Void {
+        get { self[OpenSettingsActionKey.self] }
+        set { self[OpenSettingsActionKey.self] = newValue }
+    }
+}
+
+/// Trailing gear used on each iPhone tab's navigation bar.
+struct IOSSettingsToolbar: ToolbarContent {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button(action: openSettings) {
+                Image(systemName: "gearshape")
+            }
+            .accessibilityLabel("设置")
+        }
+    }
+}
+#endif
 
 /// Flexible table column widths for the weight list.
 struct WeightColumnMetrics: Equatable {

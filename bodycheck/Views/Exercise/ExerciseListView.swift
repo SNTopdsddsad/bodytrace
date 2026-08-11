@@ -43,23 +43,28 @@ struct ExerciseListView: View {
                 }
             }
             .navigationTitle("运动")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
             #if os(macOS)
             .navigationSubtitle(macSubtitle)
             #endif
             .toolbar {
                 #if os(iOS)
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await syncFromHealth() }
                     } label: {
                         if isSyncing {
                             ProgressView()
                         } else {
-                            Label("从健康同步", systemImage: "heart.text.square")
+                            Label("同步", systemImage: "arrow.triangle.2.circlepath")
                         }
                     }
                     .disabled(isSyncing)
+                    .accessibilityLabel("从健康同步")
                 }
+                IOSSettingsToolbar()
                 #endif
             }
             #if os(iOS)
@@ -118,19 +123,23 @@ struct ExerciseListView: View {
     private var listContent: some View {
         List {
             Section {
-                LabeledContent("今日时长") {
-                    Text(todayExercises.isEmpty ? "—" : "\(todayMinutes) 分钟")
-                        .monospacedDigit()
+                HStack(spacing: 12) {
+                    exerciseSummaryTile(
+                        symbol: "timer",
+                        label: "今日时长",
+                        value: todayExercises.isEmpty ? "—" : "\(todayMinutes)",
+                        unit: todayExercises.isEmpty ? nil : "分钟"
+                    )
+                    exerciseSummaryTile(
+                        symbol: "flame.fill",
+                        label: "今日消耗",
+                        value: todayBurn.map { "\(Int($0.rounded()))" } ?? "—",
+                        unit: todayBurn == nil ? nil : "kcal"
+                    )
                 }
-                LabeledContent("今日消耗") {
-                    if let burn = todayBurn {
-                        Text("\(Int(burn.rounded())) kcal")
-                            .monospacedDigit()
-                    } else {
-                        Text("—")
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             } footer: {
                 #if os(macOS)
                 Text("运动记录来自 Apple 健康，Mac 端仅支持查看，不可新增或编辑。")
@@ -147,13 +156,59 @@ struct ExerciseListView: View {
                 // to keep Health as source of truth (re-sync restores them).
             }
         }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+    }
+
+    private func exerciseSummaryTile(
+        symbol: String,
+        label: String,
+        value: String,
+        unit: String?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(AppTheme.activityGreen)
+                .frame(width: 32, height: 32)
+                .background {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AppTheme.activityGreen.opacity(0.12))
+                }
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                if let unit {
+                    Text(unit)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
+                #if os(iOS)
+                .fill(Color(.secondarySystemGroupedBackground))
+                #else
+                .fill(Color(nsColor: .controlBackgroundColor))
+                #endif
+        }
     }
 
     private func exerciseRow(_ entry: ExerciseEntry) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.name)
-                    .font(.headline)
+                    .font(.body.weight(.medium))
                 Text(entry.date, format: .dateTime.year().month().day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -161,19 +216,19 @@ struct ExerciseListView: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(durationText(entry.durationMinutes))
-                    .font(.subheadline.monospacedDigit())
+                    .font(.subheadline.monospacedDigit().weight(.semibold))
                 Text(entry.caloriesBurned.map { "\(Int($0.rounded())) kcal" } ?? "—")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(entry.exerciseSource.displayName)
-                    .font(.caption2)
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(AppTheme.activityGreen)
                     .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 3)
                     .background(AppTheme.activityGreen.opacity(0.12), in: Capsule())
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 
     private func durationText(_ minutes: Int) -> String {

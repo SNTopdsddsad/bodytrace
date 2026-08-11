@@ -85,6 +85,9 @@ struct TodayView: View {
             }
             .pageBackground()
             .navigationTitle("今日概览")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
             #if os(macOS)
             .navigationSubtitle(Date.now.formatted(.dateTime.year().month().day().weekday(.wide)))
             #endif
@@ -100,6 +103,29 @@ struct TodayView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        #if os(iOS)
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Button {
+                    showQuickWeight = true
+                } label: {
+                    Label("记录体重", systemImage: "scalemass")
+                }
+                Button {
+                    showQuickFood = true
+                } label: {
+                    Label("记录饮食", systemImage: "fork.knife")
+                }
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.title3)
+                    .foregroundStyle(AppTheme.brandTeal)
+            }
+            .accessibilityLabel("快速记录")
+        }
+        IOSSettingsToolbar()
+        #else
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 showQuickFood = true
@@ -124,6 +150,7 @@ struct TodayView: View {
             .help("选择记录类型")
             .accessibilityLabel("选择记录类型")
         }
+        #endif
     }
 
     // MARK: - Lead
@@ -145,7 +172,7 @@ struct TodayView: View {
     private var weightHero: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("最新体重")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .tracking(0.4)
@@ -153,8 +180,10 @@ struct TodayView: View {
             if let latest = latestWeight {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(String(format: "%.1f", weightUnit.fromKilograms(latest.weight)))
-                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                        .font(.system(size: AppTheme.heroWeightSize, weight: .semibold, design: .rounded))
                         .monospacedDigit()
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
                     Text(weightUnit.shortLabel)
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -165,10 +194,11 @@ struct TodayView: View {
                         DeltaChip(deltaKg: delta, unit: weightUnit)
                     }
                     Text(latest.date, format: .dateTime.year().month().day())
-                        .font(.system(size: 12))
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
+                #if os(macOS)
                 Divider().padding(.top, 8)
 
                 Text("数据保存在你的设备上，并通过你的私人 iCloud 在 iPhone 与 Mac 之间同步。")
@@ -176,6 +206,7 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 4)
+                #endif
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("还没有体重记录")
@@ -186,13 +217,22 @@ struct TodayView: View {
                     Button("记录体重") { showQuickWeight = true }
                         .buttonStyle(.borderedProminent)
                         .tint(AppTheme.brandTeal)
+                        .controlSize(.large)
                         .padding(.top, 4)
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 8)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
-        .appSurface(padding: 22)
+        .frame(maxWidth: .infinity, minHeight: platformHeroMinHeight, alignment: .topLeading)
+        .appSurface(padding: AppTheme.cardPadding)
+    }
+
+    private var platformHeroMinHeight: CGFloat {
+        #if os(iOS)
+        140
+        #else
+        180
+        #endif
     }
 
     private var todaySummary: some View {
@@ -205,7 +245,7 @@ struct TodayView: View {
                 unit: "kcal",
                 meta: todayFoods.isEmpty ? nil : "\(todayFoods.count) 条饮食记录"
             )
-            Divider()
+            Divider().padding(.leading, summaryIconLeading)
             summaryRow(
                 symbol: "timer",
                 tint: AppTheme.activityGreen,
@@ -215,8 +255,16 @@ struct TodayView: View {
                 meta: exerciseMeta ?? healthExerciseHint
             )
         }
-        .frame(maxWidth: .infinity, minHeight: 180)
+        .frame(maxWidth: .infinity, minHeight: platformHeroMinHeight)
         .appSurface()
+    }
+
+    private var summaryIconLeading: CGFloat {
+        #if os(iOS)
+        16 + 36 + 16 // padding + icon + spacing
+        #else
+        20 + 36 + 16
+        #endif
     }
 
     private var exerciseMeta: String? {
@@ -245,21 +293,17 @@ struct TodayView: View {
     ) -> some View {
         HStack(spacing: 16) {
             Image(systemName: symbol)
-                .font(.system(size: 15))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 36, height: 36)
                 .background {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.primary.opacity(0.03))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                        }
+                        .fill(tint.opacity(0.12))
                 }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(label)
-                    .font(.system(size: 11))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value ?? "—")
@@ -273,20 +317,39 @@ struct TodayView: View {
                 }
                 if let meta {
                     Text(meta)
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, minHeight: 100, alignment: .leading)
+        .padding(AppTheme.cardPadding)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
     }
 
     // MARK: - Chart
 
     private var chartSection: some View {
         VStack(alignment: .leading, spacing: 14) {
+            #if os(iOS)
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("体重趋势")
+                        .font(.headline)
+                    Text(chartSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Picker("范围", selection: $chartRange) {
+                    ForEach(ChartRange.allCases) { range in
+                        Text(range.label).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            #else
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("体重趋势")
@@ -305,6 +368,7 @@ struct TodayView: View {
                 .frame(maxWidth: 280)
                 .labelsHidden()
             }
+            #endif
 
             if chartPoints.count >= 2 {
                 Chart(chartPoints) { point in
@@ -314,17 +378,30 @@ struct TodayView: View {
                     )
                     .interpolationMethod(.catmullRom)
                     .foregroundStyle(AppTheme.brandTeal)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
+
+                    AreaMark(
+                        x: .value("日期", point.day),
+                        y: .value("体重", weightUnit.fromKilograms(point.weightKg))
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [AppTheme.brandTeal.opacity(0.22), AppTheme.brandTeal.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
                     PointMark(
                         x: .value("日期", point.day),
                         y: .value("体重", weightUnit.fromKilograms(point.weightKg))
                     )
                     .foregroundStyle(AppTheme.brandTeal)
-                    .symbolSize(24)
+                    .symbolSize(28)
                 }
                 .chartYScale(domain: .automatic(includesZero: false))
-                .frame(height: 200)
+                .frame(height: chartHeight)
                 .padding(.top, 4)
             } else if chartPoints.count == 1 {
                 ContentUnavailableView(
@@ -332,17 +409,25 @@ struct TodayView: View {
                     systemImage: "chart.xyaxis.line",
                     description: Text("趋势图会在有至少两条体重后显示。")
                 )
-                .frame(height: 180)
+                .frame(height: chartHeight - 20)
             } else {
                 ContentUnavailableView(
                     "暂无趋势",
                     systemImage: "chart.xyaxis.line",
                     description: Text("记录体重后即可查看趋势。")
                 )
-                .frame(height: 180)
+                .frame(height: chartHeight - 20)
             }
         }
-        .appSurface(padding: 20)
+        .appSurface(padding: AppTheme.cardPadding)
+    }
+
+    private var chartHeight: CGFloat {
+        #if os(iOS)
+        180
+        #else
+        200
+        #endif
     }
 
     private var chartSubtitle: String {
@@ -361,20 +446,26 @@ struct TodayView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("最近记录")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.headline)
                     Text("体重、饮食与运动")
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("查看体重记录 →") {
+                Button {
                     onOpenWeight?()
+                } label: {
+                    HStack(spacing: 2) {
+                        Text("体重")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.brandTeal)
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, AppTheme.cardPadding)
             .padding(.vertical, 14)
 
             Divider()
@@ -419,29 +510,34 @@ struct TodayView: View {
                 #else
                 VStack(spacing: 0) {
                     ForEach(recentItems) { item in
-                        HStack {
-                            Text(item.date, format: .dateTime.month().day().hour().minute())
+                        HStack(alignment: .center, spacing: 12) {
+                            RecordDot(kind: item.dot)
+                                .frame(width: 10)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.title)
+                                    .font(.body.weight(.medium))
+                                    .lineLimit(1)
+                                HStack(spacing: 6) {
+                                    Text(item.typeLabel)
+                                    Text("·")
+                                    Text(item.date, format: .dateTime.month().day().hour().minute())
+                                }
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .frame(width: 72, alignment: .leading)
-                            HStack(spacing: 6) {
-                                RecordDot(kind: item.dot)
-                                Text(item.typeLabel)
-                                    .font(.subheadline)
                             }
-                            .frame(width: 56, alignment: .leading)
-                            Text(item.title)
-                                .font(.subheadline)
-                                .lineLimit(1)
-                            Spacer()
+
+                            Spacer(minLength: 8)
+
                             Text(item.valueText)
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline.monospacedDigit().weight(.medium))
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.trailing)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, AppTheme.cardPadding)
+                        .padding(.vertical, 12)
                         if item.id != recentItems.last?.id {
-                            Divider().padding(.leading, 16)
+                            Divider().padding(.leading, AppTheme.cardPadding + 22)
                         }
                     }
                 }

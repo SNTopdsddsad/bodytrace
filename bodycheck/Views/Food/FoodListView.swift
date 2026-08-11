@@ -52,34 +52,60 @@ struct FoodListView: View {
                         Button("添加食物") { showEditor = true }
                             .buttonStyle(.borderedProminent)
                             .tint(AppTheme.brandTeal)
+                            .controlSize(.large)
                     }
                 } else {
                     List {
                         Section {
-                            LabeledContent("今日摄入") {
-                                Text(todayFoods.isEmpty ? "—" : "\(Int(todayCalories.rounded())) kcal")
-                                    .font(.body.monospacedDigit().weight(.semibold))
+                            HStack(spacing: 16) {
+                                Image(systemName: "flame.fill")
+                                    .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(AppTheme.intakeAmber)
+                                    .frame(width: 36, height: 36)
+                                    .background {
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(AppTheme.intakeAmber.opacity(0.12))
+                                    }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("今日摄入")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                        Text(todayFoods.isEmpty ? "—" : "\(Int(todayCalories.rounded()))")
+                                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                                            .monospacedDigit()
+                                        if !todayFoods.isEmpty {
+                                            Text("kcal")
+                                                .font(.subheadline.weight(.medium))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Text(todayFoods.isEmpty ? "还没有饮食记录" : "\(todayFoods.count) 条记录")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 0)
                             }
-                            LabeledContent("今日条数", value: "\(todayFoods.count)")
+                            .padding(.vertical, 4)
                         }
 
                         ForEach(groupedByDay, id: \.day) { group in
                             Section {
                                 ForEach(group.items) { entry in
-                                    HStack {
+                                    HStack(alignment: .center, spacing: 12) {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(entry.name)
-                                                .font(.headline)
+                                                .font(.body.weight(.medium))
                                             Text(entry.date, format: .dateTime.hour().minute())
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
-                                        Spacer()
+                                        Spacer(minLength: 8)
                                         Text("\(Int(entry.calories.rounded())) kcal")
-                                            .font(.subheadline.monospacedDigit())
-                                            .foregroundStyle(.secondary)
+                                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                                            .foregroundStyle(AppTheme.intakeAmber)
                                     }
+                                    .padding(.vertical, 2)
                                 }
                                 .onDelete { offsets in
                                     delete(items: group.items, at: offsets)
@@ -89,9 +115,15 @@ struct FoodListView: View {
                             }
                         }
                     }
+                    #if os(iOS)
+                    .listStyle(.insetGrouped)
+                    #endif
                 }
             }
             .navigationTitle("饮食")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
             #if os(macOS)
             .navigationSubtitle(
                 todayFoods.isEmpty
@@ -101,6 +133,20 @@ struct FoodListView: View {
             #endif
             .searchable(text: $searchText, prompt: "搜索食物名称")
             .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showEditor = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .font(.title3)
+                            .foregroundStyle(AppTheme.brandTeal)
+                    }
+                    .accessibilityLabel("添加食物")
+                }
+                IOSSettingsToolbar()
+                #else
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showEditor = true
@@ -109,6 +155,7 @@ struct FoodListView: View {
                     }
                     .keyboardShortcut("n", modifiers: [.command])
                 }
+                #endif
             }
             .sheet(isPresented: $showEditor) {
                 FoodEditorSheet()

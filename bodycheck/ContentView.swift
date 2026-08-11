@@ -152,25 +152,21 @@ struct ContentView: View {
             }
         }
         #if os(iOS)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("设置")
-            }
-        }
+        // Toolbar must live inside each page's NavigationStack — TabView itself has no nav bar.
+        .environment(\.openSettings) { showSettings = true }
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 SettingsView()
                     .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
+                        ToolbarItem(placement: .confirmationAction) {
                             Button("完成") { showSettings = false }
+                                .fontWeight(.semibold)
                         }
                     }
             }
+            .tint(AppTheme.brandTeal)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         #endif
     }

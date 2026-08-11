@@ -179,7 +179,7 @@ struct WeightListView: View {
         NavigationStack {
             #if os(macOS)
             macBody
-            #else
+            #elseif os(iOS)
             iosBody
             #endif
         }
@@ -736,6 +736,7 @@ struct WeightListView: View {
 
     // MARK: - iOS
 
+    #if os(iOS)
     private var iosBody: some View {
         Group {
             if weights.isEmpty {
@@ -745,50 +746,236 @@ struct WeightListView: View {
                     Text("记录第一条体重，之后就能在这里查看趋势。")
                 } actions: {
                     Button("记录体重") { editorMode = .create }
+                        .buttonStyle(.borderedProminent)
+                        .tint(AppTheme.brandTeal)
+                        .controlSize(.large)
                 }
             } else {
                 List {
-                    ForEach(weights) { entry in
-                        Button {
-                            editorMode = .edit(entry)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(weightUnit.format(entry.weight))
-                                        .font(.headline.monospacedDigit())
-                                    Text(entry.date, format: .dateTime.year().month().day())
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                    Section {
+                        iosMetricCards
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
+                    Section {
+                        if filteredWeights.isEmpty {
+                            ContentUnavailableView {
+                                Label("没有匹配的记录", systemImage: "line.3.horizontal.decrease.circle")
+                            } description: {
+                                Text("试试调整筛选条件，或清除筛选。")
+                            } actions: {
+                                Button("清除筛选") {
+                                    dateRange = .days30
+                                    sourceFilter = .all
+                                    noteFilter = .all
+                                    searchText = ""
                                 }
-                                Spacer()
-                                SourceBadge(source: entry.weightSource)
+                            }
+                            .listRowBackground(Color.clear)
+                        } else {
+                            ForEach(filteredWeights) { entry in
+                                Button {
+                                    editorMode = .edit(entry)
+                                } label: {
+                                    iosWeightRow(entry)
+                                }
+                                .foregroundStyle(.primary)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        modelContext.delete(entry)
+                                        try? modelContext.save()
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        editorMode = .edit(entry)
+                                    } label: {
+                                        Label("编辑", systemImage: "pencil")
+                                    }
+                                    .tint(AppTheme.brandTeal)
+                                }
                             }
                         }
-                        .foregroundStyle(.primary)
-                    }
-                    .onDelete { offsets in
-                        for index in offsets {
-                            modelContext.delete(weights[index])
+                    } header: {
+                        HStack {
+                            Text(dateRange.label)
+                            Spacer()
+                            Text("\(filteredWeights.count) 条")
+                                .foregroundStyle(.secondary)
                         }
-                        try? modelContext.save()
+                        .font(.subheadline)
+                        .textCase(nil)
                     }
                 }
+                .listStyle(.insetGrouped)
             }
         }
         .navigationTitle("体重")
+        .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText, prompt: "搜索备注或来源")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Picker("时间范围", selection: $dateRange) {
+                        ForEach(WeightDateRange.allCases) { item in
+                            Text(item.label).tag(item)
+                        }
+                    }
+                    Picker("来源", selection: $sourceFilter) {
+                        ForEach(WeightSourceFilter.allCases) { item in
+                            Text(item.label).tag(item)
+                        }
+                    }
+                    Picker("备注", selection: $noteFilter) {
+                        ForEach(WeightNoteFilter.allCases) { item in
+                            Text(item.label).tag(item)
+                        }
+                    }
+                    if dateRange != .days30 || sourceFilter != .all || noteFilter != .all {
+                        Divider()
+                        Button("清除筛选") {
+                            dateRange = .days30
+                            sourceFilter = .all
+                            noteFilter = .all
+                        }
+                    }
+                } label: {
+                    Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                }
+                .accessibilityLabel("筛选")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     editorMode = .create
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.title3)
+                        .foregroundStyle(AppTheme.brandTeal)
                 }
+                .accessibilityLabel("记录体重")
             }
+            IOSSettingsToolbar()
         }
         .sheet(item: $editorMode) { mode in
             WeightEditorView(mode: mode)
         }
+        .alert(
+            "删除这条体重记录？",
+            isPresented: showDeleteConfirm
+        ) {
+            Button("取消", role: .cancel) { pendingDeleteIDs = [] }
+            Button("删除", role: .destructive) { confirmDelete() }
+        } message: {
+            Text("删除后无法恢复。")
+        }
     }
+
+    private var hasActiveFilters: Bool {
+        dateRange != .days30 || sourceFilter != .all || noteFilter != .all || !searchText.isEmpty
+    }
+
+    private var iosMetricCards: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                iosMetricTile(
+                    label: "最新",
+                    value: latestInFilter.map { String(format: "%.1f", weightUnit.fromKilograms($0.weight)) },
+                    unit: weightUnit.shortLabel,
+                    accent: AppTheme.brandTeal
+                )
+                iosMetricTile(
+                    label: "与上一条",
+                    value: lastChange.map { deltaText($0) },
+                    unit: lastChange == nil ? nil : weightUnit.shortLabel,
+                    accent: AppTheme.brandTeal
+                )
+            }
+            iosMetricTile(
+                label: "范围变化 · \(dateRange.label)",
+                value: rangeChange.map { deltaText($0) },
+                unit: rangeChange == nil ? nil : weightUnit.shortLabel,
+                accent: AppTheme.activityGreen
+            )
+        }
+    }
+
+    private func iosMetricTile(
+        label: String,
+        value: String?,
+        unit: String?,
+        accent: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value ?? "—")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(value == nil ? Color.secondary : Color.primary)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                if let unit, value != nil {
+                    Text(unit)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
+                        .strokeBorder(accent.opacity(0.18), lineWidth: 1)
+                }
+        }
+    }
+
+    private func iosWeightRow(_ entry: WeightEntry) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(weightUnit.format(entry.weight))
+                        .font(.title3.weight(.semibold).monospacedDigit())
+                    if let delta = iosDelta(for: entry) {
+                        DeltaChip(deltaKg: delta, unit: weightUnit)
+                    }
+                }
+                Text(entry.date, format: .dateTime.year().month().day().weekday(.abbreviated))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let note = entry.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            SourceBadge(source: entry.weightSource)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func iosDelta(for entry: WeightEntry) -> Double? {
+        let ordered = weights.sorted { $0.date > $1.date }
+        guard let idx = ordered.firstIndex(where: { $0.id == entry.id }),
+              idx + 1 < ordered.count else {
+            return nil
+        }
+        return entry.weight - ordered[idx + 1].weight
+    }
+    #endif
 
     // MARK: - Helpers
 
