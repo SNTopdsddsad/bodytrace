@@ -45,7 +45,7 @@
 - 多平台壳：iOS `TabView`，macOS `NavigationSplitView` + `Settings` 窗
 - 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
 - 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
-- 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、三列分项、趋势图、最近记录
+- 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；隐私与关于
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移

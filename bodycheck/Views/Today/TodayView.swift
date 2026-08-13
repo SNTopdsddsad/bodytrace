@@ -27,6 +27,7 @@ struct TodayView: View {
     @State private var showQuickWeight = false
     @State private var showQuickFood = false
     @State private var chartRange: ChartRange = .days30
+    @State private var openedDay: CalendarDayItem?
     #if os(iOS)
     @State private var todayRestingKcal: Double?
     @State private var todayActiveKcal: Double?
@@ -91,6 +92,9 @@ struct TodayView: View {
             .navigationSubtitle(Date.now.formatted(AppLocale.dayWeekday))
             #endif
             .toolbar { toolbarContent }
+            .navigationDestination(item: $openedDay) { item in
+                DayDetailView(day: item.date)
+            }
             .sheet(isPresented: $showQuickWeight) {
                 WeightEditorView(mode: .create)
             }
@@ -536,7 +540,7 @@ struct TodayView: View {
                         y: .value("体重", weightUnit.fromKilograms(point.weightKg))
                     )
                     .foregroundStyle(AppTheme.brandTeal)
-                    .symbolSize(28)
+                    .symbolSize(openedDay?.date.isSameDay(as: point.day) == true ? 56 : 28)
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic) { value in
@@ -550,9 +554,24 @@ struct TodayView: View {
                     }
                 }
                 .chartYScale(domain: .automatic(includesZero: false))
+                .chartOverlay { proxy in
+                    GeometryReader { geo in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                openChartDay(at: location, proxy: proxy, in: geo)
+                            }
+                    }
+                }
                 .environment(\.locale, AppLocale.chinese)
                 .frame(height: chartHeight)
                 .padding(.top, 4)
+                .accessibilityHint("点某一天查看当天饮食、运动和热量")
+
+                Text("点某一天，查看当天饮食、运动和热量")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else if chartPoints.count == 1 {
                 ContentUnavailableView(
                     "再记录一次即可查看变化",
@@ -578,6 +597,26 @@ struct TodayView: View {
         #else
         200
         #endif
+    }
+
+    private func openChartDay(at location: CGPoint, proxy: ChartProxy, in geo: GeometryProxy) {
+        let x: CGFloat
+        if let plotFrame = proxy.plotFrame {
+            x = location.x - geo[plotFrame].origin.x
+        } else {
+            x = location.x
+        }
+        guard let date: Date = proxy.value(atX: x) else { return }
+        guard let nearest = nearestChartDay(to: date) else { return }
+        openedDay = CalendarDayItem(date: nearest)
+    }
+
+    private func nearestChartDay(to date: Date) -> Date? {
+        guard let nearest = chartPoints.min(by: {
+            abs($0.day.timeIntervalSince(date)) < abs($1.day.timeIntervalSince(date))
+        }) else { return nil }
+        if abs(nearest.day.timeIntervalSince(date)) > 36 * 3_600 { return nil }
+        return nearest.day.startOfDay
     }
 
     private var chartSubtitle: String {
