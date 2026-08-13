@@ -20,6 +20,13 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        settingsBody
+            .appChineseLocale()
+            .task { await cloudSync.refresh() }
+    }
+
+    @ViewBuilder
+    private var settingsBody: some View {
         #if os(macOS)
         TabView {
             generalPane
@@ -46,8 +53,6 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.brandTeal)
         #endif
-        .appChineseLocale()
-        .task { await cloudSync.refresh() }
     }
 
     #if os(macOS)

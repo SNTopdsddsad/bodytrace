@@ -165,7 +165,7 @@ struct FoodListView: View {
                 #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showEditor = true
+                        editorMode = .create
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .symbolRenderingMode(.hierarchical)
