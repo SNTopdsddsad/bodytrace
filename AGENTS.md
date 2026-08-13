@@ -30,13 +30,13 @@
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；隐私与关于文案
 - SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；失败则回退本地 store
 - iOS：从 Apple 健康导入 **workout** → `ExerciseEntry`（按 `healthKitUUID` upsert）
-- Mac：运动列表只读，不提供新增/编辑/删除
+- iOS：手动新增/编辑/删除体重写回 Apple 健康（`bodyMass`，回填 `healthKitUUID`）；未授权时本地仍可用
+- Mac：运动列表只读，不提供新增/编辑/删除；Mac 改体重不写 HealthKit
 
 未做（文档 MVP 里仍是规划）：
 
-- HealthKit 体重读写、食物写回 `dietaryEnergyConsumed`
+- 从健康导入体重、食物写回 `dietaryEnergyConsumed`
 - Widget / App Group / Deep Link（`bodytrack://log-weight`）
-- 体重写回健康、从健康导入体重
 - 独立 `WeightService` / `FoodService`；视图目前直接写 `ModelContext`
 - 测试 Target、`.gitignore`、本地化 String Catalog
 
@@ -49,7 +49,7 @@ bodycheck/                     # 主 App 源码（同步进 Target）
   bodycheckApp.swift           # @main，创建 ModelContainer
   ContentView.swift            # 平台根导航
   Models/                      # 仅 SwiftData @Model + 来源枚举
-  Services/                    # CloudSyncMonitor（全平台）；HealthKitExerciseService（#if os(iOS)）
+  Services/                    # CloudSyncMonitor（全平台）；HealthKit*（#if os(iOS)）
   Views/{Today,Weight,Food,Exercise,Settings}/
   Utilities/                   # 主题、单位、日界
 docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Target
@@ -144,9 +144,11 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 ## HealthKit（仅 iOS，当前实现）
 
 - Entitlements：`com.apple.developer.healthkit`。
-- 现只读 `HKObjectType.workoutType()`；`HealthKitExerciseService.syncWorkouts` 默认近 90 天。
-- 权限文案目前只描述锻炼记录。若增加体重/饮食读写，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
-- 文档规划的体重对账：手动写 SwiftData + 写 HK 并回填 UUID；从健康导入按 UUID upsert。Mac 改删体重不写 HK。
+- 运动：只读 `HKObjectType.workoutType()`；`HealthKitExerciseService.syncWorkouts` 默认近 90 天。
+- 体重：读+写 `HKQuantityType(.bodyMass)`。iOS 保存/编辑手动体重时双写并回填 `healthKitUUID`；删除手动记录时尝试删本 App 写入的样本。已授权时打开体重页会补写没有 UUID 的手动记录。
+- 权限文案已覆盖锻炼读取与体重读写。若再增加饮食写回，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
+- 不要在启动第一帧弹授权。首次点保存体重或设置里「允许写入健康」再请求。
+- 从健康导入体重仍未做。Mac 改删体重不写 HK。
 - 运动：不要删除健康来源行来「保持一致」——再同步会回来。`ExerciseListView` 有意不做删除。
 
 ## 构建设置注意

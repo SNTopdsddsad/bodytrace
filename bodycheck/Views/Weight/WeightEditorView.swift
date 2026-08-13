@@ -42,6 +42,14 @@ struct WeightEditorView: View {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
     }
 
+    private var measurementFooter: String {
+        #if os(iOS)
+        "数值按当前设置单位输入，保存时统一换算为公斤。日期仅记录到天。首次保存会询问是否写入 Apple 健康。"
+        #else
+        "数值按当前设置单位输入，保存时统一换算为公斤。日期仅记录到天。Mac 上的修改不会写入 Apple 健康。"
+        #endif
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -58,7 +66,7 @@ struct WeightEditorView: View {
                 } header: {
                     Text("测量")
                 } footer: {
-                    Text("数值按当前设置单位输入，保存时统一换算为公斤。日期仅记录到天。")
+                    Text(measurementFooter)
                 }
 
                 Section("备注（可选）") {
@@ -85,9 +93,11 @@ struct WeightEditorView: View {
                         .keyboardShortcut(.cancelAction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
-                        .fontWeight(.semibold)
-                        .keyboardShortcut(.defaultAction)
+                    Button("保存") {
+                        Task { await save() }
+                    }
+                    .fontWeight(.semibold)
+                    .keyboardShortcut(.defaultAction)
                 }
             }
             .onAppear {
@@ -115,7 +125,7 @@ struct WeightEditorView: View {
         }
     }
 
-    private func save() {
+    private func save() async {
         let normalized = weightText
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")
@@ -135,24 +145,33 @@ struct WeightEditorView: View {
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let noteValue = trimmedNote.isEmpty ? nil : trimmedNote
 
+        let entry: WeightEntry
         switch mode {
         case .create:
-            modelContext.insert(
-                WeightEntry(weight: kg, date: dayOnly, source: .manual, note: noteValue)
-            )
-        case .edit(let entry):
-            entry.weight = kg
-            entry.date = dayOnly
-            entry.note = noteValue
-            entry.updatedAt = Date()
+            let created = WeightEntry(weight: kg, date: dayOnly, source: .manual, note: noteValue)
+            modelContext.insert(created)
+            entry = created
+        case .edit(let existing):
+            existing.weight = kg
+            existing.date = dayOnly
+            existing.note = noteValue
+            existing.updatedAt = Date()
+            entry = existing
         }
 
         do {
             try modelContext.save()
-            dismiss()
         } catch {
             validationMessage = "保存失败，请重试"
+            return
         }
+
+        #if os(iOS)
+        await HealthKitWeightService.shared.syncEntry(entry)
+        try? modelContext.save()
+        #endif
+
+        dismiss()
     }
 }
 

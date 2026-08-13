@@ -8,6 +8,9 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(CloudSyncMonitor.self) private var cloudSync
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    #if os(iOS)
+    @State private var weightWriteStatus = "检查中"
+    #endif
 
     private var weightUnitBinding: Binding<WeightUnit> {
         Binding(
@@ -129,12 +132,25 @@ struct SettingsView: View {
     #if os(iOS)
     private var healthSection: some View {
         Section {
+            LabeledContent("体重写回", value: weightWriteStatus)
             LabeledContent("运动数据", value: "Apple 健康锻炼")
-            Text("在「运动」页可从健康同步。Mac 端仅查看，不支持编辑。")
+            Button("允许写入健康") {
+                Task {
+                    await HealthKitWeightService.shared.requestAuthorization()
+                    weightWriteStatus = HealthKitWeightService.shared.shareStatusText
+                }
+            }
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                Link("打开系统设置", destination: url)
+            }
+            Text("在 iPhone 上记录或修改体重后，会写入 Apple 健康。Mac 上的修改不会写入健康；回到 iPhone 打开体重页后，会补写尚未同步的手动记录。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
             Text("健康")
+        }
+        .onAppear {
+            weightWriteStatus = HealthKitWeightService.shared.shareStatusText
         }
     }
     #endif

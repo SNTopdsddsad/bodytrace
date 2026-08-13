@@ -257,8 +257,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录，以便在 BodyTrack 中展示运动。";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要在授权范围内与健康数据保持一致。";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录和体重，以便展示运动并与本 App 的体重记录保持一致。";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -308,8 +308,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录，以便在 BodyTrack 中展示运动。";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要在授权范围内与健康数据保持一致。";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录和体重，以便展示运动并与本 App 的体重记录保持一致。";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

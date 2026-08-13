@@ -793,8 +793,7 @@ struct WeightListView: View {
                                 .foregroundStyle(.primary)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
-                                        modelContext.delete(entry)
-                                        try? modelContext.save()
+                                        deleteEntries([entry])
                                     } label: {
                                         Label("删除", systemImage: "trash")
                                     }
@@ -882,6 +881,11 @@ struct WeightListView: View {
         } message: {
             Text("删除后无法恢复。")
         }
+        #if os(iOS)
+        .task {
+            await HealthKitWeightService.shared.pushUnsyncedManualEntries(in: modelContext)
+        }
+        #endif
     }
 
     private var hasActiveFilters: Bool {
@@ -1005,13 +1009,31 @@ struct WeightListView: View {
         return "\(deltaText(delta)) \(weightUnit.shortLabel)"
     }
 
-    private func confirmDelete() {
-        for id in pendingDeleteIDs {
-            if let entry = weights.first(where: { $0.id == id }) {
-                modelContext.delete(entry)
-            }
+    private func deleteEntries(_ entries: [WeightEntry]) {
+        #if os(iOS)
+        let healthRemovals: [UUID] = entries.compactMap { entry in
+            guard entry.weightSource == .manual else { return nil }
+            return entry.healthKitUUID
+        }
+        #endif
+        for entry in entries {
+            modelContext.delete(entry)
         }
         try? modelContext.save()
+        #if os(iOS)
+        Task {
+            for uuid in healthRemovals {
+                await HealthKitWeightService.shared.deleteSample(uuid: uuid)
+            }
+        }
+        #endif
+    }
+
+    private func confirmDelete() {
+        let targets = pendingDeleteIDs.compactMap { id in
+            weights.first(where: { $0.id == id })
+        }
+        deleteEntries(targets)
         if let selection, pendingDeleteIDs.contains(selection) {
             self.selection = nil
         }

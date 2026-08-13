@@ -1,5 +1,5 @@
 /* App display name and system permission copy stay Chinese on Mac. */
 CFBundleDisplayName = "BodyTrack";
 CFBundleName = "BodyTrack";
-NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录，以便在 BodyTrack 中展示运动。";
-NSHealthUpdateUsageDescription = "需要在授权范围内与健康数据保持一致。";
+NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录和体重，以便展示运动并与本 App 的体重记录保持一致。";
+NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";

@@ -1,6 +1,6 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.2  
+**版本**：v1.3  
 **日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
@@ -10,6 +10,7 @@
 | v1.0 | 2026-08-11 | 初稿 |
 | v1.1 | 2026-08-11 | 修正 CloudKit/HealthKit 模型与权限；补冲突策略、Deep Link、验收标准；文档迁至 `docs/` |
 | v1.2 | 2026-08-13 | 启用 SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；模型补默认值；无账号/失败时回退本地 |
+| v1.3 | 2026-08-13 | iOS 手动体重写回 Apple 健康（`bodyMass` + `healthKitUUID`）；从健康导入体重仍未做 |
 
 ---
 
@@ -315,18 +316,18 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>需要读取您的体重数据，以便展示体征变化趋势并与 App 记录保持一致。</string>
+<string>需要读取 Apple 健康中的锻炼记录和体重，以便展示运动并与本 App 的体重记录保持一致。</string>
 <key>NSHealthUpdateUsageDescription</key>
-<string>需要将您手动记录的体重和食物热量写入「健康」App，保持数据一致。</string>
+<string>需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。</string>
 ```
 
 #### 关键逻辑
 
-- **不要**在冷启动第一帧强制弹授权；在首次进入体重页 / 用户点击「同步健康」时请求
-- 使用 `HKObserverQuery` + `enableBackgroundDelivery` 监听体重变化，再拉取并 **按 `healthKitUUID` upsert**
-- 手动记录体重：SwiftData + HealthKit 双写，保存 sample UUID
-- 后台投递：按需开启 HealthKit Background Delivery；失败时降级为前台/下次启动同步
-- 权限拒绝：本地功能全开，设置页展示状态与跳转系统设置入口
+- **不要**在冷启动第一帧强制弹授权；在用户保存体重或点击「允许写入健康」时请求
+- 手动记录/编辑体重（仅 iOS）：SwiftData + HealthKit 双写，保存 sample UUID；编辑时删除旧样本再写入
+- 已授权时打开体重页：补写没有 `healthKitUUID` 的手动记录（含 Mac 同步过来的）
+- 使用 `HKObserverQuery` + `enableBackgroundDelivery` 从健康导入体重：**尚未实现**
+- 权限拒绝：本地功能全开，设置页展示写回状态与跳转系统设置入口
 
 #### 食物写回 HealthKit 的已知限制（MVP 接受）
 
