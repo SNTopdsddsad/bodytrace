@@ -106,7 +106,7 @@ struct SettingsView: View {
         } header: {
             Text("通用")
         } footer: {
-            Text("单位切换只影响显示，底层始终以公斤存储。")
+            Text("只改界面显示的单位，已有记录不用重填。")
         }
     }
 
@@ -114,11 +114,6 @@ struct SettingsView: View {
         Section {
             LabeledContent("iCloud 同步", value: cloudSync.settingsValue)
             LabeledContent("最近同步", value: cloudSync.lastSyncText)
-            LabeledContent("资料库", value: "云端资料库")
-            LabeledContent("云端容器", value: CloudKitConfig.containerIdentifier)
-            if let user = cloudSync.cloudUserRecordName {
-                LabeledContent("同步账号", value: user)
-            }
             if let lastError = cloudSync.lastError {
                 FormErrorText(message: lastError)
             }
@@ -135,10 +130,10 @@ struct SettingsView: View {
     #if os(iOS)
     private var healthSection: some View {
         Section {
-            LabeledContent("体重写回", value: weightWriteStatus)
-            LabeledContent("运动数据", value: "Apple 健康锻炼")
-            LabeledContent("活动能量", value: "Apple 健康今日合计")
-            LabeledContent("静息能量", value: "Apple 健康今日合计")
+            LabeledContent("写入健康", value: weightWriteStatus)
+            LabeledContent("运动记录", value: "来自 Apple 健康")
+            LabeledContent("活动能量", value: "来自 Apple 健康")
+            LabeledContent("静息能量", value: "来自 Apple 健康")
             Button("允许健康数据") {
                 Task {
                     await HealthKitWeightService.shared.requestAuthorization()
@@ -148,7 +143,7 @@ struct SettingsView: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link("打开系统设置", destination: url)
             }
-            Text("体重可读写；锻炼、活动能量和静息能量只读。已授权读取后，健康里新增或修改的体重会自动同步到本 App。概览净热量 = 摄入 − 活动能量 − 静息能量。")
+            Text("可把体重写入 Apple 健康，并读取锻炼、活动能量和静息能量。授权后，健康里新增或修改的体重会自动出现在本应用。概览净热量 = 摄入 − 活动能量 − 静息能量。")
                 .font(AppFont.rowMeta)
                 .foregroundStyle(.secondary)
         } header: {
@@ -174,7 +169,6 @@ struct SettingsView: View {
         Section("关于") {
             LabeledContent("应用", value: "BodyTrack")
             LabeledContent("版本", value: "1.0")
-            LabeledContent("应用标识", value: "yinke.bodycheck")
         }
     }
 }

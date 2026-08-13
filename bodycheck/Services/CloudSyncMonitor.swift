@@ -62,7 +62,6 @@ final class CloudSyncMonitor {
     private(set) var phase: Phase
     private(set) var lastSuccessAt: Date?
     private(set) var lastError: String?
-    private(set) var cloudUserRecordName: String?
     private(set) var setupSucceeded: Bool
     @ObservationIgnored
     private var eventToken: NSObjectProtocol?
@@ -73,7 +72,6 @@ final class CloudSyncMonitor {
         self.phase = .idle
         self.lastSuccessAt = nil
         self.lastError = setupError
-        self.cloudUserRecordName = nil
         self.setupSucceeded = false
     }
 
@@ -116,11 +114,11 @@ final class CloudSyncMonitor {
         case (_, .checking):
             return "检查中"
         case (_, .available) where phase == .failed:
-            return "出错"
+            return "同步失败"
         case (_, .available) where setupSucceeded:
-            return "已连接"
+            return "已开启"
         case (_, .available):
-            return "已登录，等待首次同步"
+            return "已登录，等待同步"
         case (_, .noAccount):
             return "未登录"
         case (_, .restricted):
@@ -156,19 +154,19 @@ final class CloudSyncMonitor {
     var settingsFooter: String {
         switch (kind, account) {
         case (.localFallback, _):
-            return "当前仅使用本机存储，记录不会丢失。配置好 iCloud 后重启应用再试。数据不会出现在「文件 / iCloud 云盘」里。"
+            return "当前记录只保存在这台设备，不会丢失。请确认已登录 iCloud 后重启应用再试。"
         case (_, .checking):
             return "正在检查 iCloud 状态…"
         case (_, .available):
-            return "记录写入 iCloud 私人数据库（不会出现在「文件 / iCloud 云盘」）。开发阶段请到 CloudKit 控制台查看记录类型。"
+            return "登录 iCloud 后，记录会在你的设备之间自动同步。记录不会出现在「文件」或 iCloud 云盘里。"
         case (_, .noAccount):
-            return "请在系统设置中登录 iCloud。未登录时记录只保存在本机。"
+            return "请在系统设置中登录 iCloud。未登录时记录只保存在这台设备。"
         case (_, .restricted):
-            return "iCloud 受限制，记录只保存在本机。"
+            return "iCloud 当前不可用，记录只保存在这台设备。"
         case (_, .temporarilyUnavailable):
-            return "iCloud 暂时不可用，记录仍保存在本机。"
+            return "iCloud 暂时不可用，记录仍保存在这台设备。"
         case (_, .couldNotDetermine):
-            return "无法确认 iCloud 状态，记录仍保存在本机。"
+            return "暂时无法确认 iCloud 状态，记录仍保存在这台设备。"
         }
     }
 
@@ -243,20 +241,8 @@ final class CloudSyncMonitor {
             let container = CKContainer(identifier: CloudKitConfig.containerIdentifier)
             let status = try await container.accountStatus()
             account = Account(status)
-            guard status == .available else {
-                cloudUserRecordName = nil
-                return
-            }
-            do {
-                let userID = try await container.userRecordID()
-                cloudUserRecordName = userID.recordName
-            } catch {
-                cloudUserRecordName = nil
-                lastError = "云端容器连不上：\(Self.describe(error))"
-            }
         } catch {
             account = .couldNotDetermine
-            cloudUserRecordName = nil
             if lastError == nil {
                 lastError = Self.describe(error)
             }
@@ -294,30 +280,51 @@ final class CloudSyncMonitor {
             phase = .idle
         } else {
             phase = .failed
-            let prefix = "\(Self.eventName(event.type))失败"
             if let error = event.error {
-                lastError = "\(prefix)：\(Self.describe(error))"
+                lastError = Self.describe(error)
             } else {
-                lastError = prefix
+                lastError = Self.eventFailureMessage(event.type)
             }
         }
     }
 
     static func describe(_ error: Error) -> String {
+        #if DEBUG
         let ns = error as NSError
-        var text = "\(ns.domain)(\(ns.code)): \(ns.localizedDescription)"
-        if !ns.userInfo.isEmpty {
-            text += " | \(ns.userInfo)"
-        }
-        return text
+        print("CloudSync \(ns.domain)(\(ns.code)): \(ns.localizedDescription) | \(ns.userInfo)")
+        #endif
+        return userFacingMessage(for: error)
     }
 
-    private static func eventName(_ type: NSPersistentCloudKitContainer.EventType) -> String {
+    private static func userFacingMessage(for error: Error) -> String {
+        let ns = error as NSError
+        if ns.domain == CKError.errorDomain, let code = CKError.Code(rawValue: ns.code) {
+            switch code {
+            case .networkUnavailable, .networkFailure:
+                return "网络不可用，记录仍保存在这台设备。"
+            case .notAuthenticated:
+                return "未登录 iCloud，记录只保存在这台设备。"
+            case .quotaExceeded:
+                return "iCloud 存储空间不足，记录仍保存在这台设备。"
+            case .serviceUnavailable, .zoneBusy, .requestRateLimited, .serverRejectedRequest:
+                return "iCloud 暂时繁忙，稍后会自动重试。"
+            default:
+                break
+            }
+        }
+        return "同步暂时没完成，记录仍保存在这台设备。"
+    }
+
+    private static func eventFailureMessage(_ type: NSPersistentCloudKitContainer.EventType) -> String {
         switch type {
-        case .setup: return "初始化"
-        case .import: return "下载"
-        case .export: return "上传"
-        @unknown default: return "同步"
+        case .setup:
+            return "暂时连不上 iCloud，记录仍保存在这台设备。"
+        case .import:
+            return "下载未完成，记录仍保存在这台设备。"
+        case .export:
+            return "上传未完成，记录仍保存在这台设备。"
+        @unknown default:
+            return "同步暂时没完成，记录仍保存在这台设备。"
         }
     }
 }

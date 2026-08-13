@@ -1036,7 +1036,7 @@ struct WeightListView: View {
                 promptIfNeeded: true
             )
             healthSyncMessage = count == 0
-                ? "健康中暂无近 90 天的体重变化"
+                ? "健康中暂无新的体重记录"
                 : "已从健康同步 \(count) 条体重"
         } catch {
             healthSyncIsError = true
