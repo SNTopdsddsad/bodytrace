@@ -1,11 +1,11 @@
 //
 //  WeightUnit.swift
-//  bodycheck
+//  Shared
 //
 
 import Foundation
 
-enum WeightUnit: String, CaseIterable, Identifiable {
+nonisolated enum WeightUnit: String, CaseIterable, Identifiable, Sendable {
     case kg
     case lb
 

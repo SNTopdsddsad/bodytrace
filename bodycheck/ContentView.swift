@@ -18,6 +18,7 @@ struct ContentView: View {
     #if os(iOS)
     @State private var showSettings = false
     #endif
+    @State private var showLogWeightFromLink = false
 
     var body: some View {
         Group {
@@ -35,8 +36,29 @@ struct ContentView: View {
         .onChange(of: section) { _, newValue in
             lastSectionRaw = newValue.rawValue
         }
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
+        .sheet(isPresented: $showLogWeightFromLink) {
+            WeightEditorView(mode: .create)
+        }
+        #if os(iOS)
+        .syncsWidgetSnapshot()
+        #endif
         .tint(AppTheme.brandTeal)
         .appChineseLocale()
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        switch DeepLink.route(from: url) {
+        case .logWeight:
+            section = .weight
+            showLogWeightFromLink = true
+        case .today:
+            section = .today
+        case .none:
+            break
+        }
     }
 
     #if os(macOS)

@@ -1,6 +1,6 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.10  
+**版本**：v1.12  
 **日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
@@ -18,6 +18,8 @@
 | v1.8 | 2026-08-13 | 饮食不写健康：健康无餐食日记，只留在 SwiftData |
 | v1.9 | 2026-08-13 | 饮食支持拍照/相册；`FoodEntry.photoData` 可选外置存储 |
 | v1.10 | 2026-08-13 | 健康体重变化自动导入（Observer + 后台投递） |
+| v1.11 | 2026-08-13 | iPhone 小组件 + App Group `group.yinke.bodycheck` + Deep Link `bodytrack://log-weight` |
+| v1.12 | 2026-08-13 | 中尺寸小组件改展示今日热量差（净热量），不再只显示摄入 |
 
 ---
 
@@ -363,7 +365,7 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 
 - 最新体重（按用户单位）
 - 与上一条的差值（↑ / ↓）
-- 今日已摄入热量（简单版）
+- 今日热量差（净热量 = 摄入 − 运动消耗 − 静息能量；缺项按 0 并标明未计入）
 - 「记录体重」按钮
 
 ### 5.3 跨设备同步
@@ -390,7 +392,7 @@ let modelConfiguration = ModelConfiguration(
 
 ```swift
 enum AppGroup {
-    static let suiteName = "group.com.yourcompany.bodytrack" // 发布前替换
+    static let suiteName = "group.yinke.bodycheck"
 
     static var userDefaults: UserDefaults? {
         UserDefaults(suiteName: suiteName)
@@ -464,7 +466,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 ### 6.3 小组件尺寸
 
 - `systemSmall`：最新体重 + 记录按钮
-- `systemMedium`：体重 + 今日摄入 + 记录按钮
+- `systemMedium`：体重 + 今日热量差 + 记录按钮
 
 ---
 
@@ -526,7 +528,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 ### Xcode Capabilities
 
 - [x] iCloud → CloudKit（主 App，容器 `iCloud.yinke.bodycheck`）
-- [ ] App Groups（主 App + Widget，**相同** Group ID）
+- [x] App Groups（主 App + Widget，**相同** Group ID `group.yinke.bodycheck`）
 - [x] HealthKit（**仅** iOS 主 App Target；当前只读 workout）
 
 ### 命名（发布前替换 `yourcompany`）
@@ -534,8 +536,8 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 ```
 显示名:                 BodyTrack
 主 App Bundle ID:       yinke.bodycheck
-Widget Bundle ID:       yinke.bodycheck.widget（尚未建 Target）
-App Group:              group.yinke.bodycheck（尚未配置）
+Widget Bundle ID:       yinke.bodycheck.widget
+App Group:              group.yinke.bodycheck
 CloudKit Container:     iCloud.yinke.bodycheck
 URL Scheme:             bodytrack
 Widget kind:            WeightWidget
@@ -561,7 +563,7 @@ Widget kind:            WeightWidget
 | A4 | 在「健康」中新增体重 | App 内出现对应记录且不因重复导入产生多条（同 UUID） |
 | A5 | 拒绝 HealthKit 权限 | 仍可手动记体重/食物；有引导文案 |
 | A6 | 无 iCloud / 飞行模式 | 本地可读写；恢复后最终一致 |
-| A7 | 小组件展示 | 显示最新体重与今日摄入（主 App 写过数据后） |
+| A7 | 小组件展示 | 显示最新体重与今日热量差（主 App 写过数据后） |
 | A8 | 小组件点「记录体重」 | 打开主 App 快速记录页并可保存 |
 | A9 | 今日摄入 | 仅统计当日 `FoodEntry` 热量之和（本地时区） |
 | A10 | 单位切换 kg/lb | 主 App 与 Widget 展示一致；存储仍为 kg |
@@ -578,7 +580,7 @@ Widget kind:            WeightWidget
 | 最低系统版本 | iOS 18 / macOS 15 | 已定 |
 | 今日热量是否含运动 | 否（摄入与消耗分开展示） | 已定 |
 | Bundle ID / 显示名 / CloudKit 容器 | `yinke.bodycheck` / BodyTrack / `iCloud.yinke.bodycheck` | 已定 |
-| App Group | `group.yinke.bodycheck` | **待定**（小组件阶段） |
+| App Group | `group.yinke.bodycheck` | 已定 |
 | 是否上架多区 / 仅中文 | 先中文 | 待定 |
 | 隐私政策 URL | 上架前准备 | **待定** |
 

@@ -26,48 +26,84 @@
 - 不要新做、打磨、补齐 Mac 专用 UI（侧栏、检查器、Settings 窗、Mac 列表交互、Mac 快捷键体验等）。
 - 不要为 Mac 补 HealthKit、静息能量、净热量完整度或「和 iPhone 对齐」的桌面功能。
 - 共享代码改动时：iOS 优先；碰到 `#if os(...)` 仍要保证 **macOS 能编过**，但不主动改 Mac 体验。
-- 用户未明确说「开始做 Mac」之前，下一阶段只推进 iPhone：Widget / App Group / Deep Link、iPhone 体验与验收。**饮食不写健康。**
+- 用户未明确说「开始做 Mac」之前，下一阶段只推进 iPhone。**饮食不写健康。**
+
+## 下一会话从这里开始
+
+用户要把长对话关掉重开。新会话先读本文件，**不要重做已有项**。
+
+建议下一件（上架门槛，按顺序）：
+
+1. **真机验收**：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件已能添加，顺手确认 A7 数据、A8 点按记体重、A10 单位一致  
+2. CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`）；没部署不要 Archive / TestFlight  
+3. 上架用隐私政策 URL、App Privacy 营养标签
 
 ## 当前进度（2026-08）
 
 已有：
 
 - 多平台壳：iOS `TabView`，macOS `NavigationSplitView` + `Settings` 窗
-- 体重 CRUD（手动，`source = manual`）；体重页 Mac 侧有筛选、检查器、宽度自适应
-- 饮食 CRUD（名称 + kcal）；按本地日历日分组；iOS 可拍照/相册，`photoData` 可选外置存储
-- 今日概览：最新体重、净热量、今日摄入/运动消耗/静息能量、体重趋势图、最近记录
-- 设置：体重单位 kg/lb；iCloud 真实账号状态；隐私与关于文案
-- SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；失败则回退本地 store
-- iOS：从 Apple 健康导入 **workout** → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日 **静息能量**（`basalEnergyBurned` 合计，不入库）
-- iOS：手动新增/编辑/删除体重写回 Apple 健康（`bodyMass`，回填 `healthKitUUID`）；从健康导入体重按 UUID upsert；已授权后 Observer 自动拉取；未授权时本地仍可用
-- Mac：壳和已有列表先冻结，不再加功能。运动只读；改体重不写 HealthKit
+- 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
+- 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
+- 今日概览：最新体重、净热量（摄入 − 运动消耗 − 静息能量）、三列分项、趋势图、最近记录
+- 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
+- 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；隐私与关于
+- SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
+- iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量（不入库）
+- iOS 体重 ↔ 健康：写回 `bodyMass` 并回填 UUID；导入按 UUID upsert；`HKObserverQuery` + 后台投递（唤醒进程，不弹到前台）；未授权时本地仍可用
+- App 图标：深色进度环（`Assets.xcassets/AppIcon`）
+- iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（净热量）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）
+- App Group `group.yinke.bodycheck`：主 App 写摘要，Widget 只读摘要，不跑 SwiftData / CloudKit
+- Mac：壳和已有列表冻结。运动只读；改体重不写 HealthKit
 
 明确不做：
 
-- 饮食写回健康（健康没有餐食日记，只有膳食能量数字，产品已否决）
+- 饮食写回健康（不申请 `dietaryEnergyConsumed`）
+- 现在做 Mac 新功能
+- 自由录入运动（运动只来自 Apple 健康）
+- entitlements 里加 `com.apple.developer.healthkit.access`（临床病历；个人 Team 签不了）
 
-未做（先做 iPhone）：
+### 未完成（按优先级）
 
-- Widget / App Group / Deep Link（`bodytrack://log-weight`）
-- 独立 `WeightService` / `FoodService`；视图目前直接写 `ModelContext`
-- 测试 Target、`.gitignore`、本地化 String Catalog
+上架前 / 用户下一件：
 
-不要假装这些已存在。接入前先改 entitlements / Info.plist / 容器配置，并更新文档变更表。
+- [x] Widget + App Group + Deep Link（见「当前进度」）
+- [ ] 真机验收：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件 A7/A8/A10
+- [ ] CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`）；没部署不要 Archive / TestFlight
+- [ ] 上架用隐私政策 URL、App Privacy 营养标签
+
+产品增强（非门槛，用户未点名先别做）：
+
+- [ ] 目标体重与差距
+- [ ] 本地提醒（称重 / 记饮食）
+- [ ] 常用食物 / 食物库
+- [ ] 活动能量、步数（要再申请健康类型）
+- [ ] 体重图增强
+- [ ] Apple Watch 快速记体重
+
+工程债（用户无感，可后做）：
+
+- [ ] 独立 `WeightService` / `FoodService`（视图现在直接写 `ModelContext`）
+- [ ] 测试 Target、`.gitignore`、String Catalog
+
+不要假装未完成项已存在。改了产品口径或模型，同步改开发文档变更表。
 
 ## 目录
 
 ```
 bodycheck/                     # 主 App 源码（同步进 Target）
   bodycheckApp.swift           # @main，创建 ModelContainer
-  ContentView.swift            # 平台根导航
+  ContentView.swift            # 平台根导航；onOpenURL + iOS 摘要同步
   Models/                      # 仅 SwiftData @Model + 来源枚举
-  Services/                    # CloudSyncMonitor（全平台）；HealthKit*（#if os(iOS)）
+  Services/                    # CloudSyncMonitor；HealthKit* / WidgetSnapshotPublisher（#if os(iOS)）
   Views/{Today,Weight,Food,Exercise,Settings}/
-  Utilities/                   # 主题、单位、日界
+  Utilities/                   # 主题、日界
+Shared/                        # App + Widget 共享：App Group、摘要、Deep Link、WeightUnit
+BodyTrackWidget/               # iOS Widget Extension（kind = WeightWidget）
 docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Target
 ```
 
-新增文件放进对应目录。`docs/` 不要加入 App Target 源码组。
+新增主 App 文件放进 `bodycheck/` 对应目录；共享类型放 `Shared/`；Widget 专用放 `BodyTrackWidget/`。`docs/` 不要加入 App Target 源码组。
 
 ## 硬约束
 
@@ -83,6 +119,8 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 10. **HealthKit 未授权或不可用时，本地体重/饮食必须仍可用**。不要在启动第一帧弹授权。
 11. **业务列表以 SwiftData 为准**。HealthKit 是 iOS 出口/来源，不能阻塞 Mac 或未授权用户。
 12. 无网 / 无 iCloud：本地照常读写，UI 不阻塞。
+13. **Widget 只读 App Group 摘要**，不跑 SwiftData / CloudKit。suite 为 nil 时跳过摘要更新并打日志，禁止强制解包。
+14. **小组件不输入数字**。点按打开 `bodytrack://log-weight`，由主 App 弹出 `WeightEditorView`。
 
 ## 数据模型
 
@@ -167,7 +205,11 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 ## 构建设置注意
 
 - Xcode 26.4 工程；`SUPPORTED_PLATFORMS` 含 iOS / macOS / visionOS。日常验证以 **iOS** 为准。碰 `#if os(...)` 时 Mac 也要能编过，但不要为 Mac 补功能。visionOS 未单独打磨，不要主动加 xrOS 专用 UI。
-- App Sandbox 已开。`REGISTER_APP_GROUPS = YES` 但还没有 Group ID / Widget。
+- App Sandbox 已开。`REGISTER_APP_GROUPS = YES`；Group ID `group.yinke.bodycheck` 写在 iOS entitlements 与 Widget entitlements。Mac entitlements **不要**加 App Group。
+- Widget Target 仅 iOS（`platformFilter = ios`）。编 Mac 时不要把 Widget 编进去。
+- `BodyTrackWidget/Info.plist` 必须从同步组资源拷贝里排除（工程里已有 exception），否则会 Multiple commands produce Info.plist。
+- Widget 必须 `ENABLE_DEBUG_DYLIB = NO`，嵌入阶段要带 `CodeSignOnCopy`。Debug dylib 会让 SpringBoard 拉不起扩展，图库里就没有。
+- 图库要先用 **iPhone 目的地**安装并**打开一次**主 App，再搜索 **BodyTrack** 或 **体重**（主屏幕，不是锁定屏幕）。Mac 运行没有这个小组件。
 - Mac 必须用 `bodycheck.macos.entitlements`；不要把 HealthKit 写进 Mac entitlements。
 - 无独立 Info.plist（`GENERATE_INFOPLIST_FILE = YES`）。键在 `project.pbxproj` 的 `INFOPLIST_KEY_*`。
 
@@ -192,7 +234,7 @@ xcodebuild -project bodycheck.xcodeproj -scheme bodycheck -destination 'platform
 - 视图里直接 `modelContext.insert` / `save` 是现有模式；抽 Service 可以，但不要只抽一半、另一半仍散落。
 - 共享样式放 `AppTheme.swift`，日界放 `Date+CalendarDay.swift`，单位放 `WeightUnit.swift`。
 - 不要提交 `.DS_Store`、`xcuserdata`、个人签名之外的本地状态。
-- 用户未要求不要顺手重构、不要扩 scope 到 Widget/改名工程。
+- 用户未要求不要顺手重构、不要扩 scope、不要改名工程。
 - 改了产品口径或模型，同步改 `docs/BodyTrack_开发文档.md` 文首版本与变更表；改了 `@Model` 后还要在控制台重新 Deploy 到 Production（见上文「发布前必须」）。
 - 准备 Archive / TestFlight / 上架前，先完成 Development → Production schema 部署，否则线上同步是空的。
 - 提交说明用 conventional commits；类型保留 `feat:` / `docs:`，**标题和正文一律中文**。
@@ -201,4 +243,4 @@ xcodebuild -project bodycheck.xcodeproj -scheme bodycheck -destination 'platform
 
 - 产品范围、冲突策略、验收 A1–A10、发布前 Bundle/隐私 URL：`docs/BodyTrack_开发文档.md`。
 - Agent 日常规则、实现与文档的偏差：本文件。
-- 实现了对账、Widget 后，更新本文件「当前进度」和硬约束，避免下一次会话再踩过时信息。
+- 实现了对账或改了 Widget / App Group / Deep Link 后，更新本文件「当前进度」和硬约束，避免下一次会话再踩过时信息。
