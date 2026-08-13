@@ -18,7 +18,7 @@ nonisolated struct WidgetSnapshot: Codable, Equatable, Sendable {
     var todayFoodCount: Int
     /// 摄入 − 有消耗的运动 − 静息。都没有时为 nil。
     var todayNetCalories: Double?
-    /// 例如「摄入 − 运动消耗 − 静息能量」或「未计入静息」。
+    /// 例如「摄入 − 活动能量 − 静息能量」或「未计入静息」。
     var netCaption: String?
     /// Local calendar-day start used when calorie fields were written.
     var calorieDayStart: Date
@@ -45,7 +45,7 @@ nonisolated struct WidgetSnapshot: Codable, Equatable, Sendable {
         todayCalories: 1260,
         todayFoodCount: 3,
         todayNetCalories: -420,
-        netCaption: "摄入 − 运动消耗 − 静息能量",
+        netCaption: "摄入 − 活动能量 − 静息能量",
         calorieDayStart: Calendar.current.startOfDay(for: Date()),
         weightUnitRaw: WeightUnit.kg.rawValue,
         updatedAt: Date()

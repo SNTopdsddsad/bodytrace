@@ -45,11 +45,11 @@
 - 多平台壳：iOS `TabView`，macOS `NavigationSplitView` + `Settings` 窗
 - 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
 - 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
-- 今日概览：最新体重、净热量（摄入 − 运动消耗 − 静息能量）、三列分项、趋势图、最近记录
+- 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、三列分项、趋势图、最近记录
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；隐私与关于
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
-- iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量（不入库）
+- iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量、活动能量（不入库）
 - iOS 体重 ↔ 健康：写回 `bodyMass` 并回填 UUID；导入按 UUID upsert；`HKObserverQuery` + 后台投递（唤醒进程，不弹到前台）；未授权时本地仍可用
 - App 图标：深色进度环（`Assets.xcassets/AppIcon`）
 - iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（净热量）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）
@@ -77,7 +77,7 @@
 - [ ] 目标体重与差距
 - [ ] 本地提醒（称重 / 记饮食）
 - [ ] 常用食物 / 食物库
-- [ ] 活动能量、步数（要再申请健康类型）
+- [ ] 步数（要再申请健康类型）
 - [ ] 体重图增强
 - [ ] Apple Watch 快速记体重
 
@@ -109,8 +109,8 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 
 1. **体重只存 kg**。界面用 `WeightUnit` 换算。偏好键：`AppStorage("weightUnit")`，值为 `"kg"` | `"lb"`。
 2. **允许多条体重/日**。最新体重 = 按 `date` 最新的一条；同一天用 `createdAt` 决胜，不是「每日一条」。
-3. **今日摄入** = 当日 `FoodEntry.calories` 之和。**净热量** = 摄入 − 运动消耗（仅 `caloriesBurned != nil`）− 静息能量（没有则该项按 0，并在文案标明未计入）。不要把无消耗的运动时长折成热量。
-4. **`caloriesBurned == nil` 不计入任何热量合计**，只展示时长。
+3. **今日摄入** = 当日 `FoodEntry.calories` 之和。**净热量** = 摄入 − 活动能量 − 静息能量。不要再减「运动消耗」合计（活动能量已含锻炼）。缺项按 0，并在文案标明未计入。
+4. **锻炼行的 `caloriesBurned == nil` 只展示时长**，不另做热量合计。热量合计以健康活动能量 / 静息能量为准。
 5. **「今日」** 用设备当前时区 `Calendar.current`（见 `Date+CalendarDay` / `dayInterval`）。
 6. **体重日期只到天**：`WeightEditorView` 保存 `date.startOfDay`。饮食保留时分。
 7. **SwiftData + CloudKit 禁止 `@Attribute(.unique)`**。去重用应用层 `id` / `healthKitUUID`。新属性必须可选或带默认值。
@@ -196,8 +196,9 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 - Entitlements：`com.apple.developer.healthkit`。
 - 运动：只读 `HKObjectType.workoutType()`；`HealthKitExerciseService.syncWorkouts` 默认近 90 天。
 - 体重：读+写 `HKQuantityType(.bodyMass)`。iOS 保存/编辑手动体重时双写并回填 `healthKitUUID`；删除手动记录时尝试删本 App 写入的样本。从健康导入按 `healthKitUUID` upsert（近 90 天）。`HKObserverQuery` + `enableBackgroundDelivery(.immediate)` 在已授权时自动拉取，不弹授权。点「从健康同步」或保存体重才请求权限。
-- 静息能量：只读 `HKQuantityType(.basalEnergyBurned)`，按本地日历日做累计求和，展示在概览/运动页。不写入 SwiftData。概览净热量会减去该值。
-- 权限申请走 `HealthKitAccess`（读：体重 + workout + 静息能量；写：体重）。**不要申请** `dietaryEnergyConsumed`。权限文案必须覆盖实际申请的类型。
+- 静息能量：只读 `HKQuantityType(.basalEnergyBurned)`，按本地日历日做累计求和，展示在概览/运动页。不写入 SwiftData。
+- 活动能量：只读 `HKQuantityType(.activeEnergyBurned)`，按本地日历日累计求和，不入库。净热量减去该值。不要再展示或另减「运动消耗」合计。
+- 权限申请走 `HealthKitAccess`（读：体重 + workout + 静息能量 + 活动能量；写：体重）。**不要申请** `dietaryEnergyConsumed`。权限文案必须覆盖实际申请的类型。
 - 不要在启动第一帧弹授权。首次点保存体重、设置里「允许写入健康」或「从健康同步」再请求。
 - Mac 改删体重不写 HK。健康来源的体重不要靠删除本地行「保持一致」——再同步会回来。
 - 运动：不要删除健康来源行来「保持一致」——再同步会回来。`ExerciseListView` 有意不做删除。

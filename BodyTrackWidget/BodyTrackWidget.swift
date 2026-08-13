@@ -197,7 +197,7 @@ struct WeightWidgetView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
-            Text(snapshot.displayedNetCaption ?? "摄入 − 运动消耗 − 静息能量")
+            Text(snapshot.displayedNetCaption ?? "摄入 − 活动能量 − 静息能量")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)

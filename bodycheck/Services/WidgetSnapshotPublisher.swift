@@ -14,39 +14,29 @@ enum WidgetSnapshotPublisher {
     static func publish(
         weights: [WeightEntry],
         foods: [FoodEntry],
-        exercises: [ExerciseEntry],
         unitRaw: String,
-        todayRestingKcal: Double?
+        todayRestingKcal: Double?,
+        todayActiveKcal: Double?
     ) {
         let ordered = weights.sorted(by: WeightEntry.chronologicalDescending)
         let latest = ordered.first
         let previous = ordered.count > 1 ? ordered[1] : nil
         let day = Calendar.current.dayInterval(for: Date())
         let todayFoods = foods.filter { $0.date >= day.start && $0.date < day.end }
-        let todayExercises = exercises.filter { $0.date >= day.start && $0.date < day.end }
 
         let intake: Double? = todayFoods.isEmpty ? nil : todayFoods.reduce(0) { $0 + $1.calories }
-        let burns = todayExercises.compactMap(\.caloriesBurned)
-        let exerciseBurn: Double? = burns.isEmpty ? nil : burns.reduce(0, +)
-        let exerciseMinutes: Int? = todayExercises.isEmpty
+
+        let net = TodayEnergyMath.net(
+            intake: intake,
+            activeKcal: todayActiveKcal,
+            restingKcal: todayRestingKcal
+        )
+        let caption: String? = net == nil
             ? nil
-            : todayExercises.reduce(0) { $0 + $1.durationMinutes }
-
-        let hasIntake = intake != nil
-        let hasExerciseBurn = exerciseBurn != nil
-        let hasResting = todayRestingKcal != nil
-        let net: Double? = (hasIntake || hasExerciseBurn || hasResting)
-            ? (intake ?? 0) - (exerciseBurn ?? 0) - (todayRestingKcal ?? 0)
-            : nil
-
-        var captionParts = ["摄入 − 运动消耗 − 静息能量"]
-        if exerciseBurn == nil, exerciseMinutes != nil {
-            captionParts.append("未计入无消耗的运动")
-        }
-        if todayRestingKcal == nil {
-            captionParts.append("未计入静息")
-        }
-        let caption: String? = net == nil ? nil : captionParts.joined(separator: " · ")
+            : TodayEnergyMath.caption(
+                activeKcal: todayActiveKcal,
+                noteMissingResting: todayRestingKcal == nil
+            )
 
         let snapshot = WidgetSnapshot(
             latestWeightKg: latest?.weight,
@@ -72,7 +62,6 @@ struct WidgetSnapshotSyncModifier: ViewModifier {
         SortDescriptor(\WeightEntry.createdAt, order: .reverse)
     ]) private var weights: [WeightEntry]
     @Query(sort: \FoodEntry.date, order: .reverse) private var foods: [FoodEntry]
-    @Query(sort: \ExerciseEntry.date, order: .reverse) private var exercises: [ExerciseEntry]
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
 
     private var publishToken: String {
@@ -82,10 +71,7 @@ struct WidgetSnapshotSyncModifier: ViewModifier {
         let foodPart = foods.map {
             "\($0.id.uuidString):\($0.calories):\($0.date.timeIntervalSince1970):\($0.updatedAt.timeIntervalSince1970)"
         }.joined(separator: "|")
-        let exercisePart = exercises.map {
-            "\($0.id.uuidString):\($0.caloriesBurned ?? -1):\($0.date.timeIntervalSince1970):\($0.updatedAt.timeIntervalSince1970)"
-        }.joined(separator: "|")
-        return "\(weightPart)#\(foodPart)#\(exercisePart)#\(weightUnitRaw)"
+        return "\(weightPart)#\(foodPart)#\(weightUnitRaw)"
     }
 
     func body(content: Content) -> some View {
@@ -104,13 +90,13 @@ struct WidgetSnapshotSyncModifier: ViewModifier {
     }
 
     private func publish() async {
-        let resting = await HealthKitAccess.todayRestingEnergyKcal()
+        let totals = await HealthKitAccess.todayEnergyTotals()
         WidgetSnapshotPublisher.publish(
             weights: weights,
             foods: foods,
-            exercises: exercises,
             unitRaw: weightUnitRaw,
-            todayRestingKcal: resting
+            todayRestingKcal: totals.resting,
+            todayActiveKcal: totals.active
         )
     }
 }

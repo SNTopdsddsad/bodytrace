@@ -27,12 +27,16 @@ enum HealthKitAccess {
         HKQuantityType(.basalEnergyBurned)
     }
 
+    static var activeEnergyType: HKQuantityType {
+        HKQuantityType(.activeEnergyBurned)
+    }
+
     static var shareTypes: Set<HKSampleType> {
         [bodyMassType]
     }
 
     static var readTypes: Set<HKObjectType> {
-        [bodyMassType, workoutType, basalEnergyType]
+        [bodyMassType, workoutType, basalEnergyType, activeEnergyType]
     }
 
     static func requestAuthorization(store: HKHealthStore) async throws {
@@ -41,11 +45,24 @@ enum HealthKitAccess {
     }
 
     static func todayRestingEnergyKcal() async -> Double? {
-        await todayRestingEnergyKcal(store: HKHealthStore())
+        await todayCumulativeKcal(type: basalEnergyType)
     }
 
-    /// Today's cumulative resting energy from Apple Health. Nil if unavailable or denied.
-    static func todayRestingEnergyKcal(store: HKHealthStore) async -> Double? {
+    static func todayActiveEnergyKcal() async -> Double? {
+        await todayCumulativeKcal(type: activeEnergyType)
+    }
+
+    static func todayEnergyTotals() async -> (active: Double?, resting: Double?) {
+        async let active = todayActiveEnergyKcal()
+        async let resting = todayRestingEnergyKcal()
+        return await (active, resting)
+    }
+
+    /// Today's cumulative energy from Apple Health. Nil if unavailable or denied.
+    private static func todayCumulativeKcal(
+        type: HKQuantityType,
+        store: HKHealthStore = HKHealthStore()
+    ) async -> Double? {
         guard isAvailable else { return nil }
 
         let day = Calendar.current.dayInterval(for: Date())
@@ -58,7 +75,7 @@ enum HealthKitAccess {
         do {
             return try await withCheckedThrowingContinuation { continuation in
                 let query = HKStatisticsQuery(
-                    quantityType: basalEnergyType,
+                    quantityType: type,
                     quantitySamplePredicate: predicate,
                     options: .cumulativeSum
                 ) { _, stats, error in

@@ -18,6 +18,7 @@ struct ExerciseListView: View {
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var todayRestingKcal: Double?
+    @State private var todayActiveKcal: Double?
     #endif
 
     private var todayExercises: [ExerciseEntry] {
@@ -27,11 +28,6 @@ struct ExerciseListView: View {
 
     private var todayMinutes: Int {
         todayExercises.reduce(0) { $0 + $1.durationMinutes }
-    }
-
-    private var todayBurn: Double? {
-        let burns = todayExercises.compactMap(\.caloriesBurned)
-        return burns.isEmpty ? nil : burns.reduce(0, +)
     }
 
     private var todayRestingDisplay: String {
@@ -45,6 +41,22 @@ struct ExerciseListView: View {
     private var todayRestingUnit: String? {
         #if os(iOS)
         todayRestingKcal == nil ? nil : "千卡"
+        #else
+        nil
+        #endif
+    }
+
+    private var todayActiveDisplay: String {
+        #if os(iOS)
+        todayActiveKcal.map { "\(Int($0.rounded()))" } ?? "—"
+        #else
+        "—"
+        #endif
+    }
+
+    private var todayActiveUnit: String? {
+        #if os(iOS)
+        todayActiveKcal == nil ? nil : "千卡"
         #else
         nil
         #endif
@@ -100,7 +112,7 @@ struct ExerciseListView: View {
                 if exercises.isEmpty {
                     await syncFromHealth(silent: true)
                 } else {
-                    await refreshRestingEnergy()
+                    await refreshEnergyTotals()
                 }
             }
             #endif
@@ -151,9 +163,9 @@ struct ExerciseListView: View {
                     )
                     exerciseSummaryTile(
                         symbol: "flame.fill",
-                        label: "今日消耗",
-                        value: todayBurn.map { "\(Int($0.rounded()))" } ?? "—",
-                        unit: todayBurn == nil ? nil : "千卡"
+                        label: "活动能量",
+                        value: todayActiveDisplay,
+                        unit: todayActiveUnit
                     )
                     exerciseSummaryTile(
                         symbol: "bed.double.fill",
@@ -167,9 +179,9 @@ struct ExerciseListView: View {
                 .listRowSeparator(.hidden)
             } footer: {
                 #if os(macOS)
-                Text("运动记录来自 Apple 健康，Mac 端仅支持查看，不可新增或编辑。静息能量请在 iPhone 上读取。")
+                Text("运动记录来自 Apple 健康，Mac 端仅支持查看。活动能量和静息能量请在 iPhone 上读取。")
                 #else
-                Text("锻炼消耗来自 workout；静息能量来自健康。概览净热量 = 摄入 − 运动消耗 − 静息能量。")
+                Text("活动能量、静息能量是健康今日合计。概览净热量 = 摄入 − 活动能量 − 静息能量。")
                 #endif
             }
 
@@ -277,7 +289,7 @@ struct ExerciseListView: View {
         do {
             try await HealthKitExerciseService.shared.requestAuthorization()
             let count = try await HealthKitExerciseService.shared.syncWorkouts(into: modelContext)
-            await refreshRestingEnergy()
+            await refreshEnergyTotals()
             if !silent {
                 statusMessage = count == 0
                     ? "健康中暂无最近的锻炼记录"
@@ -292,8 +304,10 @@ struct ExerciseListView: View {
     }
 
     @MainActor
-    private func refreshRestingEnergy() async {
-        todayRestingKcal = await HealthKitAccess.todayRestingEnergyKcal()
+    private func refreshEnergyTotals() async {
+        let totals = await HealthKitAccess.todayEnergyTotals()
+        todayActiveKcal = totals.active
+        todayRestingKcal = totals.resting
     }
     #endif
 }

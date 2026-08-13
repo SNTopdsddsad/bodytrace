@@ -29,6 +29,7 @@ struct TodayView: View {
     @State private var chartRange: ChartRange = .days30
     #if os(iOS)
     @State private var todayRestingKcal: Double?
+    @State private var todayActiveKcal: Double?
     #endif
 
     private var weightUnit: WeightUnit {
@@ -52,25 +53,9 @@ struct TodayView: View {
         return foods.filter { $0.date >= day.start && $0.date < day.end }
     }
 
-    private var todayExercises: [ExerciseEntry] {
-        let day = Calendar.current.dayInterval(for: Date())
-        return exercises.filter { $0.date >= day.start && $0.date < day.end }
-    }
-
     private var todayCalories: Double? {
         guard !todayFoods.isEmpty else { return nil }
         return todayFoods.reduce(0) { $0 + $1.calories }
-    }
-
-    private var todayExerciseMinutes: Int? {
-        guard !todayExercises.isEmpty else { return nil }
-        return todayExercises.reduce(0) { $0 + $1.durationMinutes }
-    }
-
-    private var todayExerciseBurn: Double? {
-        let burns = todayExercises.compactMap(\.caloriesBurned)
-        guard !burns.isEmpty else { return nil }
-        return burns.reduce(0, +)
     }
 
     private var chartPoints: [WeightChartPoint] {
@@ -132,7 +117,9 @@ struct TodayView: View {
             into: modelContext,
             promptIfNeeded: false
         )
-        todayRestingKcal = await HealthKitAccess.todayRestingEnergyKcal()
+        let totals = await HealthKitAccess.todayEnergyTotals()
+        todayActiveKcal = totals.active
+        todayRestingKcal = totals.resting
     }
     #endif
 
@@ -268,27 +255,27 @@ struct TodayView: View {
         #endif
     }
 
-    private var todayIntakeKcal: Double { todayCalories ?? 0 }
-    private var todayExerciseBurnKcal: Double { todayExerciseBurn ?? 0 }
-    private var todayRestingKcalValue: Double {
+    private var todayActiveKcalValue: Double? {
         #if os(iOS)
-        todayRestingKcal ?? 0
+        todayActiveKcal
         #else
-        0
+        nil
         #endif
     }
 
-    /// 摄入 − 有消耗数据的运动 − 静息能量。无消耗的运动只展示时长，不参与相减。
+    /// 摄入 − 活动能量 − 静息能量。
     private var netCalories: Double? {
-        let hasIntake = todayCalories != nil
-        let hasExerciseBurn = todayExerciseBurn != nil
-        #if os(iOS)
-        let hasResting = todayRestingKcal != nil
-        #else
-        let hasResting = false
-        #endif
-        guard hasIntake || hasExerciseBurn || hasResting else { return nil }
-        return todayIntakeKcal - todayExerciseBurnKcal - todayRestingKcalValue
+        TodayEnergyMath.net(
+            intake: todayCalories,
+            activeKcal: todayActiveKcalValue,
+            restingKcal: {
+                #if os(iOS)
+                todayRestingKcal
+                #else
+                nil
+                #endif
+            }()
+        )
     }
 
     private var netCaloriesText: String? {
@@ -305,18 +292,17 @@ struct TodayView: View {
 
     private var netCaloriesCaption: String {
         guard netCalories != nil else { return "记录饮食或同步健康后计算" }
-        var parts = ["摄入 − 运动消耗 − 静息能量"]
-        if todayExerciseBurn == nil, todayExerciseMinutes != nil {
-            parts.append("未计入无消耗的运动")
-        }
-        #if os(iOS)
-        if todayRestingKcal == nil {
-            parts.append("未计入静息")
-        }
-        #else
-        parts.append("未计入静息")
-        #endif
-        return parts.joined(separator: " · ")
+        let missingResting: Bool = {
+            #if os(iOS)
+            todayRestingKcal == nil
+            #else
+            true
+            #endif
+        }()
+        return TodayEnergyMath.caption(
+            activeKcal: todayActiveKcalValue,
+            noteMissingResting: missingResting
+        )
     }
 
     private var energySection: some View {
@@ -359,14 +345,14 @@ struct TodayView: View {
                 HStack(alignment: .top, spacing: 0) {
                     energyCell(intakeMetric)
                     energyRule
-                    energyCell(exerciseMetric)
+                    energyCell(activeMetric)
                     energyRule
                     energyCell(restingMetric)
                 }
                 VStack(spacing: 0) {
                     energyCell(intakeMetric)
                     Divider()
-                    energyCell(exerciseMetric)
+                    energyCell(activeMetric)
                     Divider()
                     energyCell(restingMetric)
                 }
@@ -388,34 +374,14 @@ struct TodayView: View {
         )
     }
 
-    private var exerciseMetric: EnergyMetric {
-        if let burn = todayExerciseBurn {
-            return EnergyMetric(
-                symbol: "figure.run",
-                tint: AppTheme.activityGreen,
-                label: "运动消耗",
-                value: "\(Int(burn.rounded()))",
-                unit: "千卡",
-                meta: todayExerciseMinutes.map { "\($0) 分钟 · 健康" } ?? "来自健康"
-            )
-        }
-        if let minutes = todayExerciseMinutes {
-            return EnergyMetric(
-                symbol: "figure.run",
-                tint: AppTheme.activityGreen,
-                label: "运动消耗",
-                value: "\(minutes)",
-                unit: "分钟",
-                meta: "暂无消耗数据"
-            )
-        }
-        return EnergyMetric(
-            symbol: "figure.run",
+    private var activeMetric: EnergyMetric {
+        EnergyMetric(
+            symbol: "flame.fill",
             tint: AppTheme.activityGreen,
-            label: "运动消耗",
-            value: nil,
+            label: "活动能量",
+            value: todayActiveDisplay,
             unit: "千卡",
-            meta: healthExerciseHint
+            meta: activeEnergyMeta
         )
     }
 
@@ -430,11 +396,11 @@ struct TodayView: View {
         )
     }
 
-    private var healthExerciseHint: String {
-        #if os(macOS)
-        "来自健康，需 iPhone 同步"
+    private var todayActiveDisplay: String? {
+        #if os(iOS)
+        todayActiveKcal.map { "\(Int($0.rounded()))" }
         #else
-        "在「运动」页从健康同步"
+        nil
         #endif
     }
 
@@ -443,6 +409,14 @@ struct TodayView: View {
         todayRestingKcal.map { "\(Int($0.rounded()))" }
         #else
         nil
+        #endif
+    }
+
+    private var activeEnergyMeta: String {
+        #if os(iOS)
+        todayActiveKcal == nil ? "需授权读取健康" : "健康今日合计"
+        #else
+        "请在 iPhone 上读取"
         #endif
     }
 

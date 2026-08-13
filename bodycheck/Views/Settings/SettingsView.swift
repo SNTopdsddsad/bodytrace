@@ -139,6 +139,7 @@ struct SettingsView: View {
         Section {
             LabeledContent("体重写回", value: weightWriteStatus)
             LabeledContent("运动数据", value: "Apple 健康锻炼")
+            LabeledContent("活动能量", value: "Apple 健康今日合计")
             LabeledContent("静息能量", value: "Apple 健康今日合计")
             Button("允许健康数据") {
                 Task {
@@ -149,7 +150,7 @@ struct SettingsView: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link("打开系统设置", destination: url)
             }
-            Text("体重可读写；锻炼和静息能量只读。已授权读取后，健康里新增或修改的体重会自动同步到本 App。概览净热量 = 摄入 − 运动消耗 − 静息能量。")
+            Text("体重可读写；锻炼、活动能量和静息能量只读。已授权读取后，健康里新增或修改的体重会自动同步到本 App。概览净热量 = 摄入 − 活动能量 − 静息能量。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {

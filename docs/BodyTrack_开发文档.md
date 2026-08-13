@@ -1,6 +1,6 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.12  
+**版本**：v1.14  
 **日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
@@ -20,6 +20,8 @@
 | v1.10 | 2026-08-13 | 健康体重变化自动导入（Observer + 后台投递） |
 | v1.11 | 2026-08-13 | iPhone 小组件 + App Group `group.yinke.bodycheck` + Deep Link `bodytrack://log-weight` |
 | v1.12 | 2026-08-13 | 中尺寸小组件改展示今日热量差（净热量），不再只显示摄入 |
+| v1.13 | 2026-08-13 | iOS 读取今日活动能量（`activeEnergyBurned`）；有值时净热量用活动能量，不再另减运动消耗 |
+| v1.14 | 2026-08-13 | 去掉「运动消耗」合计；净热量只减活动能量与静息能量 |
 
 ---
 
@@ -57,8 +59,8 @@
 |------|----------|
 | 体重单位存储 | 始终 **kg**；界面可切换显示为 lb |
 | 体重条数 | **允许多条/日**（列表全保留；「最新体重」取 `date` 最新一条，同一天用 `createdAt` 决胜） |
-| 今日热量公式 | **今日摄入** = 当日 `FoodEntry.calories` 之和；**净热量** = 摄入 − 运动消耗（有 kcal）− 静息能量 |
-| 运动消耗为空 | `caloriesBurned == nil` 时不计入任何热量合计，仅展示时长 |
+| 今日热量公式 | **今日摄入** = 当日 `FoodEntry.calories` 之和；**净热量** = 摄入 − 活动能量 − 静息能量 |
+| 锻炼无消耗 | 列表行 `caloriesBurned == nil` 只展示时长，不另做合计 |
 | 「今日」边界 | 使用设备 **当前时区** 的 `Calendar.current` 日界（00:00–24:00） |
 | 食物写回 HealthKit | **否**。饮食只存在 BodyTrack；健康没有餐食列表，不写 `dietaryEnergyConsumed` |
 | 小组件输入 | **否**直接输数字；跳转主 App 快速记录页 |
@@ -319,6 +321,7 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 - `HKQuantityTypeIdentifier.bodyMass`
 - `HKObjectType.workoutType()`
 - `HKQuantityTypeIdentifier.basalEnergyBurned`（今日静息能量合计）
+- `HKQuantityTypeIdentifier.activeEnergyBurned`（今日活动能量合计）
 
 **写入**：
 
@@ -326,14 +329,14 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 
 不要申请 `dietaryEnergyConsumed`。
 
-> 后续扩展再申请：`activeEnergyBurned`、`stepCount` 等。  
+> 后续扩展再申请：`stepCount` 等。  
 > 与审核原则一致：**只申请真正用到的类型**。
 
 #### Info.plist
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>需要读取 Apple 健康中的锻炼记录、体重和静息能量，以便展示运动、体重与今日消耗。</string>
+<string>需要读取 Apple 健康中的锻炼记录、体重、静息能量和活动能量，以便展示运动、体重与今日消耗。</string>
 <key>NSHealthUpdateUsageDescription</key>
 <string>需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。</string>
 ```
@@ -365,7 +368,7 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 
 - 最新体重（按用户单位）
 - 与上一条的差值（↑ / ↓）
-- 今日热量差（净热量 = 摄入 − 运动消耗 − 静息能量；缺项按 0 并标明未计入）
+- 今日热量差（净热量 = 摄入 − 活动能量 − 静息能量；缺项标明未计入）
 - 「记录体重」按钮
 
 ### 5.3 跨设备同步
@@ -438,7 +441,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 1. **今日概览**
    - 最新体重 + 与上条差值
-   - 今日热量：净热量（摄入 − 运动消耗 − 静息能量）+ 三列分项
+   - 今日热量：净热量（摄入 − 活动能量 − 静息能量）+ 三列分项
    - 快捷入口：记录体重 / 记录食物
 
 2. **体重**

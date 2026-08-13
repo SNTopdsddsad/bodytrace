@@ -306,8 +306,8 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
@@ -373,7 +373,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重和静息能量，以便展示运动、体重与今日消耗。";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重、静息能量和活动能量，以便展示运动、体重与今日消耗。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要从相册选择饮食照片。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -426,7 +426,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重和静息能量，以便展示运动、体重与今日消耗。";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重、静息能量和活动能量，以便展示运动、体重与今日消耗。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要从相册选择饮食照片。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
