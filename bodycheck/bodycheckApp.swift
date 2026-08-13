@@ -26,6 +26,9 @@ struct bodycheckApp: App {
                 .appChineseLocale()
                 .task {
                     await cloudSync.start()
+                    #if os(iOS)
+                    await HealthKitWeightService.shared.startObserving(container: modelContainer)
+                    #endif
                 }
         }
         .modelContainer(modelContainer)

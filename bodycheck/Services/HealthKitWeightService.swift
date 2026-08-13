@@ -17,6 +17,9 @@ final class HealthKitWeightService {
     static let shared = HealthKitWeightService()
 
     private let store = HKHealthStore()
+    private var container: ModelContainer?
+    private var backgroundContext: ModelContext?
+    private var observerQuery: HKObserverQuery?
 
     var isHealthDataAvailable: Bool {
         HKHealthStore.isHealthDataAvailable()
@@ -47,6 +50,42 @@ final class HealthKitWeightService {
         } catch {
             // Local records must remain usable.
         }
+        if let container {
+            await startObserving(container: container)
+        }
+    }
+
+    /// Watch Health body-mass changes and import them. Never prompts.
+    func startObserving(container: ModelContainer) async {
+        guard isHealthDataAvailable else { return }
+        self.container = container
+        if backgroundContext == nil {
+            let context = ModelContext(container)
+            context.autosaveEnabled = false
+            backgroundContext = context
+        }
+
+        do {
+            try await store.enableBackgroundDelivery(for: bodyMassType, frequency: .immediate)
+        } catch {
+            // Denied or unavailable — observer still helps while the app is open.
+        }
+
+        guard observerQuery == nil else { return }
+
+        let query = HKObserverQuery(sampleType: bodyMassType, predicate: nil) { [weak self] _, completion, _ in
+            Task { @MainActor in
+                await self?.handleObserverFire(completion: completion)
+            }
+        }
+        observerQuery = query
+        store.execute(query)
+    }
+
+    private func handleObserverFire(completion: @escaping HKObserverQueryCompletionHandler) async {
+        defer { completion() }
+        guard let context = backgroundContext else { return }
+        _ = try? await importSamples(into: context, promptIfNeeded: false)
     }
 
     /// Write or replace the Health sample for a local row. Does not throw into UI.
