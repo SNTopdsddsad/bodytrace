@@ -53,6 +53,8 @@ struct WeightEditorView: View {
                         .focused($weightFocused)
                     LabeledContent("单位", value: weightUnit.shortLabel)
                     DatePicker("日期", selection: $date, displayedComponents: [.date])
+                        .environment(\.locale, AppLocale.chinese)
+                        .environment(\.calendar, AppLocale.calendar)
                 } header: {
                     Text("测量")
                 } footer: {
@@ -94,6 +96,7 @@ struct WeightEditorView: View {
             }
             .tint(AppTheme.brandTeal)
         }
+        .appChineseLocale()
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 360)
         #endif

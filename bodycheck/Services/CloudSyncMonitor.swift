@@ -120,7 +120,7 @@ final class CloudSyncMonitor {
         case (_, .available) where setupSucceeded:
             return "已连接"
         case (_, .available):
-            return "已登录，等待 setup"
+            return "已登录，等待首次同步"
         case (_, .noAccount):
             return "未登录"
         case (_, .restricted):
@@ -144,12 +144,12 @@ final class CloudSyncMonitor {
             return lastError ?? "同步失败"
         case .idle:
             if let lastSuccessAt {
-                return lastSuccessAt.formatted(date: .omitted, time: .shortened)
+                return lastSuccessAt.formatted(AppLocale.clockTime)
             }
             if setupSucceeded {
-                return "CloudKit setup 已成功"
+                return "同步已就绪"
             }
-            return "尚未观察到 setup / 上传"
+            return "尚未完成首次同步"
         }
     }
 
@@ -160,7 +160,7 @@ final class CloudSyncMonitor {
         case (_, .checking):
             return "正在检查 iCloud 状态…"
         case (_, .available):
-            return "记录写入 CloudKit 私人库（不是 iCloud 云盘）。控制台看 Development → Schema → Record Types 是否出现 CD_WeightEntry。"
+            return "记录写入 iCloud 私人数据库（不会出现在「文件 / iCloud 云盘」）。开发阶段请到 CloudKit 控制台查看记录类型。"
         case (_, .noAccount):
             return "请在系统设置中登录 iCloud。未登录时记录只保存在本机。"
         case (_, .restricted):
@@ -200,7 +200,7 @@ final class CloudSyncMonitor {
         case .idle:
             if lastSuccessAt != nil { return "自动同步已打开" }
             if setupSucceeded { return "等待首次上传" }
-            return "等待 CloudKit setup"
+            return "等待首次同步"
         }
     }
 
@@ -252,7 +252,7 @@ final class CloudSyncMonitor {
                 cloudUserRecordName = userID.recordName
             } catch {
                 cloudUserRecordName = nil
-                lastError = "CloudKit 容器连不上：\(Self.describe(error))"
+                lastError = "云端容器连不上：\(Self.describe(error))"
             }
         } catch {
             account = .couldNotDetermine
@@ -294,7 +294,7 @@ final class CloudSyncMonitor {
             phase = .idle
         } else {
             phase = .failed
-            let prefix = "CloudKit \(event.type) 失败"
+            let prefix = "\(Self.eventName(event.type))失败"
             if let error = event.error {
                 lastError = "\(prefix)：\(Self.describe(error))"
             } else {
@@ -310,6 +310,15 @@ final class CloudSyncMonitor {
             text += " | \(ns.userInfo)"
         }
         return text
+    }
+
+    private static func eventName(_ type: NSPersistentCloudKitContainer.EventType) -> String {
+        switch type {
+        case .setup: return "初始化"
+        case .import: return "下载"
+        case .export: return "上传"
+        @unknown default: return "同步"
+        }
     }
 }
 

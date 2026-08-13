@@ -13,7 +13,10 @@ struct TodayView: View {
     var onOpenWeight: (() -> Void)?
 
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
-    @Query(sort: \WeightEntry.date, order: .reverse) private var weights: [WeightEntry]
+    @Query(sort: [
+        SortDescriptor(\WeightEntry.date, order: .reverse),
+        SortDescriptor(\WeightEntry.createdAt, order: .reverse)
+    ]) private var weights: [WeightEntry]
     @Query(sort: \FoodEntry.date, order: .reverse) private var foods: [FoodEntry]
     @Query(sort: \ExerciseEntry.date, order: .reverse) private var exercises: [ExerciseEntry]
 
@@ -25,8 +28,12 @@ struct TodayView: View {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
     }
 
-    private var latestWeight: WeightEntry? { weights.first }
-    private var previousWeight: WeightEntry? { weights.count > 1 ? weights[1] : nil }
+    private var orderedWeights: [WeightEntry] {
+        weights.sorted(by: WeightEntry.chronologicalDescending)
+    }
+
+    private var latestWeight: WeightEntry? { orderedWeights.first }
+    private var previousWeight: WeightEntry? { orderedWeights.count > 1 ? orderedWeights[1] : nil }
 
     private var weightDelta: Double? {
         guard let latest = latestWeight, let previous = previousWeight else { return nil }
@@ -69,7 +76,7 @@ struct TodayView: View {
     }
 
     private var recentItems: [RecentRecord] {
-        RecentRecord.build(weights: weights, foods: foods, exercises: exercises, limit: 8)
+        RecentRecord.build(weights: weights, foods: foods, exercises: exercises, unit: weightUnit, limit: 8)
     }
 
     var body: some View {
@@ -89,7 +96,7 @@ struct TodayView: View {
             .navigationBarTitleDisplayMode(.large)
             #endif
             #if os(macOS)
-            .navigationSubtitle(Date.now.formatted(.dateTime.year().month().day().weekday(.wide)))
+            .navigationSubtitle(Date.now.formatted(AppLocale.dayWeekday))
             #endif
             .toolbar { toolbarContent }
             .sheet(isPresented: $showQuickWeight) {
@@ -193,7 +200,7 @@ struct TodayView: View {
                     if let delta = weightDelta {
                         DeltaChip(deltaKg: delta, unit: weightUnit)
                     }
-                    Text(latest.date, format: .dateTime.year().month().day())
+                    Text(latest.date, format: AppLocale.day)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -242,7 +249,7 @@ struct TodayView: View {
                 tint: AppTheme.intakeAmber,
                 label: "今日摄入",
                 value: todayCalories.map { "\(Int($0.rounded()))" },
-                unit: "kcal",
+                unit: "千卡",
                 meta: todayFoods.isEmpty ? nil : "\(todayFoods.count) 条饮食记录"
             )
             Divider().padding(.leading, summaryIconLeading)
@@ -270,7 +277,7 @@ struct TodayView: View {
     private var exerciseMeta: String? {
         if todayExercises.isEmpty { return nil }
         if let burn = todayExerciseBurn {
-            return "消耗 \(Int(burn.rounded())) kcal · 健康"
+            return "消耗 \(Int(burn.rounded())) 千卡 · 健康"
         }
         return "\(todayExercises.count) 条 · 来自健康"
     }
@@ -400,7 +407,19 @@ struct TodayView: View {
                     .foregroundStyle(AppTheme.brandTeal)
                     .symbolSize(28)
                 }
+                .chartXAxis {
+                    AxisMarks(values: .automatic) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        if let date = value.as(Date.self) {
+                            AxisValueLabel {
+                                Text(date, format: AppLocale.monthDay)
+                            }
+                        }
+                    }
+                }
                 .chartYScale(domain: .automatic(includesZero: false))
+                .environment(\.locale, AppLocale.chinese)
                 .frame(height: chartHeight)
                 .padding(.top, 4)
             } else if chartPoints.count == 1 {
@@ -482,7 +501,7 @@ struct TodayView: View {
                 #if os(macOS)
                 Table(recentItems) {
                     TableColumn("时间") { item in
-                        Text(item.date, format: .dateTime.month().day().hour().minute())
+                        Text(item.date, format: AppLocale.monthDayTime)
                             .foregroundStyle(.secondary)
                     }
                     .width(min: 100, ideal: 118)
@@ -521,7 +540,7 @@ struct TodayView: View {
                                 HStack(spacing: 6) {
                                     Text(item.typeLabel)
                                     Text("·")
-                                    Text(item.date, format: .dateTime.month().day().hour().minute())
+                                    Text(item.date, format: AppLocale.monthDayTime)
                                 }
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -603,7 +622,9 @@ struct WeightChartPoint: Identifiable {
         }
 
         return grouped.keys.sorted().compactMap { day in
-            guard let last = grouped[day]?.max(by: { $0.date < $1.date }) else { return nil }
+            guard let last = grouped[day]?.sorted(by: WeightEntry.chronologicalDescending).first else {
+                return nil
+            }
             return WeightChartPoint(id: day, day: day, weightKg: last.weight)
         }
     }
@@ -621,16 +642,17 @@ struct RecentRecord: Identifiable {
         weights: [WeightEntry],
         foods: [FoodEntry],
         exercises: [ExerciseEntry],
+        unit: WeightUnit,
         limit: Int
     ) -> [RecentRecord] {
         var items: [RecentRecord] = []
         items += weights.map {
             RecentRecord(
                 id: "w-\($0.id.uuidString)",
-                date: $0.date,
+                date: $0.createdAt,
                 typeLabel: "体重",
                 title: $0.note?.isEmpty == false ? ($0.note ?? "体重") : "体重记录",
-                valueText: String(format: "%.1f kg", $0.weight),
+                valueText: unit.format($0.weight),
                 dot: .weight
             )
         }
@@ -640,14 +662,14 @@ struct RecentRecord: Identifiable {
                 date: $0.date,
                 typeLabel: "饮食",
                 title: $0.name,
-                valueText: "\(Int($0.calories.rounded())) kcal",
+                valueText: "\(Int($0.calories.rounded())) 千卡",
                 dot: .food
             )
         }
         items += exercises.map {
             let value: String
             if let burn = $0.caloriesBurned {
-                value = "\($0.durationMinutes) 分钟 · \(Int(burn.rounded())) kcal"
+                value = "\($0.durationMinutes) 分钟 · \(Int(burn.rounded())) 千卡"
             } else {
                 value = "\($0.durationMinutes) 分钟"
             }

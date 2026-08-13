@@ -60,7 +60,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 ## 硬约束
 
 1. **体重只存 kg**。界面用 `WeightUnit` 换算。偏好键：`AppStorage("weightUnit")`，值为 `"kg"` | `"lb"`。
-2. **允许多条体重/日**。最新体重 = 按 `date` 最新的一条，不是「每日一条」。
+2. **允许多条体重/日**。最新体重 = 按 `date` 最新的一条；同一天用 `createdAt` 决胜，不是「每日一条」。
 3. **今日摄入** = 当日 `FoodEntry.calories` 之和。运动消耗单独展示，**不要做净热量**。
 4. **`caloriesBurned == nil` 不计入任何热量合计**，只展示时长。
 5. **「今日」** 用设备当前时区 `Calendar.current`（见 `Date+CalendarDay` / `dayInterval`）。
@@ -139,13 +139,13 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 - 空状态用 `ContentUnavailableView`。数字用 `monospacedDigit`。
 - 体重 Mac 列表：**不要**给行加 `onTapGesture`（会抢走 `List` 选择，尤其第一列）。单元格文本 `.allowsHitTesting(false)`。
 - 快捷键：新增常用 `⌘N`；取消/保存用 `cancelAction` / `defaultAction`。
-- 新文案先写中文。`SWIFT_EMIT_LOC_STRINGS` 已开，需要时再抽 String Catalog，不要先铺一层无调用的本地化包装。
+- 新文案先写中文。日期、时间、星期强制简体中文（`AppLocale` / `.appChineseLocale()`），工程 `developmentRegion` 为 `zh-Hans`，不要跟系统语言走。Mac 菜单、日期选择器、图表坐标同样用中文。`SWIFT_EMIT_LOC_STRINGS` 已开，需要时再抽 String Catalog，不要先铺一层无调用的本地化包装。
 
 ## HealthKit（仅 iOS，当前实现）
 
 - Entitlements：`com.apple.developer.healthkit`。
 - 现只读 `HKObjectType.workoutType()`；`HealthKitExerciseService.syncWorkouts` 默认近 90 天。
-- 权限文案目前只描述 workout。若增加体重/饮食读写，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
+- 权限文案目前只描述锻炼记录。若增加体重/饮食读写，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
 - 文档规划的体重对账：手动写 SwiftData + 写 HK 并回填 UUID；从健康导入按 UUID upsert。Mac 改删体重不写 HK。
 - 运动：不要删除健康来源行来「保持一致」——再同步会回来。`ExerciseListView` 有意不做删除。
 

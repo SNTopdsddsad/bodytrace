@@ -13,13 +13,13 @@ enum WeightUnit: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .kg: "公斤 (kg)"
-        case .lb: "磅 (lb)"
+        case .kg: "公斤"
+        case .lb: "磅"
         }
     }
 
     var shortLabel: String {
-        rawValue
+        displayName
     }
 
     /// Convert stored kilograms to the display unit.

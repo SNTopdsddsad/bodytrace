@@ -23,6 +23,7 @@ struct bodycheckApp: App {
         WindowGroup {
             ContentView()
                 .environment(cloudSync)
+                .appChineseLocale()
                 .task {
                     await cloudSync.start()
                 }
@@ -41,6 +42,7 @@ struct bodycheckApp: App {
             SettingsView()
                 .modelContainer(modelContainer)
                 .environment(cloudSync)
+                .appChineseLocale()
                 .frame(minWidth: 520, idealWidth: 560, minHeight: 360)
         }
         #endif

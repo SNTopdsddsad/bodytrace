@@ -43,6 +43,7 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.brandTeal)
         #endif
+        .appChineseLocale()
         .task { await cloudSync.refresh() }
     }
 
@@ -105,10 +106,10 @@ struct SettingsView: View {
         Section {
             LabeledContent("iCloud 同步", value: cloudSync.settingsValue)
             LabeledContent("最近同步", value: cloudSync.lastSyncText)
-            LabeledContent("仓库", value: CloudKitConfig.cloudStoreName)
-            LabeledContent("容器", value: CloudKitConfig.containerIdentifier)
+            LabeledContent("资料库", value: "云端资料库")
+            LabeledContent("云端容器", value: CloudKitConfig.containerIdentifier)
             if let user = cloudSync.cloudUserRecordName {
-                LabeledContent("CloudKit 用户", value: user)
+                LabeledContent("同步账号", value: user)
             }
             if let lastError = cloudSync.lastError {
                 Text(lastError)
@@ -128,7 +129,7 @@ struct SettingsView: View {
     #if os(iOS)
     private var healthSection: some View {
         Section {
-            LabeledContent("运动数据", value: "Apple 健康 workout")
+            LabeledContent("运动数据", value: "Apple 健康锻炼")
             Text("在「运动」页可从健康同步。Mac 端仅查看，不支持编辑。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -152,7 +153,7 @@ struct SettingsView: View {
         Section("关于") {
             LabeledContent("应用", value: "BodyTrack")
             LabeledContent("版本", value: "1.0")
-            LabeledContent("Bundle ID", value: "yinke.bodycheck")
+            LabeledContent("应用标识", value: "yinke.bodycheck")
         }
     }
 }

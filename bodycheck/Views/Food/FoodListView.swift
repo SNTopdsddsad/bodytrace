@@ -75,7 +75,7 @@ struct FoodListView: View {
                                             .font(.system(size: 28, weight: .semibold, design: .rounded))
                                             .monospacedDigit()
                                         if !todayFoods.isEmpty {
-                                            Text("kcal")
+                                            Text("千卡")
                                                 .font(.subheadline.weight(.medium))
                                                 .foregroundStyle(.secondary)
                                         }
@@ -96,12 +96,12 @@ struct FoodListView: View {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(entry.name)
                                                 .font(.body.weight(.medium))
-                                            Text(entry.date, format: .dateTime.hour().minute())
+                                            Text(entry.date, format: AppLocale.time)
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
                                         Spacer(minLength: 8)
-                                        Text("\(Int(entry.calories.rounded())) kcal")
+                                        Text("\(Int(entry.calories.rounded())) 千卡")
                                             .font(.subheadline.monospacedDigit().weight(.semibold))
                                             .foregroundStyle(AppTheme.intakeAmber)
                                     }
@@ -128,7 +128,7 @@ struct FoodListView: View {
             .navigationSubtitle(
                 todayFoods.isEmpty
                     ? "今日尚未记录"
-                    : "今日 \(Int(todayCalories.rounded())) kcal · \(todayFoods.count) 条"
+                    : "今日 \(Int(todayCalories.rounded())) 千卡 · \(todayFoods.count) 条"
             )
             #endif
             .searchable(text: $searchText, prompt: "搜索食物名称")
@@ -164,8 +164,8 @@ struct FoodListView: View {
     }
 
     private func sectionTitle(day: Date, total: Double) -> String {
-        let datePart = day.formatted(.dateTime.month().day().weekday(.abbreviated))
-        return "\(datePart) · \(Int(total.rounded())) kcal"
+        let datePart = day.formatted(AppLocale.monthDayWeekday)
+        return "\(datePart) · \(Int(total.rounded())) 千卡"
     }
 
     private func delete(items: [FoodEntry], at offsets: IndexSet) {
@@ -190,11 +190,13 @@ struct FoodEditorSheet: View {
             Form {
                 Section {
                     TextField("名称", text: $nameText)
-                    TextField("热量 (kcal)", text: $caloriesText)
+                    TextField("热量（千卡）", text: $caloriesText)
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
                     DatePicker("时间", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                        .environment(\.locale, AppLocale.chinese)
+                        .environment(\.calendar, AppLocale.calendar)
                 }
                 if let validationMessage {
                     Section {
@@ -221,6 +223,7 @@ struct FoodEditorSheet: View {
                 }
             }
         }
+        .appChineseLocale()
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 280, idealHeight: 320)
         #endif

@@ -93,7 +93,10 @@ enum WeightNoteFilter: String, CaseIterable, Identifiable {
 struct WeightListView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
-    @Query(sort: \WeightEntry.date, order: .reverse) private var weights: [WeightEntry]
+    @Query(sort: [
+        SortDescriptor(\WeightEntry.date, order: .reverse),
+        SortDescriptor(\WeightEntry.createdAt, order: .reverse)
+    ]) private var weights: [WeightEntry]
 
     @State private var selection: UUID?
     @State private var editorMode: WeightEditorMode?
@@ -110,8 +113,8 @@ struct WeightListView: View {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
     }
 
-    private var filteredWeights: [WeightEntry] {
-        let base = weights.filter { entry in
+    private var matchingWeights: [WeightEntry] {
+        weights.filter { entry in
             guard dateRange.contains(entry.date) else { return false }
             guard sourceFilter.matches(entry.weightSource) else { return false }
             guard noteFilter.matches(entry.note) else { return false }
@@ -121,9 +124,15 @@ struct WeightListView: View {
             let source = entry.weightSource.displayName.lowercased()
             return note.contains(q) || source.contains(q)
         }
-        return base.sorted { lhs, rhs in
-            sortNewestFirst ? lhs.date > rhs.date : lhs.date < rhs.date
-        }
+    }
+
+    /// Newest calendar day first; same-day rows use `createdAt`.
+    private var orderedWeights: [WeightEntry] {
+        matchingWeights.sorted(by: WeightEntry.chronologicalDescending)
+    }
+
+    private var filteredWeights: [WeightEntry] {
+        sortNewestFirst ? orderedWeights : Array(orderedWeights.reversed())
     }
 
     private var selectedEntry: WeightEntry? {
@@ -131,18 +140,18 @@ struct WeightListView: View {
         return weights.first { $0.id == selection }
     }
 
-    private var latestInFilter: WeightEntry? { filteredWeights.first }
+    private var latestInFilter: WeightEntry? { orderedWeights.first }
 
     private var lastChange: Double? {
-        guard filteredWeights.count > 1 else { return nil }
-        return filteredWeights[0].weight - filteredWeights[1].weight
+        guard orderedWeights.count > 1 else { return nil }
+        return orderedWeights[0].weight - orderedWeights[1].weight
     }
 
     private var rangeChange: Double? {
-        guard let first = filteredWeights.last, let last = filteredWeights.first, filteredWeights.count > 1 else {
+        guard let newest = orderedWeights.first, let oldest = orderedWeights.last, orderedWeights.count > 1 else {
             return nil
         }
-        return last.weight - first.weight
+        return newest.weight - oldest.weight
     }
 
     private var showDeleteConfirm: Binding<Bool> {
@@ -296,7 +305,7 @@ struct WeightListView: View {
                         label: "最新体重",
                         value: latestInFilter.map { String(format: "%.1f", weightUnit.fromKilograms($0.weight)) },
                         unit: weightUnit.shortLabel,
-                        meta: latestInFilter.map { $0.date.formatted(.dateTime.year().month().day()) }
+                        meta: latestInFilter.map { $0.date.formatted(AppLocale.day) }
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Divider()
@@ -324,7 +333,7 @@ struct WeightListView: View {
                         label: "最新体重",
                         value: latestInFilter.map { String(format: "%.1f", weightUnit.fromKilograms($0.weight)) },
                         unit: weightUnit.shortLabel,
-                        meta: latestInFilter.map { $0.date.formatted(.dateTime.year().month().day()) }
+                        meta: latestInFilter.map { $0.date.formatted(AppLocale.day) }
                     )
                     verticalRule
                     stripCell(
@@ -558,7 +567,7 @@ struct WeightListView: View {
 
     private func weightRow(_ entry: WeightEntry, columns: WeightColumnMetrics) -> some View {
         HStack(spacing: 0) {
-            Text(entry.date, format: .dateTime.year().month().day())
+            Text(entry.date, format: AppLocale.day)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(width: columns.date, alignment: .leading)
@@ -665,7 +674,7 @@ struct WeightListView: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        inspectorRow("日期", entry.date.formatted(.dateTime.year().month().day()))
+                        inspectorRow("日期", entry.date.formatted(AppLocale.day))
                         inspectorRow("来源", entry.weightSource.displayName)
                         inspectorRow(
                             "备注",
@@ -951,7 +960,7 @@ struct WeightListView: View {
                         DeltaChip(deltaKg: delta, unit: weightUnit)
                     }
                 }
-                Text(entry.date, format: .dateTime.year().month().day().weekday(.abbreviated))
+                Text(entry.date, format: AppLocale.dayWeekday)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let note = entry.note, !note.isEmpty {
@@ -987,7 +996,7 @@ struct WeightListView: View {
     }
 
     private func deltaVersusPrevious(_ entry: WeightEntry) -> String {
-        let ordered = weights.sorted { $0.date > $1.date }
+        let ordered = weights.sorted(by: WeightEntry.chronologicalDescending)
         guard let idx = ordered.firstIndex(where: { $0.id == entry.id }),
               idx + 1 < ordered.count else {
             return "—"

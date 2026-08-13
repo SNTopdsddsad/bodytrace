@@ -55,4 +55,11 @@ final class WeightEntry {
     var weightSource: WeightSource {
         WeightSource(rawValue: source) ?? .manual
     }
+
+    /// `date` is stored at start-of-day, so same-day rows need `createdAt` (then `id`) to stay stable.
+    static func chronologicalDescending(_ lhs: WeightEntry, _ rhs: WeightEntry) -> Bool {
+        if lhs.date != rhs.date { return lhs.date > rhs.date }
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+        return lhs.id.uuidString > rhs.id.uuidString
+    }
 }

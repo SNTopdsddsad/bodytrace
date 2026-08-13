@@ -102,9 +102,9 @@ struct ExerciseListView: View {
             Label("还没有运动记录", systemImage: "figure.run")
         } description: {
             #if os(macOS)
-            Text("运动数据来自 Apple 健康，由 iPhone 同步到此 Mac。请在 iPhone 上打开 BodyTrack 并从「健康」同步 workout。")
+            Text("运动数据来自 Apple 健康，由 iPhone 同步到此 Mac。请在 iPhone 上打开 BodyTrack 并从「健康」同步锻炼记录。")
             #else
-            Text("点右上角「从健康同步」，读取 Apple 健康中的 workout 记录。Mac 端仅可查看。")
+            Text("点右上角「从健康同步」，读取 Apple 健康中的锻炼记录。Mac 端仅可查看。")
             #endif
         } actions: {
             #if os(iOS)
@@ -134,7 +134,7 @@ struct ExerciseListView: View {
                         symbol: "flame.fill",
                         label: "今日消耗",
                         value: todayBurn.map { "\(Int($0.rounded()))" } ?? "—",
-                        unit: todayBurn == nil ? nil : "kcal"
+                        unit: todayBurn == nil ? nil : "千卡"
                     )
                 }
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
@@ -144,7 +144,7 @@ struct ExerciseListView: View {
                 #if os(macOS)
                 Text("运动记录来自 Apple 健康，Mac 端仅支持查看，不可新增或编辑。")
                 #else
-                Text("数据来自 Apple 健康中的 workout；消耗为空时显示为 —。")
+                Text("数据来自 Apple 健康中的锻炼记录；消耗为空时显示为 —。")
                 #endif
             }
 
@@ -209,7 +209,7 @@ struct ExerciseListView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.name)
                     .font(.body.weight(.medium))
-                Text(entry.date, format: .dateTime.year().month().day().hour().minute())
+                Text(entry.date, format: AppLocale.dateTime)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -217,7 +217,7 @@ struct ExerciseListView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(durationText(entry.durationMinutes))
                     .font(.subheadline.monospacedDigit().weight(.semibold))
-                Text(entry.caloriesBurned.map { "\(Int($0.rounded())) kcal" } ?? "—")
+                Text(entry.caloriesBurned.map { "\(Int($0.rounded())) 千卡" } ?? "—")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(entry.exerciseSource.displayName)
@@ -254,7 +254,7 @@ struct ExerciseListView: View {
             let count = try await HealthKitExerciseService.shared.syncWorkouts(into: modelContext)
             if !silent {
                 statusMessage = count == 0
-                    ? "健康中暂无最近的 workout 记录"
+                    ? "健康中暂无最近的锻炼记录"
                     : "已同步 \(count) 条运动记录"
             }
         } catch {

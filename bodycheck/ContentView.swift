@@ -36,6 +36,7 @@ struct ContentView: View {
             lastSectionRaw = newValue.rawValue
         }
         .tint(AppTheme.brandTeal)
+        .appChineseLocale()
     }
 
     #if os(macOS)
