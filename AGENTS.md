@@ -195,7 +195,7 @@ xcodebuild -project bodycheck.xcodeproj -scheme bodycheck -destination 'platform
 - 用户未要求不要顺手重构、不要扩 scope 到 Widget/改名工程。
 - 改了产品口径或模型，同步改 `docs/BodyTrack_开发文档.md` 文首版本与变更表；改了 `@Model` 后还要在控制台重新 Deploy 到 Production（见上文「发布前必须」）。
 - 准备 Archive / TestFlight / 上架前，先完成 Development → Production schema 部署，否则线上同步是空的。
-- 提交说明用 conventional commits；现有风格：`feat:` / `docs:`。
+- 提交说明用 conventional commits；类型保留 `feat:` / `docs:`，**标题和正文一律中文**。
 
 ## 文档关系
 
