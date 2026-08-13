@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(CloudSyncMonitor.self) private var cloudSync
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
 
     private var weightUnitBinding: Binding<WeightUnit> {
@@ -42,6 +43,7 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.brandTeal)
         #endif
+        .task { await cloudSync.refresh() }
     }
 
     #if os(macOS)
@@ -101,12 +103,25 @@ struct SettingsView: View {
 
     private var syncSection: some View {
         Section {
-            LabeledContent("iCloud 同步", value: "未启用")
-            LabeledContent("说明", value: "后续阶段接入；离线时本地记录仍可用")
+            LabeledContent("iCloud 同步", value: cloudSync.settingsValue)
+            LabeledContent("最近同步", value: cloudSync.lastSyncText)
+            LabeledContent("仓库", value: CloudKitConfig.cloudStoreName)
+            LabeledContent("容器", value: CloudKitConfig.containerIdentifier)
+            if let user = cloudSync.cloudUserRecordName {
+                LabeledContent("CloudKit 用户", value: user)
+            }
+            if let lastError = cloudSync.lastError {
+                Text(lastError)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+            Button("重新检查") {
+                Task { await cloudSync.refresh() }
+            }
         } header: {
             Text("同步")
         } footer: {
-            Text("数据保存在你的设备上，并通过你的私人 iCloud 在设备间同步（启用后）。")
+            Text(cloudSync.settingsFooter)
         }
     }
 
@@ -144,4 +159,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        .environment(CloudSyncMonitor(kind: .cloudEnabled))
 }

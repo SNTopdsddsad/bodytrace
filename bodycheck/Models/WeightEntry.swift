@@ -23,16 +23,17 @@ enum WeightSource: String, Codable, CaseIterable, Identifiable {
 
 @Model
 final class WeightEntry {
-    var id: UUID
-    var date: Date
+    /// Defaults required for SwiftData + CloudKit.
+    var id: UUID = UUID()
+    var date: Date = Date()
     /// Stored in kilograms.
-    var weight: Double
+    var weight: Double = 0
     /// `WeightSource.rawValue`
-    var source: String
+    var source: String = WeightSource.manual.rawValue
     var healthKitUUID: UUID?
     var note: String?
-    var createdAt: Date
-    var updatedAt: Date
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
 
     init(
         weight: Double,

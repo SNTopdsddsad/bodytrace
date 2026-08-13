@@ -1,7 +1,7 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.1  
-**日期**：2026-08-11  
+**版本**：v1.2  
+**日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
 
@@ -9,6 +9,7 @@
 |------|------|------|
 | v1.0 | 2026-08-11 | 初稿 |
 | v1.1 | 2026-08-11 | 修正 CloudKit/HealthKit 模型与权限；补冲突策略、Deep Link、验收标准；文档迁至 `docs/` |
+| v1.2 | 2026-08-13 | 启用 SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；模型补默认值；无账号/失败时回退本地 |
 
 ---
 
@@ -354,22 +355,19 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 ```swift
 let modelConfiguration = ModelConfiguration(
     "BodyTrack",
-    cloudKitDatabase: .automatic
-)
-
-let container = try ModelContainer(
-    for: WeightEntry.self, FoodEntry.self, ExerciseEntry.self,
-    configurations: modelConfiguration
+    cloudKitDatabase: .private("iCloud.yinke.bodycheck")
 )
 ```
 
+实现见 `PersistenceController.load()`：先开 CloudKit，失败则同一 store 名回退 `cloudKitDatabase: .none`。设置页与 Mac 侧栏展示 `CKContainer.accountStatus()`。
+
 **注意**：
 
-- CloudKit 容器在开发者后台创建，并与 Xcode Capability 一致
-- 模型属性尽量可选或带默认值，避免同步失败
-- **不要**使用 `@Attribute(.unique)`
-- 开发/生产 Schema 需在 CloudKit 控制台部署
-- 无 iCloud 账号时 App 仍可单机使用
+- CloudKit 容器 ID：`iCloud.yinke.bodycheck`（与 Bundle `yinke.bodycheck` 对齐）
+- 首次用自动签名编译时，Xcode 会向开发者账号注册 iCloud / Push / CloudKit
+- 模型属性必须可选或带默认值；**不要**使用 `@Attribute(.unique)`
+- 开发环境 schema 随第一次写入自动生成；上架前须在 CloudKit 控制台部署到 Production
+- 无 iCloud 账号或容器创建失败时 App 仍可单机使用
 - Widget **不**直接操作完整 CloudKit 同步
 
 ### 5.4 App Group 共享
@@ -514,23 +512,23 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 ### Xcode Capabilities
 
-- [ ] iCloud → CloudKit（主 App）
+- [x] iCloud → CloudKit（主 App，容器 `iCloud.yinke.bodycheck`）
 - [ ] App Groups（主 App + Widget，**相同** Group ID）
-- [ ] HealthKit（**仅** iOS 主 App Target）
+- [x] HealthKit（**仅** iOS 主 App Target；当前只读 workout）
 
 ### 命名（发布前替换 `yourcompany`）
 
 ```
-显示名:                 待定（如「体征追踪」/ BodyTrack）
-主 App Bundle ID:       com.yourcompany.bodytrack
-Widget Bundle ID:       com.yourcompany.bodytrack.widget
-App Group:              group.com.yourcompany.bodytrack
-CloudKit Container:     iCloud.com.yourcompany.bodytrack
+显示名:                 BodyTrack
+主 App Bundle ID:       yinke.bodycheck
+Widget Bundle ID:       yinke.bodycheck.widget（尚未建 Target）
+App Group:              group.yinke.bodycheck（尚未配置）
+CloudKit Container:     iCloud.yinke.bodycheck
 URL Scheme:             bodytrack
 Widget kind:            WeightWidget
 ```
 
-> 当前 Xcode 工程名为 `bodycheck`，与代号 BodyTrack 不一致。确定 Bundle 后，在 Xcode 中统一改名，避免证书与 Capability 反复配置。
+> Xcode 工程名仍为 `bodycheck`，显示名与代号为 BodyTrack。不要擅自改 Bundle，以免证书与 Capability 失效。
 
 ### 开发环境
 
@@ -566,7 +564,8 @@ Widget kind:            WeightWidget
 | 小组件是否直接输入数字 | 否（跳转 App） | 已定 |
 | 最低系统版本 | iOS 18 / macOS 15 | 已定 |
 | 今日热量是否含运动 | 否（摄入与消耗分开展示） | 已定 |
-| Bundle ID / App Group / 显示名 | 需自行确定 | **待定** |
+| Bundle ID / 显示名 / CloudKit 容器 | `yinke.bodycheck` / BodyTrack / `iCloud.yinke.bodycheck` | 已定 |
+| App Group | `group.yinke.bodycheck` | **待定**（小组件阶段） |
 | 是否上架多区 / 仅中文 | 先中文 | 待定 |
 | 隐私政策 URL | 上架前准备 | **待定** |
 

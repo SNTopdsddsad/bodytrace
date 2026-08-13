@@ -9,6 +9,7 @@ import SwiftData
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(CloudSyncMonitor.self) private var cloudSync
     @AppStorage("lastAppSection") private var lastSectionRaw: String = AppSection.today.rawValue
     @State private var section: AppSection = .today
     #if os(macOS)
@@ -117,14 +118,14 @@ struct ContentView: View {
     private var sidebarFooter: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "icloud")
+                Image(systemName: cloudSync.systemImage)
                     .font(.system(size: 12))
                     .frame(width: 14)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("iCloud 未启用")
+                    Text(cloudSync.title)
                         .font(.system(size: 11, weight: .medium))
                         .lineLimit(1)
-                    Text("本地可用")
+                    Text(cloudSync.subtitle)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -188,5 +189,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environment(CloudSyncMonitor(kind: .cloudEnabled))
         .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self], inMemory: true)
 }

@@ -11,26 +11,21 @@ import SwiftUI
 @main
 struct bodycheckApp: App {
     private let modelContainer: ModelContainer
+    @State private var cloudSync: CloudSyncMonitor
 
     init() {
-        do {
-            let configuration = ModelConfiguration(
-                "BodyTrack",
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .none
-            )
-            modelContainer = try ModelContainer(
-                for: WeightEntry.self, FoodEntry.self, ExerciseEntry.self,
-                configurations: configuration
-            )
-        } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
-        }
+        let persistence = PersistenceController.load()
+        modelContainer = persistence.container
+        _cloudSync = State(initialValue: persistence.cloudSync)
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(cloudSync)
+                .task {
+                    await cloudSync.start()
+                }
         }
         .modelContainer(modelContainer)
         #if os(macOS)
@@ -45,6 +40,7 @@ struct bodycheckApp: App {
         Settings {
             SettingsView()
                 .modelContainer(modelContainer)
+                .environment(cloudSync)
                 .frame(minWidth: 520, idealWidth: 560, minHeight: 360)
         }
         #endif

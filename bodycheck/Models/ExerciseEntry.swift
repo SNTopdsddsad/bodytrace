@@ -23,18 +23,19 @@ enum ExerciseSource: String, Codable, CaseIterable {
 
 @Model
 final class ExerciseEntry {
-    var id: UUID
-    var date: Date
-    var name: String
-    var durationMinutes: Int
+    /// Defaults required for SwiftData + CloudKit.
+    var id: UUID = UUID()
+    var date: Date = Date()
+    var name: String = ""
+    var durationMinutes: Int = 0
     var caloriesBurned: Double?
     var note: String?
     /// `ExerciseSource.rawValue` — default healthkit for lightweight migration.
     var source: String = ExerciseSource.healthkit.rawValue
     /// HKWorkout / sample UUID for idempotent Health import.
     var healthKitUUID: UUID?
-    var createdAt: Date
-    var updatedAt: Date
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
 
     init(
         name: String,

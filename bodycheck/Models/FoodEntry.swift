@@ -8,14 +8,15 @@ import SwiftData
 
 @Model
 final class FoodEntry {
-    var id: UUID
-    var date: Date
-    var name: String
-    var calories: Double
+    /// Defaults required for SwiftData + CloudKit.
+    var id: UUID = UUID()
+    var date: Date = Date()
+    var name: String = ""
+    var calories: Double = 0
     var healthKitUUID: UUID?
     var note: String?
-    var createdAt: Date
-    var updatedAt: Date
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
 
     init(
         name: String,
