@@ -1,6 +1,6 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.4  
+**版本**：v1.5  
 **日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
@@ -12,6 +12,7 @@
 | v1.2 | 2026-08-13 | 启用 SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；模型补默认值；无账号/失败时回退本地 |
 | v1.3 | 2026-08-13 | iOS 手动体重写回 Apple 健康（`bodyMass` + `healthKitUUID`） |
 | v1.4 | 2026-08-13 | iOS 从健康导入体重：按 `healthKitUUID` upsert；回到前台静默拉取 |
+| v1.5 | 2026-08-13 | iOS 读取今日静息能量（`basalEnergyBurned` 合计）；不入库、不做净热量 |
 
 ---
 
@@ -304,11 +305,13 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 **读取**：
 
 - `HKQuantityTypeIdentifier.bodyMass`
+- `HKObjectType.workoutType()`
+- `HKQuantityTypeIdentifier.basalEnergyBurned`（今日静息能量合计）
 
 **写入**：
 
 - `HKQuantityTypeIdentifier.bodyMass`
-- `HKQuantityTypeIdentifier.dietaryEnergyConsumed`（食物写回）
+- `HKQuantityTypeIdentifier.dietaryEnergyConsumed`（食物写回，尚未实现）
 
 > 后续扩展再申请：`activeEnergyBurned`、`stepCount` 等。  
 > 与审核原则一致：**只申请真正用到的类型**。
@@ -317,7 +320,7 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>需要读取 Apple 健康中的锻炼记录和体重，以便展示运动并与本 App 的体重记录保持一致。</string>
+<string>需要读取 Apple 健康中的锻炼记录、体重和静息能量，以便展示运动、体重与今日消耗。</string>
 <key>NSHealthUpdateUsageDescription</key>
 <string>需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。</string>
 ```

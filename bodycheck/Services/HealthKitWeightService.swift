@@ -43,7 +43,7 @@ final class HealthKitWeightService {
     func requestAuthorization() async {
         guard isHealthDataAvailable else { return }
         do {
-            try await store.requestAuthorization(toShare: [bodyMassType], read: [bodyMassType])
+            try await HealthKitAccess.requestAuthorization(store: store)
         } catch {
             // Local records must remain usable.
         }

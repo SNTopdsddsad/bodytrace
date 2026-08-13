@@ -29,7 +29,7 @@ final class HealthKitExerciseService {
         guard isHealthDataAvailable else {
             throw HealthKitExerciseError.unavailable
         }
-        try await store.requestAuthorization(toShare: [], read: [workoutType])
+        try await HealthKitAccess.requestAuthorization(store: store)
     }
 
     /// Import workouts from the last `days` days (default 90).

@@ -27,6 +27,9 @@ struct TodayView: View {
     @State private var showQuickWeight = false
     @State private var showQuickFood = false
     @State private var chartRange: ChartRange = .days30
+    #if os(iOS)
+    @State private var todayRestingKcal: Double?
+    #endif
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -111,11 +114,11 @@ struct TodayView: View {
             }
             #if os(iOS)
             .task {
-                await importWeightsFromHealthIfPossible()
+                await refreshHealthSummaries()
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
-                    Task { await importWeightsFromHealthIfPossible() }
+                    Task { await refreshHealthSummaries() }
                 }
             }
             #endif
@@ -124,11 +127,12 @@ struct TodayView: View {
 
     #if os(iOS)
     @MainActor
-    private func importWeightsFromHealthIfPossible() async {
+    private func refreshHealthSummaries() async {
         _ = try? await HealthKitWeightService.shared.reconcile(
             into: modelContext,
             promptIfNeeded: false
         )
+        todayRestingKcal = await HealthKitAccess.todayRestingEnergyKcal()
     }
     #endif
 
@@ -285,6 +289,15 @@ struct TodayView: View {
                 unit: "分钟",
                 meta: exerciseMeta ?? healthExerciseHint
             )
+            Divider()
+            summaryRow(
+                symbol: "bed.double.fill",
+                tint: AppTheme.activityGreen,
+                label: "今日静息能量",
+                value: todayRestingDisplay,
+                unit: "千卡",
+                meta: restingEnergyMeta
+            )
         }
         .frame(maxWidth: .infinity, minHeight: platformHeroMinHeight)
         .appSurface()
@@ -311,6 +324,22 @@ struct TodayView: View {
         "来自 Apple 健康（iPhone 同步）"
         #else
         "在「运动」页从健康同步"
+        #endif
+    }
+
+    private var todayRestingDisplay: String? {
+        #if os(iOS)
+        todayRestingKcal.map { "\(Int($0.rounded()))" }
+        #else
+        nil
+        #endif
+    }
+
+    private var restingEnergyMeta: String? {
+        #if os(iOS)
+        todayRestingKcal == nil ? "需授权读取健康中的静息能量" : "来自 Apple 健康"
+        #else
+        "请在 iPhone 上从健康读取"
         #endif
     }
 

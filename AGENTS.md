@@ -26,10 +26,10 @@
 - 多平台壳：iOS `TabView`，macOS `NavigationSplitView` + `Settings` 窗
 - 体重 CRUD（手动，`source = manual`）；体重页 Mac 侧有筛选、检查器、宽度自适应
 - 饮食 CRUD（名称 + kcal）；按本地日历日分组
-- 今日概览：最新体重、今日摄入、今日运动、体重趋势图、最近记录
+- 今日概览：最新体重、今日摄入、今日运动、今日静息能量、体重趋势图、最近记录
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；隐私与关于文案
 - SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；失败则回退本地 store
-- iOS：从 Apple 健康导入 **workout** → `ExerciseEntry`（按 `healthKitUUID` upsert）
+- iOS：从 Apple 健康导入 **workout** → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日 **静息能量**（`basalEnergyBurned` 合计，不入库）
 - iOS：手动新增/编辑/删除体重写回 Apple 健康（`bodyMass`，回填 `healthKitUUID`）；从健康导入体重按 UUID upsert；未授权时本地仍可用
 - Mac：运动列表只读，不提供新增/编辑/删除；Mac 改体重不写 HealthKit
 
@@ -146,7 +146,8 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 - Entitlements：`com.apple.developer.healthkit`。
 - 运动：只读 `HKObjectType.workoutType()`；`HealthKitExerciseService.syncWorkouts` 默认近 90 天。
 - 体重：读+写 `HKQuantityType(.bodyMass)`。iOS 保存/编辑手动体重时双写并回填 `healthKitUUID`；删除手动记录时尝试删本 App 写入的样本。从健康导入按 `healthKitUUID` upsert（近 90 天）；打开体重/概览或回到前台时静默拉取，不弹授权。点「从健康同步」才请求权限。
-- 权限文案已覆盖锻炼读取与体重读写。若再增加饮食写回，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
+- 静息能量：只读 `HKQuantityType(.basalEnergyBurned)`，按本地日历日做累计求和，展示在概览/运动页。不写入 SwiftData，不做净热量。
+- 权限申请走 `HealthKitAccess`（读：体重 + workout + 静息能量；写：体重）。权限文案必须覆盖实际申请的类型。若再增加饮食写回，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
 - 不要在启动第一帧弹授权。首次点保存体重、设置里「允许写入健康」或「从健康同步」再请求。
 - Mac 改删体重不写 HK。健康来源的体重不要靠删除本地行「保持一致」——再同步会回来。
 - 运动：不要删除健康来源行来「保持一致」——再同步会回来。`ExerciseListView` 有意不做删除。

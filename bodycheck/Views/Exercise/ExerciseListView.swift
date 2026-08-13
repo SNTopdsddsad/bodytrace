@@ -17,6 +17,7 @@ struct ExerciseListView: View {
     @State private var isSyncing = false
     @State private var statusMessage: String?
     @State private var statusIsError = false
+    @State private var todayRestingKcal: Double?
     #endif
 
     private var todayExercises: [ExerciseEntry] {
@@ -31,6 +32,22 @@ struct ExerciseListView: View {
     private var todayBurn: Double? {
         let burns = todayExercises.compactMap(\.caloriesBurned)
         return burns.isEmpty ? nil : burns.reduce(0, +)
+    }
+
+    private var todayRestingDisplay: String {
+        #if os(iOS)
+        todayRestingKcal.map { "\(Int($0.rounded()))" } ?? "—"
+        #else
+        "—"
+        #endif
+    }
+
+    private var todayRestingUnit: String? {
+        #if os(iOS)
+        todayRestingKcal == nil ? nil : "千卡"
+        #else
+        nil
+        #endif
     }
 
     var body: some View {
@@ -82,6 +99,8 @@ struct ExerciseListView: View {
                 // Soft auto-sync on first open (won't crash if denied).
                 if exercises.isEmpty {
                     await syncFromHealth(silent: true)
+                } else {
+                    await refreshRestingEnergy()
                 }
             }
             #endif
@@ -136,15 +155,21 @@ struct ExerciseListView: View {
                         value: todayBurn.map { "\(Int($0.rounded()))" } ?? "—",
                         unit: todayBurn == nil ? nil : "千卡"
                     )
+                    exerciseSummaryTile(
+                        symbol: "bed.double.fill",
+                        label: "静息能量",
+                        value: todayRestingDisplay,
+                        unit: todayRestingUnit
+                    )
                 }
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             } footer: {
                 #if os(macOS)
-                Text("运动记录来自 Apple 健康，Mac 端仅支持查看，不可新增或编辑。")
+                Text("运动记录来自 Apple 健康，Mac 端仅支持查看，不可新增或编辑。静息能量请在 iPhone 上读取。")
                 #else
-                Text("数据来自 Apple 健康中的锻炼记录；消耗为空时显示为 —。")
+                Text("锻炼消耗来自 workout；静息能量来自健康中的静息能量，不与摄入做净热量。")
                 #endif
             }
 
@@ -252,6 +277,7 @@ struct ExerciseListView: View {
         do {
             try await HealthKitExerciseService.shared.requestAuthorization()
             let count = try await HealthKitExerciseService.shared.syncWorkouts(into: modelContext)
+            await refreshRestingEnergy()
             if !silent {
                 statusMessage = count == 0
                     ? "健康中暂无最近的锻炼记录"
@@ -263,6 +289,11 @@ struct ExerciseListView: View {
                 statusMessage = error.localizedDescription
             }
         }
+    }
+
+    @MainActor
+    private func refreshRestingEnergy() async {
+        todayRestingKcal = await HealthKitAccess.todayRestingEnergyKcal()
     }
     #endif
 }

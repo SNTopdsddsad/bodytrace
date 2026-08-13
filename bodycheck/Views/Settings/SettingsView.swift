@@ -134,7 +134,8 @@ struct SettingsView: View {
         Section {
             LabeledContent("体重写回", value: weightWriteStatus)
             LabeledContent("运动数据", value: "Apple 健康锻炼")
-            Button("允许写入健康") {
+            LabeledContent("静息能量", value: "Apple 健康今日合计")
+            Button("允许健康数据") {
                 Task {
                     await HealthKitWeightService.shared.requestAuthorization()
                     weightWriteStatus = HealthKitWeightService.shared.shareStatusText
@@ -143,7 +144,7 @@ struct SettingsView: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link("打开系统设置", destination: url)
             }
-            Text("在 iPhone 上记录或修改体重会写入 Apple 健康；在健康里改的体重，回到 BodyTrack 或点「从健康同步」后会按样本更新。请在系统设置中同时允许读取和写入体重。Mac 上的修改不会写入健康。")
+            Text("体重可读写；锻炼和静息能量只读。静息能量是健康里的「静息能量」，不是锻炼消耗，也不会和摄入做净热量。请在系统设置中打开对应读取权限。Mac 不读取健康。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {
