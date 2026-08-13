@@ -100,10 +100,10 @@ struct ExerciseListView: View {
             .safeAreaInset(edge: .bottom) {
                 if let statusMessage {
                     Text(statusMessage)
-                        .font(.footnote)
-                        .foregroundStyle(statusIsError ? .red : .secondary)
+                        .font(AppFont.formError)
+                        .foregroundStyle(statusIsError ? AppTheme.danger : .secondary)
                         .frame(maxWidth: .infinity)
-                        .padding(10)
+                        .padding(AppTheme.statusBarPadding)
                         .background(.bar)
                 }
             }
@@ -154,27 +154,32 @@ struct ExerciseListView: View {
     private var listContent: some View {
         List {
             Section {
-                HStack(spacing: 12) {
+                HStack(spacing: AppTheme.space12) {
                     exerciseSummaryTile(
                         symbol: "timer",
                         label: "今日时长",
-                        value: todayExercises.isEmpty ? "—" : "\(todayMinutes)",
+                        value: todayExercises.isEmpty ? nil : "\(todayMinutes)",
                         unit: todayExercises.isEmpty ? nil : "分钟"
                     )
                     exerciseSummaryTile(
                         symbol: "flame.fill",
                         label: "活动能量",
-                        value: todayActiveDisplay,
+                        value: todayActiveUnit == nil ? nil : todayActiveDisplay,
                         unit: todayActiveUnit
                     )
                     exerciseSummaryTile(
                         symbol: "bed.double.fill",
                         label: "静息能量",
-                        value: todayRestingDisplay,
+                        value: todayRestingUnit == nil ? nil : todayRestingDisplay,
                         unit: todayRestingUnit
                     )
                 }
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                .listRowInsets(EdgeInsets(
+                    top: AppTheme.space8,
+                    leading: AppTheme.contentInset,
+                    bottom: AppTheme.space8,
+                    trailing: AppTheme.contentInset
+                ))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             } footer: {
@@ -185,13 +190,17 @@ struct ExerciseListView: View {
                 #endif
             }
 
-            Section("全部记录") {
+            Section {
                 ForEach(exercises) { entry in
                     exerciseRow(entry)
                 }
-                // Mac: no swipe-to-delete. iOS: also no delete of Health-sourced rows
-                // to keep Health as source of truth (re-sync restores them).
+            } header: {
+                Text("全部记录")
+                    .font(AppFont.listSectionHeader)
+                    .textCase(nil)
             }
+            // Mac: no swipe-to-delete. iOS: also no delete of Health-sourced rows
+            // to keep Health as source of truth (re-sync restores them).
         }
         #if os(iOS)
         .listStyle(.insetGrouped)
@@ -201,71 +210,38 @@ struct ExerciseListView: View {
     private func exerciseSummaryTile(
         symbol: String,
         label: String,
-        value: String,
+        value: String?,
         unit: String?
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(AppTheme.activityGreen)
-                .frame(width: 32, height: 32)
-                .background {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(AppTheme.activityGreen.opacity(0.12))
-                }
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                if let unit {
-                    Text(unit)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background {
-            RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
-                #if os(iOS)
-                .fill(Color(.secondarySystemGroupedBackground))
-                #else
-                .fill(Color(nsColor: .controlBackgroundColor))
-                #endif
-        }
+        SummaryMetricTile(
+            label: label,
+            value: value,
+            unit: unit,
+            symbol: symbol,
+            tint: AppTheme.activityGreen
+        )
     }
 
     private func exerciseRow(_ entry: ExerciseEntry) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center, spacing: AppTheme.space12) {
+            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                 Text(entry.name)
-                    .font(.body.weight(.medium))
+                    .font(AppFont.rowTitle)
                 Text(entry.date, format: AppLocale.dateTime)
-                    .font(.caption)
+                    .font(AppFont.rowMeta)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 4) {
+            Spacer(minLength: AppTheme.space8)
+            VStack(alignment: .trailing, spacing: AppTheme.stackTight) {
                 Text(durationText(entry.durationMinutes))
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .font(AppFont.rowValue)
                 Text(entry.caloriesBurned.map { "\(Int($0.rounded())) 千卡" } ?? "—")
-                    .font(.caption)
+                    .font(AppFont.rowMeta)
                     .foregroundStyle(.secondary)
-                Text(entry.exerciseSource.displayName)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(AppTheme.activityGreen)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(AppTheme.activityGreen.opacity(0.12), in: Capsule())
+                TintedChip(text: entry.exerciseSource.displayName, tint: AppTheme.activityGreen)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppTheme.rowVertical)
     }
 
     private func durationText(_ minutes: Int) -> String {

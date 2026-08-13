@@ -129,40 +129,30 @@ struct DayDetailView: View {
     }
 
     private var weightHero: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("体重")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.4)
+        VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
+            SectionEyebrow(text: "体重")
 
             if let latest = latestWeight {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(String(format: "%.1f", weightUnit.fromKilograms(latest.weight)))
-                        .font(.system(size: AppTheme.heroWeightSize, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
-                    Text(weightUnit.shortLabel)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                HStack(spacing: 9) {
+                MeasurementValue(
+                    value: String(format: "%.1f", weightUnit.fromKilograms(latest.weight)),
+                    unit: weightUnit.shortLabel
+                )
+                HStack(spacing: AppTheme.space8) {
                     if let delta = weightDelta {
                         DeltaChip(deltaKg: delta, unit: weightUnit)
                     }
                     if dayWeights.count > 1 {
                         Text("当天 \(dayWeights.count) 条")
-                            .font(.subheadline)
+                            .font(AppFont.sectionSubtitle)
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                 }
             } else {
                 Text("这一天没有体重记录")
-                    .font(.title3.weight(.semibold))
+                    .font(AppFont.emptyTitle)
                 Text("趋势图上的点来自体重。若只看饮食和运动，仍会列在下面。")
-                    .font(.subheadline)
+                    .font(AppFont.emptyBody)
                     .foregroundStyle(.secondary)
             }
         }
@@ -171,40 +161,36 @@ struct DayDetailView: View {
     }
 
     private var energyCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
+            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                 Text("当天热量")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(AppFont.sectionTitle)
                 Text(energyCaption)
-                    .font(.system(size: 11))
+                    .font(AppFont.sectionSubtitle)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
                 Text("热量差")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFont.inlineAction)
                     .foregroundStyle(.secondary)
-                Text(netText ?? "—")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(netTone)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                if netText != nil {
-                    Text("千卡")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+                MeasurementValue(
+                    value: netText ?? "—",
+                    unit: netText == nil ? nil : "千卡",
+                    tint: netTone,
+                    size: .metric,
+                    dimmed: netText == nil
+                )
                 Spacer(minLength: 0)
             }
 
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 0) {
                     energyCell("摄入", intake.map { "\(Int($0.rounded()))" }, AppTheme.intakeAmber)
-                    energyRule
+                    VerticalHairline()
                     energyCell("活动能量", activeDisplay, AppTheme.activityGreen)
-                    energyRule
+                    VerticalHairline()
                     energyCell("静息能量", restingDisplay, AppTheme.brandTeal)
                 }
                 VStack(spacing: 0) {
@@ -216,7 +202,7 @@ struct DayDetailView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(AppTheme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appSurface()
     }
@@ -261,33 +247,8 @@ struct DayDetailView: View {
         #endif
     }
 
-    private var energyRule: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.08))
-            .frame(width: 1)
-            .padding(.vertical, 8)
-    }
-
     private func energyCell(_ label: String, _ value: String?, _ tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value ?? "—")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(value == nil ? Color.secondary : tint)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                Text("千卡")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        EnergyBreakdownCell(label: label, tint: tint, value: value)
     }
 
     private var weightSection: some View {
@@ -297,23 +258,23 @@ struct DayDetailView: View {
                     weightEditor = .edit(entry)
                 } label: {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                             Text(weightUnit.format(entry.weight))
-                                .font(.body.weight(.semibold).monospacedDigit())
+                                .font(AppFont.rowTitleEmphasis.monospacedDigit())
                                 .foregroundStyle(.primary)
                             Text(entry.weightSource.displayName)
-                                .font(.caption)
+                                .font(AppFont.rowMeta)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 8)
+                        Spacer(minLength: AppTheme.space8)
                         if let note = entry.note, !note.isEmpty {
                             Text(note)
-                                .font(.caption)
+                                .font(AppFont.rowMeta)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                     }
-                    .padding(.vertical, 10)
+                    .padding(.vertical, AppTheme.space8)
                 }
                 .buttonStyle(.plain)
                 if entry.id != dayWeights.last?.id {
@@ -329,22 +290,22 @@ struct DayDetailView: View {
                 NavigationLink {
                     FoodDetailView(entry: entry)
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: AppTheme.space12) {
                         FoodPhotoThumb(data: entry.photoData)
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                             Text(entry.name)
-                                .font(.body.weight(.medium))
+                                .font(AppFont.rowTitle)
                                 .foregroundStyle(.primary)
                             Text(entry.date, format: AppLocale.time)
-                                .font(.caption)
+                                .font(AppFont.rowMeta)
                                 .foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 8)
+                        Spacer(minLength: AppTheme.space8)
                         Text("\(Int(entry.calories.rounded())) 千卡")
-                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                            .font(AppFont.rowValue)
                             .foregroundStyle(AppTheme.intakeAmber)
                     }
-                    .padding(.vertical, 10)
+                    .padding(.vertical, AppTheme.space8)
                 }
                 if entry.id != dayFoods.last?.id {
                     Divider()
@@ -356,26 +317,26 @@ struct DayDetailView: View {
     private var exerciseSection: some View {
         daySection(title: "当天运动", empty: dayExercises.isEmpty ? "没有运动记录" : nil) {
             ForEach(dayExercises) { entry in
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .center, spacing: AppTheme.space12) {
+                    VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                         Text(entry.name)
-                            .font(.body.weight(.medium))
+                            .font(AppFont.rowTitle)
                         Text(entry.date, format: AppLocale.time)
-                            .font(.caption)
+                            .font(AppFont.rowMeta)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 8)
-                    VStack(alignment: .trailing, spacing: 4) {
+                    Spacer(minLength: AppTheme.space8)
+                    VStack(alignment: .trailing, spacing: AppTheme.stackTight) {
                         Text("\(entry.durationMinutes) 分钟")
-                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                            .font(AppFont.rowValue)
                         if let burn = entry.caloriesBurned {
                             Text("\(Int(burn.rounded())) 千卡")
-                                .font(.caption)
+                                .font(AppFont.rowMeta)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
-                .padding(.vertical, 10)
+                .padding(.vertical, AppTheme.space8)
                 if entry.id != dayExercises.last?.id {
                     Divider()
                 }
@@ -391,23 +352,23 @@ struct DayDetailView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.headline)
+                .font(AppFont.sectionTitle)
                 .padding(.horizontal, AppTheme.cardPadding)
-                .padding(.top, 14)
-                .padding(.bottom, 8)
+                .padding(.top, AppTheme.space12)
+                .padding(.bottom, AppTheme.space8)
 
             if let empty {
                 Text(empty)
-                    .font(.subheadline)
+                    .font(AppFont.emptyBody)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, AppTheme.cardPadding)
-                    .padding(.bottom, 14)
+                    .padding(.bottom, AppTheme.space12)
             } else {
                 VStack(spacing: 0) {
                     content()
                 }
                 .padding(.horizontal, AppTheme.cardPadding)
-                .padding(.bottom, 8)
+                .padding(.bottom, AppTheme.space8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

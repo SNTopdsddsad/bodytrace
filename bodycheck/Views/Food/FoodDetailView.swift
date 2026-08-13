@@ -17,7 +17,7 @@ struct FoodDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: AppTheme.space20) {
                 if let data = entry.photoData, let image = FoodPhotoCodec.image(from: data) {
                     image
                         .resizable()
@@ -28,18 +28,15 @@ struct FoodDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous))
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppTheme.stackDefault) {
                     Text(entry.name)
-                        .font(.title2.weight(.semibold))
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("\(Int(entry.calories.rounded()))")
-                            .font(.system(size: 34, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(AppTheme.intakeAmber)
-                        Text("千卡")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
+                        .font(AppFont.detailTitle)
+                    MeasurementValue(
+                        value: "\(Int(entry.calories.rounded()))",
+                        unit: "千卡",
+                        tint: AppTheme.intakeAmber,
+                        size: .metric
+                    )
                 }
 
                 VStack(spacing: 0) {
@@ -50,7 +47,7 @@ struct FoodDetailView: View {
                         (entry.note?.isEmpty == false) ? (entry.note ?? "—") : "—"
                     )
                 }
-                .padding(16)
+                .padding(AppTheme.cardPadding)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .appSurface()
             }
@@ -77,7 +74,7 @@ struct FoodDetailView: View {
             }
             .buttonStyle(.bordered)
             .padding(.horizontal, AppTheme.contentInset)
-            .padding(.vertical, 12)
+            .padding(.vertical, AppTheme.statusBarPadding)
             .background(.bar)
         }
         .sheet(item: $editorMode) { mode in
@@ -92,16 +89,16 @@ struct FoodDetailView: View {
     }
 
     private func detailRow(_ title: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppTheme.space12) {
             Text(title)
-                .font(.system(size: 13))
+                .font(AppFont.detailLabel)
                 .foregroundStyle(.secondary)
                 .frame(width: 36, alignment: .leading)
             Text(value)
-                .font(.system(size: 15))
+                .font(AppFont.detailValue)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, AppTheme.space8)
     }
 
     private func deleteEntry() {

@@ -120,9 +120,7 @@ struct SettingsView: View {
                 LabeledContent("同步账号", value: user)
             }
             if let lastError = cloudSync.lastError {
-                Text(lastError)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                FormErrorText(message: lastError)
             }
             Button("重新检查") {
                 Task { await cloudSync.refresh() }
@@ -151,7 +149,7 @@ struct SettingsView: View {
                 Link("打开系统设置", destination: url)
             }
             Text("体重可读写；锻炼、活动能量和静息能量只读。已授权读取后，健康里新增或修改的体重会自动同步到本 App。概览净热量 = 摄入 − 活动能量 − 静息能量。")
-                .font(.caption)
+                .font(AppFont.rowMeta)
                 .foregroundStyle(.secondary)
         } header: {
             Text("健康")
@@ -165,7 +163,7 @@ struct SettingsView: View {
     private var privacySection: some View {
         Section {
             Text("BodyTrack 不会将健康数据用于广告或出售给第三方。")
-                .font(.callout)
+                .font(AppFont.prose)
                 .foregroundStyle(.secondary)
         } header: {
             Text("数据与隐私")

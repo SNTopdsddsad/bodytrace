@@ -81,36 +81,25 @@ struct FoodListView: View {
                 } else {
                     List {
                         Section {
-                            HStack(spacing: 16) {
-                                Image(systemName: "flame.fill")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(AppTheme.intakeAmber)
-                                    .frame(width: 36, height: 36)
-                                    .background {
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(AppTheme.intakeAmber.opacity(0.12))
-                                    }
-                                VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: AppTheme.space16) {
+                                IconWell(systemName: "flame.fill", tint: AppTheme.intakeAmber)
+                                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                                     Text("今日摄入")
-                                        .font(.subheadline)
+                                        .font(AppFont.sectionSubtitle)
                                         .foregroundStyle(.secondary)
-                                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                        Text(todayFoods.isEmpty ? "—" : "\(Int(todayCalories.rounded()))")
-                                            .font(.system(size: 28, weight: .semibold, design: .rounded))
-                                            .monospacedDigit()
-                                        if !todayFoods.isEmpty {
-                                            Text("千卡")
-                                                .font(.subheadline.weight(.medium))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
+                                    MeasurementValue(
+                                        value: todayFoods.isEmpty ? "—" : "\(Int(todayCalories.rounded()))",
+                                        unit: todayFoods.isEmpty ? nil : "千卡",
+                                        size: .metric,
+                                        dimmed: todayFoods.isEmpty
+                                    )
                                     Text(todayFoods.isEmpty ? "还没有饮食记录" : "\(todayFoods.count) 条记录")
-                                        .font(.caption)
+                                        .font(AppFont.rowMeta)
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength: 0)
                             }
-                            .padding(.vertical, 4)
+                            .padding(.vertical, AppTheme.rowVertical)
                         }
 
                         ForEach(groupedByDay, id: \.day) { group in
@@ -119,28 +108,30 @@ struct FoodListView: View {
                                     NavigationLink {
                                         FoodDetailView(entry: entry)
                                     } label: {
-                                        HStack(alignment: .center, spacing: 12) {
+                                        HStack(alignment: .center, spacing: AppTheme.space12) {
                                             FoodPhotoThumb(data: entry.photoData)
-                                            VStack(alignment: .leading, spacing: 4) {
+                                            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                                                 Text(entry.name)
-                                                    .font(.body.weight(.medium))
+                                                    .font(AppFont.rowTitle)
                                                 Text(entry.date, format: AppLocale.time)
-                                                    .font(.caption)
+                                                    .font(AppFont.rowMeta)
                                                     .foregroundStyle(.secondary)
                                             }
-                                            Spacer(minLength: 8)
+                                            Spacer(minLength: AppTheme.space8)
                                             Text("\(Int(entry.calories.rounded())) 千卡")
-                                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                                                .font(AppFont.rowValue)
                                                 .foregroundStyle(AppTheme.intakeAmber)
                                         }
                                     }
-                                    .padding(.vertical, 2)
+                                    .padding(.vertical, AppTheme.rowVertical)
                                 }
                                 .onDelete { offsets in
                                     delete(items: group.items, at: offsets)
                                 }
                             } header: {
                                 Text(sectionTitle(day: group.day, total: group.total))
+                                    .font(AppFont.listSectionHeader)
+                                    .textCase(nil)
                             }
                         }
                     }
@@ -164,15 +155,9 @@ struct FoodListView: View {
             .toolbar {
                 #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+                    IOSCircleAddButton(accessibilityLabel: "添加食物") {
                         editorMode = .create
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .font(.title3)
-                            .foregroundStyle(AppTheme.brandTeal)
                     }
-                    .accessibilityLabel("添加食物")
                 }
                 IOSSettingsToolbar()
                 #else
@@ -250,9 +235,7 @@ struct FoodEditorSheet: View {
 
                 if let validationMessage {
                     Section {
-                        Text(validationMessage)
-                            .foregroundStyle(.red)
-                            .font(.footnote)
+                        FormErrorText(message: validationMessage)
                     }
                 }
             }
@@ -321,17 +304,17 @@ struct FoodEditorSheet: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 180)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.iconWellRadius, style: .continuous))
                         .overlay(alignment: .bottomTrailing) {
                             Text("更换")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .font(AppFont.inlineAction)
+                                .padding(.horizontal, AppTheme.chipHorizontal)
+                                .padding(.vertical, AppTheme.chipVertical)
                                 .background(.ultraThinMaterial, in: Capsule())
-                                .padding(10)
+                                .padding(AppTheme.space8)
                         }
                 } else {
-                    HStack(spacing: 10) {
+                    HStack(spacing: AppTheme.space8) {
                         Image(systemName: "camera.fill")
                         Text("添加照片")
                         Spacer()

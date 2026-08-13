@@ -145,7 +145,7 @@ struct TodayView: View {
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .symbolRenderingMode(.hierarchical)
-                    .font(.title3)
+                    .font(AppFont.toolbarIcon)
                     .foregroundStyle(AppTheme.brandTeal)
             }
             .accessibilityLabel("快速记录")
@@ -189,36 +189,26 @@ struct TodayView: View {
     }
 
     private var weightHero: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("最新体重")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.4)
+        VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
+            SectionEyebrow(text: "最新体重")
 
             if let latest = latestWeight {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(String(format: "%.1f", weightUnit.fromKilograms(latest.weight)))
-                        .font(.system(size: AppTheme.heroWeightSize, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.7)
-                        .lineLimit(1)
-                    Text(weightUnit.shortLabel)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+                MeasurementValue(
+                    value: String(format: "%.1f", weightUnit.fromKilograms(latest.weight)),
+                    unit: weightUnit.shortLabel
+                )
 
-                HStack(spacing: 9) {
+                HStack(spacing: AppTheme.space8) {
                     if let delta = weightDelta {
                         DeltaChip(deltaKg: delta, unit: weightUnit)
                     }
                     Text(latest.date, format: AppLocale.day)
-                        .font(.subheadline)
+                        .font(AppFont.sectionSubtitle)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                     Button("记录") { showQuickWeight = true }
                         .buttonStyle(.borderless)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(AppFont.inlineAction)
                         .foregroundStyle(AppTheme.brandTeal)
                 }
 
@@ -232,19 +222,19 @@ struct TodayView: View {
                     .padding(.top, 4)
                 #endif
             } else {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: AppTheme.space8) {
                     Text("还没有体重记录")
-                        .font(.title3.weight(.semibold))
+                        .font(AppFont.emptyTitle)
                     Text("记录第一条体重，开始了解自己的变化。")
-                        .font(.subheadline)
+                        .font(AppFont.emptyBody)
                         .foregroundStyle(.secondary)
                     Button("记录体重") { showQuickWeight = true }
                         .buttonStyle(.borderedProminent)
                         .tint(AppTheme.brandTeal)
                         .controlSize(.large)
-                        .padding(.top, 4)
+                        .padding(.top, AppTheme.space4)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, AppTheme.space8)
             }
         }
         .frame(maxWidth: .infinity, minHeight: platformHeroMinHeight, alignment: .topLeading)
@@ -310,47 +300,43 @@ struct TodayView: View {
     }
 
     private var energySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
             HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                     Text("今日热量")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(AppFont.sectionTitle)
                     Text(netCaloriesCaption)
-                        .font(.system(size: 11))
+                        .font(AppFont.sectionSubtitle)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: AppTheme.space8)
                 Button("记录饮食") { showQuickFood = true }
                     .buttonStyle(.borderless)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFont.inlineAction)
                     .foregroundStyle(AppTheme.intakeAmber)
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
                 Text("净热量")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFont.inlineAction)
                     .foregroundStyle(.secondary)
-                Text(netCaloriesText ?? "—")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(netCaloriesTone)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                if netCaloriesText != nil {
-                    Text("千卡")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+                MeasurementValue(
+                    value: netCaloriesText ?? "—",
+                    unit: netCaloriesText == nil ? nil : "千卡",
+                    tint: netCaloriesTone,
+                    size: .metric,
+                    dimmed: netCaloriesText == nil
+                )
                 Spacer(minLength: 0)
             }
 
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 0) {
                     energyCell(intakeMetric)
-                    energyRule
+                    VerticalHairline()
                     energyCell(activeMetric)
-                    energyRule
+                    VerticalHairline()
                     energyCell(restingMetric)
                 }
                 VStack(spacing: 0) {
@@ -362,7 +348,7 @@ struct TodayView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(AppTheme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appSurface()
     }
@@ -432,55 +418,28 @@ struct TodayView: View {
         #endif
     }
 
-    private var energyRule: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.08))
-            .frame(width: 1)
-            .padding(.vertical, 8)
-    }
-
     private func energyCell(_ metric: EnergyMetric) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: metric.symbol)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(metric.tint)
-                Text(metric.label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(metric.value ?? "—")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                Text(metric.unit)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            Text(metric.meta)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        EnergyBreakdownCell(
+            label: metric.label,
+            symbol: metric.symbol,
+            tint: metric.tint,
+            value: metric.value,
+            unit: metric.unit,
+            meta: metric.meta
+        )
     }
 
     // MARK: - Chart
 
     private var chartSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: AppTheme.space12) {
             #if os(iOS)
-            VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: AppTheme.space8) {
+                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                     Text("体重趋势")
-                        .font(.headline)
+                        .font(AppFont.sectionTitle)
                     Text(chartSubtitle)
-                        .font(.caption)
+                        .font(AppFont.sectionSubtitle)
                         .foregroundStyle(.secondary)
                 }
                 Picker("范围", selection: $chartRange) {
@@ -566,11 +525,11 @@ struct TodayView: View {
                 }
                 .environment(\.locale, AppLocale.chinese)
                 .frame(height: chartHeight)
-                .padding(.top, 4)
+                .padding(.top, AppTheme.space4)
                 .accessibilityHint("点某一天查看当天饮食、运动和热量")
 
                 Text("点某一天，查看当天饮食、运动和热量")
-                    .font(.caption)
+                    .font(AppFont.rowMeta)
                     .foregroundStyle(.secondary)
             } else if chartPoints.count == 1 {
                 ContentUnavailableView(
@@ -633,29 +592,29 @@ struct TodayView: View {
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                     Text("最近记录")
-                        .font(.headline)
+                        .font(AppFont.sectionTitle)
                     Text("体重、饮食与运动")
-                        .font(.caption)
+                        .font(AppFont.sectionSubtitle)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button {
                     onOpenWeight?()
                 } label: {
-                    HStack(spacing: 2) {
+                    HStack(spacing: AppTheme.space2) {
                         Text("体重")
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
+                            .font(AppFont.inlineAction)
                     }
-                    .font(.subheadline)
+                    .font(AppFont.sectionSubtitle)
                     .foregroundStyle(AppTheme.brandTeal)
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, AppTheme.cardPadding)
-            .padding(.vertical, 14)
+            .padding(.vertical, AppTheme.space12)
 
             Divider()
 
@@ -666,7 +625,7 @@ struct TodayView: View {
                     description: Text("记录体重、饮食或运动后会显示在这里。")
                 )
                 .frame(minHeight: 140)
-                .padding(.vertical, 12)
+                .padding(.vertical, AppTheme.space12)
             } else {
                 #if os(macOS)
                 Table(recentItems) {
@@ -699,34 +658,34 @@ struct TodayView: View {
                 #else
                 VStack(spacing: 0) {
                     ForEach(recentItems) { item in
-                        HStack(alignment: .center, spacing: 12) {
+                        HStack(alignment: .center, spacing: AppTheme.space12) {
                             RecordDot(kind: item.dot)
-                                .frame(width: 10)
+                                .frame(width: AppTheme.recordDotColumn)
 
-                            VStack(alignment: .leading, spacing: 3) {
+                            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                                 Text(item.title)
-                                    .font(.body.weight(.medium))
+                                    .font(AppFont.rowTitle)
                                     .lineLimit(1)
-                                HStack(spacing: 6) {
+                                HStack(spacing: AppTheme.space4) {
                                     Text(item.typeLabel)
                                     Text("·")
                                     Text(item.date, format: AppLocale.monthDayTime)
                                 }
-                                .font(.caption)
+                                .font(AppFont.rowMeta)
                                 .foregroundStyle(.secondary)
                             }
 
-                            Spacer(minLength: 8)
+                            Spacer(minLength: AppTheme.space8)
 
                             Text(item.valueText)
-                                .font(.subheadline.monospacedDigit().weight(.medium))
+                                .font(AppFont.rowValue)
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.trailing)
                         }
                         .padding(.horizontal, AppTheme.cardPadding)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, AppTheme.space12)
                         if item.id != recentItems.last?.id {
-                            Divider().padding(.leading, AppTheme.cardPadding + 22)
+                            Divider().padding(.leading, AppTheme.cardPadding + AppTheme.recordDotColumn + AppTheme.space12)
                         }
                     }
                 }

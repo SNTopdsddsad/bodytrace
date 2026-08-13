@@ -56,7 +56,7 @@ enum FoodPhotoCodec {
 
 struct FoodPhotoThumb: View {
     let data: Data?
-    var size: CGFloat = 48
+    var size: CGFloat = AppTheme.thumbSize
 
     var body: some View {
         if let data, let image = FoodPhotoCodec.image(from: data) {
@@ -64,7 +64,7 @@ struct FoodPhotoThumb: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.thumbRadius, style: .continuous))
         }
     }
 }

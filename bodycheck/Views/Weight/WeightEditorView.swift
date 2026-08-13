@@ -76,9 +76,7 @@ struct WeightEditorView: View {
 
                 if let validationMessage {
                     Section {
-                        Text(validationMessage)
-                            .foregroundStyle(.red)
-                            .font(.footnote)
+                        FormErrorText(message: validationMessage)
                     }
                 }
             }

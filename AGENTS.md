@@ -46,6 +46,7 @@
 - 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
 - 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
 - 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
+- iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；隐私与关于
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
@@ -97,8 +98,8 @@ bodycheck/                     # 主 App 源码（同步进 Target）
   Models/                      # 仅 SwiftData @Model + 来源枚举
   Services/                    # CloudSyncMonitor；HealthKit* / WidgetSnapshotPublisher（#if os(iOS)）
   Views/{Today,Weight,Food,Exercise,Settings}/
-  Utilities/                   # 主题、日界
-Shared/                        # App + Widget 共享：App Group、摘要、Deep Link、WeightUnit
+  Utilities/                   # 主题（AppTheme / AppFont）、日界
+Shared/                        # App + Widget 共享：App Group、摘要、Deep Link、WeightUnit、BrandColor
 BodyTrackWidget/               # iOS Widget Extension（kind = WeightWidget）
 docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Target
 ```
@@ -185,8 +186,9 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 - 分区：`AppSection` = 概览 / 体重 / 饮食 / 运动。上次分区：`AppStorage("lastAppSection")`。
 - iOS：`TabView`；设置是 toolbar sheet。
 - macOS：侧栏 + detail；设置走系统 Settings 场景（⌘,）。**现有实现冻结，不继续打磨。**
-- 品牌色：`AppTheme.brandTeal` / `intakeAmber` / `activityGreen`。卡片用 `appSurface`，页面用 `pageBackground`。
-- 空状态用 `ContentUnavailableView`。数字用 `monospacedDigit`。
+- 品牌色：`AppTheme.brandTeal` / `intakeAmber` / `activityGreen`（源在 `Shared/BrandColor.swift`，小组件共用）。卡片用 `appSurface`，页面用 `pageBackground`。
+- iPhone 字号 / 间距走 `AppFont` + `AppTheme.space*` / `stack*`，不要在视图里再写 `.system(size: 11)` 一类魔法数。数字用 `MeasurementValue` 或 `monospacedDigit`。
+- 空状态用 `ContentUnavailableView`。
 - 体重 Mac 列表：**不要**给行加 `onTapGesture`（会抢走 `List` 选择，尤其第一列）。单元格文本 `.allowsHitTesting(false)`。
 - 快捷键：新增常用 `⌘N`；取消/保存用 `cancelAction` / `defaultAction`。
 - 新文案先写中文。日期、时间、星期强制简体中文（`AppLocale` / `.appChineseLocale()`），工程 `developmentRegion` 为 `zh-Hans`，不要跟系统语言走。Mac 菜单、日期选择器、图表坐标同样用中文。`SWIFT_EMIT_LOC_STRINGS` 已开，需要时再抽 String Catalog，不要先铺一层无调用的本地化包装。
@@ -233,7 +235,7 @@ xcodebuild -project bodycheck.xcodeproj -scheme bodycheck -destination 'platform
 
 - 先读将改的 Swift 文件和开发文档对应章节，再写。
 - 视图里直接 `modelContext.insert` / `save` 是现有模式；抽 Service 可以，但不要只抽一半、另一半仍散落。
-- 共享样式放 `AppTheme.swift`，日界放 `Date+CalendarDay.swift`，单位放 `WeightUnit.swift`。
+- 共享样式放 `AppTheme.swift` / `AppFont`，品牌色放 `Shared/BrandColor.swift`，日界放 `Date+CalendarDay.swift`，单位放 `WeightUnit.swift`。
 - 不要提交 `.DS_Store`、`xcuserdata`、个人签名之外的本地状态。
 - 用户未要求不要顺手重构、不要扩 scope、不要改名工程。
 - 改了产品口径或模型，同步改 `docs/BodyTrack_开发文档.md` 文首版本与变更表；改了 `@Model` 后还要在控制台重新 Deploy 到 Production（见上文「发布前必须」）。

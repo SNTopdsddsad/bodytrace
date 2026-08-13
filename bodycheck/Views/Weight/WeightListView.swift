@@ -774,7 +774,12 @@ struct WeightListView: View {
                     Section {
                         iosMetricCards
                     }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowInsets(EdgeInsets(
+                        top: AppTheme.space8,
+                        leading: AppTheme.contentInset,
+                        bottom: AppTheme.space8,
+                        trailing: AppTheme.contentInset
+                    ))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
 
@@ -825,7 +830,7 @@ struct WeightListView: View {
                             Text("\(filteredWeights.count) 条")
                                 .foregroundStyle(.secondary)
                         }
-                        .font(.subheadline)
+                        .font(AppFont.listSectionHeader)
                         .textCase(nil)
                     }
                 }
@@ -880,15 +885,9 @@ struct WeightListView: View {
                 .accessibilityLabel("从健康同步")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                IOSCircleAddButton(accessibilityLabel: "记录体重") {
                     editorMode = .create
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.title3)
-                        .foregroundStyle(AppTheme.brandTeal)
                 }
-                .accessibilityLabel("记录体重")
             }
             IOSSettingsToolbar()
         }
@@ -908,10 +907,10 @@ struct WeightListView: View {
         .safeAreaInset(edge: .bottom) {
             if let healthSyncMessage {
                 Text(healthSyncMessage)
-                    .font(.footnote)
-                    .foregroundStyle(healthSyncIsError ? .red : .secondary)
+                    .font(AppFont.formError)
+                    .foregroundStyle(healthSyncIsError ? AppTheme.danger : .secondary)
                     .frame(maxWidth: .infinity)
-                    .padding(10)
+                    .padding(AppTheme.statusBarPadding)
                     .background(.bar)
             }
         }
@@ -931,8 +930,8 @@ struct WeightListView: View {
     }
 
     private var iosMetricCards: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(spacing: AppTheme.space8) {
+            HStack(spacing: AppTheme.space8) {
                 iosMetricTile(
                     label: "最新",
                     value: latestInFilter.map { String(format: "%.1f", weightUnit.fromKilograms($0.weight)) },
@@ -961,61 +960,39 @@ struct WeightListView: View {
         unit: String?,
         accent: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value ?? "—")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(value == nil ? Color.secondary : Color.primary)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                if let unit, value != nil {
-                    Text(unit)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background {
-            RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
-                .overlay {
-                    RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
-                        .strokeBorder(accent.opacity(0.18), lineWidth: 1)
-                }
-        }
+        SummaryMetricTile(
+            label: label,
+            value: value,
+            unit: unit,
+            tint: accent,
+            showAccentStroke: true
+        )
     }
 
     private func iosWeightRow(_ entry: WeightEntry) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .center, spacing: AppTheme.space12) {
+            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
                     Text(weightUnit.format(entry.weight))
-                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .font(AppFont.listHero.monospacedDigit())
                     if let delta = iosDelta(for: entry) {
                         DeltaChip(deltaKg: delta, unit: weightUnit)
                     }
                 }
                 Text(entry.date, format: AppLocale.dayWeekday)
-                    .font(.subheadline)
+                    .font(AppFont.rowDate)
                     .foregroundStyle(.secondary)
                 if let note = entry.note, !note.isEmpty {
                     Text(note)
-                        .font(.caption)
+                        .font(AppFont.rowMeta)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: AppTheme.space8)
             SourceBadge(source: entry.weightSource)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppTheme.rowVertical)
     }
 
     private func iosDelta(for entry: WeightEntry) -> Double? {

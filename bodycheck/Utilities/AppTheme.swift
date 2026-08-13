@@ -2,7 +2,8 @@
 //  AppTheme.swift
 //  bodycheck
 //
-//  Visual system mapped from opendesign BodyTrack macOS design.md
+//  iPhone visual tokens: color, type, spacing, shared chrome.
+//  Mac layout constants stay below; do not restyle Mac UI from here.
 //
 
 import SwiftUI
@@ -35,15 +36,42 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 enum AppTheme {
-    /// Brand teal — primary actions & chart line. Design: #267A78 / #4FA7A3
-    static let brandTeal = Color(light: Color(red: 0.149, green: 0.478, blue: 0.471),
-                                 dark: Color(red: 0.310, green: 0.655, blue: 0.639))
-    /// Intake amber. Design: #B56A22 / #D99550
-    static let intakeAmber = Color(light: Color(red: 0.710, green: 0.416, blue: 0.133),
-                                   dark: Color(red: 0.851, green: 0.584, blue: 0.314))
-    /// Activity green. Design: #587448 / #7F9C6B
-    static let activityGreen = Color(light: Color(red: 0.345, green: 0.455, blue: 0.282),
-                                     dark: Color(red: 0.498, green: 0.612, blue: 0.420))
+    static let brandTeal = BrandColor.teal
+    static let intakeAmber = BrandColor.amber
+    static let activityGreen = BrandColor.green
+
+    static let danger = Color.red
+    static let hairline = Color.primary.opacity(0.08)
+    static let chipFillOpacity = 0.12
+    static let accentStrokeOpacity = 0.18
+
+    /// 4pt grid. Prefer these over ad-hoc padding.
+    static let space2: CGFloat = 2
+    static let space4: CGFloat = 4
+    static let space8: CGFloat = 8
+    static let space12: CGFloat = 12
+    static let space16: CGFloat = 16
+    static let space20: CGFloat = 20
+    static let space24: CGFloat = 24
+
+    /// Title + caption stacked in a card.
+    static let stackTight: CGFloat = space4
+    /// Default in-card stack (icon + label, row title + meta).
+    static let stackDefault: CGFloat = space8
+    /// Card internals (eyebrow → number → chips).
+    static let stackLoose: CGFloat = space12
+    /// Extra inset on list rows that already have system padding.
+    static let rowVertical: CGFloat = space4
+    static let chipHorizontal: CGFloat = space8
+    static let chipVertical: CGFloat = space4
+
+    static let iconWellSize: CGFloat = 36
+    static let iconWellRadius: CGFloat = 10
+    static let thumbSize: CGFloat = 48
+    static let thumbRadius: CGFloat = 8
+    static let statusBarPadding: CGFloat = 12
+    static let recordDotSize: CGFloat = 6
+    static let recordDotColumn: CGFloat = 10
 
     /// Platform-aware card radius (softer on iPhone).
     static var cardCornerRadius: CGFloat {
@@ -57,15 +85,15 @@ enum AppTheme {
     /// Page horizontal/vertical inset for scroll content.
     static var contentInset: CGFloat {
         #if os(iOS)
-        16
+        space16
         #else
-        24
+        space24
         #endif
     }
 
     static let contentMaxWidth: CGFloat = 1120
-    static let spaceL: CGFloat = 16
-    static let spaceXL: CGFloat = 24
+    static let spaceL: CGFloat = space16
+    static let spaceXL: CGFloat = space24
 
     /// Hero weight number size (latest weight).
     static var heroWeightSize: CGFloat {
@@ -76,14 +104,72 @@ enum AppTheme {
         #endif
     }
 
+    /// Net calories / daily intake hero.
+    static let metricNumberSize: CGFloat = 32
+    /// Three-column tiles and list summary numbers.
+    static let compactNumberSize: CGFloat = 22
+
     /// Inner padding for primary surface cards.
     static var cardPadding: CGFloat {
         #if os(iOS)
-        16
+        space16
         #else
         22
         #endif
     }
+
+    static var compactTilePadding: CGFloat {
+        #if os(iOS)
+        space12
+        #else
+        space16
+        #endif
+    }
+}
+
+/// Semantic type roles. Prefer these over raw `.system(size:)`.
+enum AppFont {
+    /// Uppercase card eyebrow: 最新体重 / 当天热量
+    static let eyebrow = Font.caption.weight(.semibold)
+    /// Card and section titles.
+    static let sectionTitle = Font.headline
+    /// Line under a section title.
+    static let sectionSubtitle = Font.footnote
+
+    static var heroNumber: Font {
+        .system(size: AppTheme.heroWeightSize, weight: .semibold, design: .rounded)
+    }
+
+    static let heroUnit = Font.title3.weight(.medium)
+
+    static let metricNumber = Font.system(size: AppTheme.metricNumberSize, weight: .semibold, design: .rounded)
+    static let metricUnit = Font.subheadline.weight(.medium)
+
+    static let compactNumber = Font.system(size: AppTheme.compactNumberSize, weight: .semibold, design: .rounded)
+    static let compactUnit = Font.caption.weight(.medium)
+
+    static let rowTitle = Font.body.weight(.medium)
+    static let rowTitleEmphasis = Font.body.weight(.semibold)
+    /// Primary number when the row *is* a measurement (体重列表).
+    static let listHero = Font.title3.weight(.semibold)
+    static let rowMeta = Font.caption
+    static let rowDate = Font.subheadline
+    static let rowValue = Font.subheadline.weight(.semibold).monospacedDigit()
+
+    static let emptyTitle = Font.title3.weight(.semibold)
+    static let emptyBody = Font.subheadline
+    static let inlineAction = Font.caption.weight(.medium)
+    static let chip = Font.caption.weight(.semibold).monospacedDigit()
+    static let badge = Font.caption2.weight(.medium)
+    static let formError = Font.footnote
+    static let icon = Font.subheadline.weight(.semibold)
+    static let toolbarIcon = Font.title3
+    static let detailTitle = Font.title2.weight(.semibold)
+    static let detailLabel = Font.footnote
+    static let detailValue = Font.subheadline
+    static let listSectionHeader = Font.subheadline
+    /// Longer settings / privacy copy.
+    static let prose = Font.callout
 }
 
 enum MacLayout {
@@ -194,23 +280,6 @@ struct WeightColumnMetrics: Equatable {
     }
 }
 
-// MARK: - Adaptive color helper
-
-extension Color {
-    init(light: Color, dark: Color) {
-        #if os(macOS)
-        self.init(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return NSColor(isDark ? dark : light)
-        })
-        #else
-        self.init(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
-        })
-        #endif
-    }
-}
-
 // MARK: - Surface styles
 
 struct SurfaceStyle: ViewModifier {
@@ -275,6 +344,219 @@ extension View {
     }
 }
 
+struct SectionEyebrow: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(AppFont.eyebrow)
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .tracking(0.4)
+    }
+}
+
+struct MeasurementValue: View {
+    enum Size {
+        case hero
+        case metric
+        case compact
+    }
+
+    let value: String
+    var unit: String? = nil
+    var tint: Color = .primary
+    var size: Size = .hero
+    var dimmed: Bool = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.space4) {
+            Text(value)
+                .font(numberFont)
+                .monospacedDigit()
+                .foregroundStyle(dimmed ? Color.secondary : tint)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+            if let unit {
+                Text(unit)
+                    .font(unitFont)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var numberFont: Font {
+        switch size {
+        case .hero: AppFont.heroNumber
+        case .metric: AppFont.metricNumber
+        case .compact: AppFont.compactNumber
+        }
+    }
+
+    private var unitFont: Font {
+        switch size {
+        case .hero: AppFont.heroUnit
+        case .metric: AppFont.metricUnit
+        case .compact: AppFont.compactUnit
+        }
+    }
+}
+
+struct IconWell: View {
+    let systemName: String
+    var tint: Color = AppTheme.brandTeal
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(AppFont.icon)
+            .foregroundStyle(tint)
+            .frame(width: AppTheme.iconWellSize, height: AppTheme.iconWellSize)
+            .background {
+                RoundedRectangle(cornerRadius: AppTheme.iconWellRadius, style: .continuous)
+                    .fill(tint.opacity(AppTheme.chipFillOpacity))
+            }
+    }
+}
+
+struct VerticalHairline: View {
+    var body: some View {
+        Rectangle()
+            .fill(AppTheme.hairline)
+            .frame(width: 1)
+            .padding(.vertical, AppTheme.space8)
+    }
+}
+
+struct EnergyBreakdownCell: View {
+    let label: String
+    var symbol: String? = nil
+    var tint: Color = .secondary
+    let value: String?
+    var unit: String = "千卡"
+    var meta: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.stackDefault) {
+            HStack(spacing: AppTheme.space4) {
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(AppFont.eyebrow)
+                        .foregroundStyle(tint)
+                }
+                Text(label)
+                    .font(AppFont.compactUnit)
+                    .foregroundStyle(.secondary)
+            }
+            MeasurementValue(
+                value: value ?? "—",
+                unit: unit,
+                tint: value == nil ? .secondary : tint,
+                size: .compact,
+                dimmed: value == nil
+            )
+            if let meta {
+                Text(meta)
+                    .font(AppFont.rowMeta)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, AppTheme.space12)
+        .padding(.vertical, AppTheme.space8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct FormErrorText: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(AppFont.formError)
+            .foregroundStyle(AppTheme.danger)
+    }
+}
+
+struct TintedChip: View {
+    let text: String
+    var tint: Color = AppTheme.brandTeal
+
+    var body: some View {
+        Text(text)
+            .font(AppFont.badge)
+            .foregroundStyle(tint)
+            .padding(.horizontal, AppTheme.chipHorizontal)
+            .padding(.vertical, AppTheme.chipVertical)
+            .background(tint.opacity(AppTheme.chipFillOpacity), in: Capsule())
+    }
+}
+
+struct SummaryMetricTile: View {
+    let label: String
+    let value: String?
+    var unit: String? = nil
+    var symbol: String? = nil
+    var tint: Color = AppTheme.brandTeal
+    var showAccentStroke: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.stackDefault) {
+            if let symbol {
+                IconWell(systemName: symbol, tint: tint)
+            }
+            Text(label)
+                .font(AppFont.rowMeta)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            MeasurementValue(
+                value: value ?? "—",
+                unit: (value != nil) ? unit : nil,
+                tint: value == nil ? .secondary : .primary,
+                size: .compact,
+                dimmed: value == nil
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppTheme.compactTilePadding)
+        .background {
+            RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
+                .fill(tileFill)
+                .overlay {
+                    if showAccentStroke {
+                        RoundedRectangle(cornerRadius: AppTheme.cardCornerRadius, style: .continuous)
+                            .strokeBorder(tint.opacity(AppTheme.accentStrokeOpacity), lineWidth: 1)
+                    }
+                }
+        }
+    }
+
+    private var tileFill: Color {
+        #if os(iOS)
+        Color(.secondarySystemGroupedBackground)
+        #else
+        Color(nsColor: .controlBackgroundColor)
+        #endif
+    }
+}
+
+#if os(iOS)
+struct IOSCircleAddButton: View {
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus.circle.fill")
+                .symbolRenderingMode(.hierarchical)
+                .font(AppFont.toolbarIcon)
+                .foregroundStyle(AppTheme.brandTeal)
+        }
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+#endif
+
 struct DeltaChip: View {
     let deltaKg: Double
     let unit: WeightUnit
@@ -290,11 +572,11 @@ struct DeltaChip: View {
         }()
 
         Text(text)
-            .font(.caption.weight(.semibold).monospacedDigit())
+            .font(AppFont.chip)
             .foregroundStyle(AppTheme.brandTeal)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(AppTheme.brandTeal.opacity(0.12), in: Capsule())
+            .padding(.horizontal, AppTheme.chipHorizontal)
+            .padding(.vertical, AppTheme.chipVertical)
+            .background(AppTheme.brandTeal.opacity(AppTheme.chipFillOpacity), in: Capsule())
     }
 }
 
@@ -303,10 +585,10 @@ struct SourceBadge: View {
 
     var body: some View {
         Text(source.displayName)
-            .font(.caption2.weight(.medium))
+            .font(AppFont.badge)
             .foregroundStyle(source == .healthkit ? AppTheme.brandTeal : .secondary)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
+            .padding(.horizontal, AppTheme.chipHorizontal)
+            .padding(.vertical, AppTheme.chipVertical)
             .background {
                 Capsule()
                     .fill(Color.primary.opacity(0.04))
@@ -325,7 +607,7 @@ struct RecordDot: View {
     var body: some View {
         Circle()
             .fill(color)
-            .frame(width: 6, height: 6)
+            .frame(width: AppTheme.recordDotSize, height: AppTheme.recordDotSize)
     }
 
     private var color: Color {

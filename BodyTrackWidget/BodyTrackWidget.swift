@@ -59,9 +59,9 @@ struct WeightWidgetProvider: TimelineProvider {
 // MARK: - Views
 
 private enum WidgetPalette {
-    static let brand = Color(red: 0.149, green: 0.478, blue: 0.471)
-    static let intake = Color(red: 0.710, green: 0.416, blue: 0.133)
-    static let activity = Color(red: 0.345, green: 0.455, blue: 0.282)
+    static let brand = BrandColor.teal
+    static let intake = BrandColor.amber
+    static let activity = BrandColor.green
 }
 
 struct WeightWidgetView: View {
