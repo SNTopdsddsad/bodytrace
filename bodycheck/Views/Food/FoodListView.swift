@@ -6,11 +6,35 @@
 import SwiftData
 import SwiftUI
 
+#if os(iOS)
+import PhotosUI
+import UIKit
+#endif
+
+enum FoodEditorMode: Identifiable {
+    case create
+    case edit(FoodEntry)
+
+    var id: String {
+        switch self {
+        case .create: "create"
+        case .edit(let entry): entry.id.uuidString
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .create: "添加食物"
+        case .edit: "编辑食物"
+        }
+    }
+}
+
 struct FoodListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \FoodEntry.date, order: .reverse) private var foods: [FoodEntry]
 
-    @State private var showEditor = false
+    @State private var editorMode: FoodEditorMode?
     @State private var searchText = ""
 
     private var todayFoods: [FoodEntry] {
@@ -49,7 +73,7 @@ struct FoodListView: View {
                     } description: {
                         Text("快速添加名称和热量即可。")
                     } actions: {
-                        Button("添加食物") { showEditor = true }
+                        Button("添加食物") { editorMode = .create }
                             .buttonStyle(.borderedProminent)
                             .tint(AppTheme.brandTeal)
                             .controlSize(.large)
@@ -92,18 +116,23 @@ struct FoodListView: View {
                         ForEach(groupedByDay, id: \.day) { group in
                             Section {
                                 ForEach(group.items) { entry in
-                                    HStack(alignment: .center, spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(entry.name)
-                                                .font(.body.weight(.medium))
-                                            Text(entry.date, format: AppLocale.time)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                    NavigationLink {
+                                        FoodDetailView(entry: entry)
+                                    } label: {
+                                        HStack(alignment: .center, spacing: 12) {
+                                            FoodPhotoThumb(data: entry.photoData)
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(entry.name)
+                                                    .font(.body.weight(.medium))
+                                                Text(entry.date, format: AppLocale.time)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer(minLength: 8)
+                                            Text("\(Int(entry.calories.rounded())) 千卡")
+                                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                                                .foregroundStyle(AppTheme.intakeAmber)
                                         }
-                                        Spacer(minLength: 8)
-                                        Text("\(Int(entry.calories.rounded())) 千卡")
-                                            .font(.subheadline.monospacedDigit().weight(.semibold))
-                                            .foregroundStyle(AppTheme.intakeAmber)
                                     }
                                     .padding(.vertical, 2)
                                 }
@@ -149,7 +178,7 @@ struct FoodListView: View {
                 #else
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showEditor = true
+                        editorMode = .create
                     } label: {
                         Label("添加", systemImage: "plus")
                     }
@@ -157,8 +186,8 @@ struct FoodListView: View {
                 }
                 #endif
             }
-            .sheet(isPresented: $showEditor) {
-                FoodEditorSheet()
+            .sheet(item: $editorMode) { mode in
+                FoodEditorSheet(mode: mode)
             }
         }
     }
@@ -180,10 +209,21 @@ struct FoodEditorSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    let mode: FoodEditorMode
+
     @State private var nameText = ""
     @State private var caloriesText = ""
     @State private var date = Date()
+    @State private var noteText = ""
+    @State private var photoData: Data?
     @State private var validationMessage: String?
+    #if os(iOS)
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var cameraImage: UIImage?
+    @State private var showCamera = false
+    @State private var showPhotoSource = false
+    @State private var showLibraryPicker = false
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -198,6 +238,16 @@ struct FoodEditorSheet: View {
                         .environment(\.locale, AppLocale.chinese)
                         .environment(\.calendar, AppLocale.calendar)
                 }
+
+                Section("备注（可选）") {
+                    TextField("例如：早餐、外卖、少油", text: $noteText, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+
+                #if os(iOS)
+                photoSection
+                #endif
+
                 if let validationMessage {
                     Section {
                         Text(validationMessage)
@@ -207,7 +257,7 @@ struct FoodEditorSheet: View {
                 }
             }
             .appFormStyle()
-            .navigationTitle("添加食物")
+            .navigationTitle(mode.title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -222,11 +272,113 @@ struct FoodEditorSheet: View {
                         .keyboardShortcut(.defaultAction)
                 }
             }
+            .onAppear { hydrate() }
+            #if os(iOS)
+            .confirmationDialog("选择照片来源", isPresented: $showPhotoSource, titleVisibility: .visible) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("拍照") { showCamera = true }
+                }
+                Button("从相册选择") { showLibraryPicker = true }
+                if photoData != nil {
+                    Button("移除照片", role: .destructive) {
+                        photoData = nil
+                        pickerItem = nil
+                        cameraImage = nil
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            }
+            .photosPicker(isPresented: $showLibraryPicker, selection: $pickerItem, matching: .images)
+            .sheet(isPresented: $showCamera) {
+                CameraPicker(image: $cameraImage)
+                    .ignoresSafeArea()
+            }
+            .onChange(of: cameraImage) { _, image in
+                guard let image, let data = FoodPhotoCodec.compressedJPEG(from: image) else { return }
+                photoData = data
+            }
+            .onChange(of: pickerItem) { _, item in
+                Task { await loadPickerItem(item) }
+            }
+            #endif
         }
         .appChineseLocale()
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 280, idealHeight: 320)
         #endif
+    }
+
+    #if os(iOS)
+    private var photoSection: some View {
+        Section {
+            Button {
+                showPhotoSource = true
+            } label: {
+                if let photoData, let image = FoodPhotoCodec.image(from: photoData) {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(alignment: .bottomTrailing) {
+                            Text("更换")
+                                .font(.caption.weight(.semibold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .padding(10)
+                        }
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "camera.fill")
+                        Text("添加照片")
+                        Spacer()
+                        Text("拍照或相册")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+        } header: {
+            Text("照片（可选）")
+        } footer: {
+            Text("点照片后选择拍照或从相册选取。照片只保存在 BodyTrack，不写入健康。")
+        }
+    }
+
+    private func loadPickerItem(_ item: PhotosPickerItem?) async {
+        guard let item else { return }
+        do {
+            guard let raw = try await item.loadTransferable(type: Data.self),
+                  let compressed = FoodPhotoCodec.compressedJPEG(from: raw) else {
+                return
+            }
+            photoData = compressed
+        } catch {
+            validationMessage = "无法读取这张照片，请换一张再试"
+        }
+    }
+    #endif
+
+    private func hydrate() {
+        switch mode {
+        case .create:
+            nameText = ""
+            caloriesText = ""
+            date = Date()
+            noteText = ""
+            photoData = nil
+        case .edit(let entry):
+            nameText = entry.name
+            caloriesText = entry.calories == 0 ? "" : String(format: "%.0f", entry.calories)
+            date = entry.date
+            noteText = entry.note ?? ""
+            photoData = entry.photoData
+        }
     }
 
     private func saveFood() {
@@ -244,7 +396,23 @@ struct FoodEditorSheet: View {
             return
         }
 
-        modelContext.insert(FoodEntry(name: name, calories: calories, date: date))
+        let trimmedNote = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let noteValue = trimmedNote.isEmpty ? nil : trimmedNote
+
+        switch mode {
+        case .create:
+            modelContext.insert(
+                FoodEntry(name: name, calories: calories, date: date, note: noteValue, photoData: photoData)
+            )
+        case .edit(let entry):
+            entry.name = name
+            entry.calories = calories
+            entry.date = date
+            entry.note = noteValue
+            entry.photoData = photoData
+            entry.updatedAt = Date()
+        }
+
         do {
             try modelContext.save()
             dismiss()

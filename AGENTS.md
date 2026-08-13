@@ -34,7 +34,7 @@
 
 - 多平台壳：iOS `TabView`，macOS `NavigationSplitView` + `Settings` 窗
 - 体重 CRUD（手动，`source = manual`）；体重页 Mac 侧有筛选、检查器、宽度自适应
-- 饮食 CRUD（名称 + kcal）；按本地日历日分组
+- 饮食 CRUD（名称 + kcal）；按本地日历日分组；iOS 可拍照/相册，`photoData` 可选外置存储
 - 今日概览：最新体重、净热量、今日摄入/运动消耗/静息能量、体重趋势图、最近记录
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；隐私与关于文案
 - SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；失败则回退本地 store
@@ -89,7 +89,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 三个 `@Model`：`WeightEntry`、`FoodEntry`、`ExerciseEntry`。公共字段：`id`、`date`、`note?`、`createdAt`、`updatedAt`。
 
 - `WeightEntry.weight`：kg。`source` 存 `WeightSource.rawValue`（`manual` / `healthkit`）。`healthKitUUID` 预留给体重对账，Mac 上通常为 nil。
-- `FoodEntry.calories`：kcal。`healthKitUUID` 仍保留（CloudKit 不能删字段），**不要**用来写健康。
+- `FoodEntry.calories`：kcal。`healthKitUUID` 仍保留（CloudKit 不能删字段），**不要**用来写健康。`photoData` 可选 JPEG，`@Attribute(.externalStorage)`。
 - `ExerciseEntry`：比文档初稿多了 `source`（默认 `healthkit`）和 `healthKitUUID`。导入用 UUID upsert，禁止按名称+日期盲目插入。
 
 改模型时：给新属性默认值或设为可选；同步更新 Preview 的 `modelContainer(for:)` 列表；更新开发文档 §3。
@@ -125,7 +125,7 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 当前 Development 已有、必须一并部署的类型：
 
 - `CD_WeightEntry`
-- `CD_FoodEntry`
+- `CD_FoodEntry`（含可选 `CD_photoData`）
 - `CD_ExerciseEntry`
 
 步骤（每次改了模型字段后都要再做一遍）：

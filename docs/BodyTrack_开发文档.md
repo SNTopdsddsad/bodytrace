@@ -1,6 +1,6 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.8  
+**版本**：v1.9  
 **日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
@@ -16,6 +16,7 @@
 | v1.6 | 2026-08-13 | 概览展示净热量：摄入 − 运动消耗 − 静息能量 |
 | v1.7 | 2026-08-13 | Mac 功能全部搁置；先做完 iPhone |
 | v1.8 | 2026-08-13 | 饮食不写健康：健康无餐食日记，只留在 SwiftData |
+| v1.9 | 2026-08-13 | 饮食支持拍照/相册；`FoodEntry.photoData` 可选外置存储 |
 
 ---
 
@@ -173,9 +174,11 @@ final class FoodEntry {
     var date: Date
     var name: String
     var calories: Double
-    /// 写回 HealthKit 后的样本 UUID（可选）
+    /// 不写健康；字段保留兼容旧 schema
     var healthKitUUID: UUID?
     var note: String?
+    /// 可选饮食照片（JPEG），externalStorage
+    var photoData: Data?
     var createdAt: Date
     var updatedAt: Date
 
@@ -184,7 +187,8 @@ final class FoodEntry {
         calories: Double,
         date: Date = Date(),
         healthKitUUID: UUID? = nil,
-        note: String? = nil
+        note: String? = nil,
+        photoData: Data? = nil
     ) {
         self.id = UUID()
         self.date = date
@@ -192,6 +196,7 @@ final class FoodEntry {
         self.calories = calories
         self.healthKitUUID = healthKitUUID
         self.note = note
+        self.photoData = photoData
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -437,8 +442,8 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
    - 新增 / 编辑 / 删除
 
 3. **饮食**
-   - 按**本地日历日**分组的食物列表
-   - 快速添加（名称 + 热量）
+   - 按**本地日历日**分组的食物列表；点进详情看照片、热量与时间，再编辑或删除
+   - 快速添加（名称 + 热量）；iPhone 可拍照或从相册选图
 
 4. **运动**（P1）
    - 简单记录列表

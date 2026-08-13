@@ -443,7 +443,8 @@ enum PersistenceController {
                     calories: entry.calories,
                     date: entry.date,
                     healthKitUUID: entry.healthKitUUID,
-                    note: entry.note
+                    note: entry.note,
+                    photoData: entry.photoData
                 )
                 copy.id = entry.id
                 copy.createdAt = entry.createdAt

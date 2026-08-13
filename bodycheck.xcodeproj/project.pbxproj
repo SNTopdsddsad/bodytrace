@@ -257,8 +257,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
+				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重和静息能量，以便展示运动、体重与今日消耗。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要从相册选择饮食照片。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -308,8 +310,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
+				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重和静息能量，以便展示运动、体重与今日消耗。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要从相册选择饮食照片。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

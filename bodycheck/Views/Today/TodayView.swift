@@ -110,7 +110,7 @@ struct TodayView: View {
                 WeightEditorView(mode: .create)
             }
             .sheet(isPresented: $showQuickFood) {
-                FoodEditorSheet()
+                FoodEditorSheet(mode: .create)
             }
             #if os(iOS)
             .task {
