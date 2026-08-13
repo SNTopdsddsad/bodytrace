@@ -144,7 +144,7 @@ struct SettingsView: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link("打开系统设置", destination: url)
             }
-            Text("体重可读写；锻炼和静息能量只读。静息能量是健康里的「静息能量」，不是锻炼消耗，也不会和摄入做净热量。请在系统设置中打开对应读取权限。Mac 不读取健康。")
+            Text("体重可读写；锻炼和静息能量只读。概览净热量 = 摄入 − 运动消耗 − 静息能量。请在系统设置中打开对应读取权限。Mac 不读取健康。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {

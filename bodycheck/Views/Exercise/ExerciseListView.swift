@@ -169,7 +169,7 @@ struct ExerciseListView: View {
                 #if os(macOS)
                 Text("运动记录来自 Apple 健康，Mac 端仅支持查看，不可新增或编辑。静息能量请在 iPhone 上读取。")
                 #else
-                Text("锻炼消耗来自 workout；静息能量来自健康中的静息能量，不与摄入做净热量。")
+                Text("锻炼消耗来自 workout；静息能量来自健康。概览净热量 = 摄入 − 运动消耗 − 静息能量。")
                 #endif
             }
 

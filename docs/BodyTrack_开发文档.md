@@ -1,6 +1,6 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.5  
+**版本**：v1.8  
 **日期**：2026-08-13  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
@@ -12,7 +12,10 @@
 | v1.2 | 2026-08-13 | 启用 SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；模型补默认值；无账号/失败时回退本地 |
 | v1.3 | 2026-08-13 | iOS 手动体重写回 Apple 健康（`bodyMass` + `healthKitUUID`） |
 | v1.4 | 2026-08-13 | iOS 从健康导入体重：按 `healthKitUUID` upsert；回到前台静默拉取 |
-| v1.5 | 2026-08-13 | iOS 读取今日静息能量（`basalEnergyBurned` 合计）；不入库、不做净热量 |
+| v1.5 | 2026-08-13 | iOS 读取今日静息能量（`basalEnergyBurned` 合计）；不入库 |
+| v1.6 | 2026-08-13 | 概览展示净热量：摄入 − 运动消耗 − 静息能量 |
+| v1.7 | 2026-08-13 | Mac 功能全部搁置；先做完 iPhone |
+| v1.8 | 2026-08-13 | 饮食不写健康：健康无餐食日记，只留在 SwiftData |
 
 ---
 
@@ -50,13 +53,14 @@
 |------|----------|
 | 体重单位存储 | 始终 **kg**；界面可切换显示为 lb |
 | 体重条数 | **允许多条/日**（列表全保留；「最新体重」取 `date` 最新一条，同一天用 `createdAt` 决胜） |
-| 今日热量公式 | **今日摄入合计**（`FoodEntry.calories` 之和）；运动消耗单独展示，MVP 不做净热量 |
+| 今日热量公式 | **今日摄入** = 当日 `FoodEntry.calories` 之和；**净热量** = 摄入 − 运动消耗（有 kcal）− 静息能量 |
 | 运动消耗为空 | `caloriesBurned == nil` 时不计入任何热量合计，仅展示时长 |
 | 「今日」边界 | 使用设备 **当前时区** 的 `Calendar.current` 日界（00:00–24:00） |
-| 食物写回 HealthKit | **是**（仅能量值 `dietaryEnergyConsumed`；见 §5.1 已知限制） |
+| 食物写回 HealthKit | **否**。饮食只存在 BodyTrack；健康没有餐食列表，不写 `dietaryEnergyConsumed` |
 | 小组件输入 | **否**直接输数字；跳转主 App 快速记录页 |
 | 界面语言 | 先中文；日期/时间/星期强制简体中文，不跟系统语言走 |
 | 最低系统 | iOS 18+ / macOS 15+ |
+| 平台节奏 | **先做完 iPhone**；Mac 已有壳冻结，未宣布重启前不补 Mac 功能 |
 
 ---
 
@@ -89,7 +93,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │ 写入路径                                                     │
 │  App / Widget Intent → 主 App UI → SwiftData 写入            │
-│       ├─(iOS)→ 写回 HealthKit（体重 / 饮食能量，按策略）      │
+│       ├─(iOS)→ 写回 HealthKit（仅体重，按策略）               │
 │       ├─────→ CloudKit 同步到其他设备                         │
 │       └─────→ 更新 App Group + reload Widget timelines       │
 └─────────────────────────────────────────────────────────────┘
@@ -111,7 +115,7 @@
 | iOS 编辑体重 | 更新 SwiftData；若有 `healthKitUUID` 则删除旧 HK 样本并写入新样本（或按实现选择 update），再更新 UUID |
 | iOS 删除体重 | 删 SwiftData；若有 `healthKitUUID` 且 `source == manual`（或本 App 写入的样本）则尝试删 HK 样本 |
 | Mac 新增/编辑/删除体重 | **仅**改 SwiftData + CloudKit；**不**写 HealthKit |
-| 食物删除（iOS） | 删 SwiftData；若有关联 `healthKitUUID` 则尝试删对应 `dietaryEnergyConsumed` 样本 |
+| 食物新增/编辑/删除 | **仅**改 SwiftData + CloudKit；**不**写 HealthKit |
 | 无 iCloud / 离线 | 本地 SwiftData 照常读写；恢复网络后由系统同步；UI 不阻塞 |
 | HealthKit 未授权 | 全部业务功能仍可用；隐藏/禁用「从健康同步」相关提示，引导去设置 |
 
@@ -311,7 +315,8 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 **写入**：
 
 - `HKQuantityTypeIdentifier.bodyMass`
-- `HKQuantityTypeIdentifier.dietaryEnergyConsumed`（食物写回，尚未实现）
+
+不要申请 `dietaryEnergyConsumed`。
 
 > 后续扩展再申请：`activeEnergyBurned`、`stepCount` 等。  
 > 与审核原则一致：**只申请真正用到的类型**。
@@ -333,11 +338,10 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 - 用户点「从健康同步」时才弹授权。`HKObserverQuery` + 后台投递仍未做
 - 权限拒绝：本地功能全开，设置页展示写回状态与跳转系统设置入口
 
-#### 食物写回 HealthKit 的已知限制（MVP 接受）
+#### 饮食与健康
 
-- 仅写入能量数值（`dietaryEnergyConsumed`），健康 App 中可能缺少完整「餐食」上下文
-- 可用 `HKMetadata` 附带食物名称（若 API 允许）便于排查
-- 删除本 App 创建的食物记录时，尽量删除对应 HK 样本；非本 App 写入的样本不删
+- **不写回**。健康「营养 → 膳食能量」只有千卡合计，没有餐食名称/列表
+- 今日摄入、净热量一律以 SwiftData 里的 `FoodEntry` 为准
 
 ### 5.2 小组件（快速记录体重）
 
@@ -425,8 +429,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 1. **今日概览**
    - 最新体重 + 与上条差值
-   - 今日摄入热量
-   - 今日运动（时长；有消耗则展示消耗，P1）
+   - 今日热量：净热量（摄入 − 运动消耗 − 静息能量）+ 三列分项
    - 快捷入口：记录体重 / 记录食物
 
 2. **体重**
@@ -476,7 +479,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 ### 第三阶段（饮食与运动）
 
-1. `FoodEntry` + 可选写回 `dietaryEnergyConsumed`
+1. `FoodEntry`（仅本地/iCloud，不写健康）
 2. `ExerciseEntry`（P1）
 3. 今日摄入汇总与概览展示
 
@@ -509,8 +512,6 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 - Live Activity（记录运动时）
 - 更丰富的营养素记录
 - 读取活动能量 / 步数（届时再申请对应 HealthKit 类型）
-- 净热量（摄入 − 消耗）展示
-
 ---
 
 ## 10. 配置清单与命名
@@ -565,7 +566,7 @@ Widget kind:            WeightWidget
 | 事项 | 建议默认值 | 状态 |
 |------|------------|------|
 | 体重单位默认 | kg | 已定 |
-| 食物是否写回 HealthKit | 是 | 已定 |
+| 食物是否写回 HealthKit | **否** | 已定 |
 | 小组件是否直接输入数字 | 否（跳转 App） | 已定 |
 | 最低系统版本 | iOS 18 / macOS 15 | 已定 |
 | 今日热量是否含运动 | 否（摄入与消耗分开展示） | 已定 |

@@ -19,6 +19,15 @@
 
 不要把仓库、工程、显示名、Bundle 擅自统一改名。
 
+## 当前优先级（2026-08-13 起）
+
+**先做完 iPhone，Mac 功能全部搁置。**
+
+- 不要新做、打磨、补齐 Mac 专用 UI（侧栏、检查器、Settings 窗、Mac 列表交互、Mac 快捷键体验等）。
+- 不要为 Mac 补 HealthKit、静息能量、净热量完整度或「和 iPhone 对齐」的桌面功能。
+- 共享代码改动时：iOS 优先；碰到 `#if os(...)` 仍要保证 **macOS 能编过**，但不主动改 Mac 体验。
+- 用户未明确说「开始做 Mac」之前，下一阶段只推进 iPhone：Widget / App Group / Deep Link、iPhone 体验与验收。**饮食不写健康。**
+
 ## 当前进度（2026-08）
 
 已有：
@@ -26,16 +35,19 @@
 - 多平台壳：iOS `TabView`，macOS `NavigationSplitView` + `Settings` 窗
 - 体重 CRUD（手动，`source = manual`）；体重页 Mac 侧有筛选、检查器、宽度自适应
 - 饮食 CRUD（名称 + kcal）；按本地日历日分组
-- 今日概览：最新体重、今日摄入、今日运动、今日静息能量、体重趋势图、最近记录
+- 今日概览：最新体重、净热量、今日摄入/运动消耗/静息能量、体重趋势图、最近记录
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；隐私与关于文案
 - SwiftData CloudKit：容器 `iCloud.yinke.bodycheck`；失败则回退本地 store
 - iOS：从 Apple 健康导入 **workout** → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日 **静息能量**（`basalEnergyBurned` 合计，不入库）
 - iOS：手动新增/编辑/删除体重写回 Apple 健康（`bodyMass`，回填 `healthKitUUID`）；从健康导入体重按 UUID upsert；未授权时本地仍可用
-- Mac：运动列表只读，不提供新增/编辑/删除；Mac 改体重不写 HealthKit
+- Mac：壳和已有列表先冻结，不再加功能。运动只读；改体重不写 HealthKit
 
-未做（文档 MVP 里仍是规划）：
+明确不做：
 
-- 食物写回 `dietaryEnergyConsumed`
+- 饮食写回健康（健康没有餐食日记，只有膳食能量数字，产品已否决）
+
+未做（先做 iPhone）：
+
 - Widget / App Group / Deep Link（`bodytrack://log-weight`）
 - 独立 `WeightService` / `FoodService`；视图目前直接写 `ModelContext`
 - 测试 Target、`.gitignore`、本地化 String Catalog
@@ -61,12 +73,12 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 
 1. **体重只存 kg**。界面用 `WeightUnit` 换算。偏好键：`AppStorage("weightUnit")`，值为 `"kg"` | `"lb"`。
 2. **允许多条体重/日**。最新体重 = 按 `date` 最新的一条；同一天用 `createdAt` 决胜，不是「每日一条」。
-3. **今日摄入** = 当日 `FoodEntry.calories` 之和。运动消耗单独展示，**不要做净热量**。
+3. **今日摄入** = 当日 `FoodEntry.calories` 之和。**净热量** = 摄入 − 运动消耗（仅 `caloriesBurned != nil`）− 静息能量（没有则该项按 0，并在文案标明未计入）。不要把无消耗的运动时长折成热量。
 4. **`caloriesBurned == nil` 不计入任何热量合计**，只展示时长。
 5. **「今日」** 用设备当前时区 `Calendar.current`（见 `Date+CalendarDay` / `dayInterval`）。
 6. **体重日期只到天**：`WeightEditorView` 保存 `date.startOfDay`。饮食保留时分。
 7. **SwiftData + CloudKit 禁止 `@Attribute(.unique)`**。去重用应用层 `id` / `healthKitUUID`。新属性必须可选或带默认值。
-8. **Mac 不依赖 HealthKit**。Health 相关 API、授权入口、写回逻辑一律 `#if os(iOS)`。
+8. **Mac 功能搁置，且不依赖 HealthKit**。不要主动做 Mac 新功能。Health 相关 API、授权入口、写回逻辑一律 `#if os(iOS)`。
 9. **运动以 Apple 健康为源**。iOS 同步 workout；Mac 只读。不要加自由录入运动，除非产品明确改口。
 10. **HealthKit 未授权或不可用时，本地体重/饮食必须仍可用**。不要在启动第一帧弹授权。
 11. **业务列表以 SwiftData 为准**。HealthKit 是 iOS 出口/来源，不能阻塞 Mac 或未授权用户。
@@ -77,7 +89,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 三个 `@Model`：`WeightEntry`、`FoodEntry`、`ExerciseEntry`。公共字段：`id`、`date`、`note?`、`createdAt`、`updatedAt`。
 
 - `WeightEntry.weight`：kg。`source` 存 `WeightSource.rawValue`（`manual` / `healthkit`）。`healthKitUUID` 预留给体重对账，Mac 上通常为 nil。
-- `FoodEntry.calories`：kcal。`healthKitUUID` 预留给饮食写回。
+- `FoodEntry.calories`：kcal。`healthKitUUID` 仍保留（CloudKit 不能删字段），**不要**用来写健康。
 - `ExerciseEntry`：比文档初稿多了 `source`（默认 `healthkit`）和 `healthKitUUID`。导入用 UUID upsert，禁止按名称+日期盲目插入。
 
 改模型时：给新属性默认值或设为可选；同步更新 Preview 的 `modelContainer(for:)` 列表；更新开发文档 §3。
@@ -134,7 +146,7 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 
 - 分区：`AppSection` = 概览 / 体重 / 饮食 / 运动。上次分区：`AppStorage("lastAppSection")`。
 - iOS：`TabView`；设置是 toolbar sheet。
-- macOS：侧栏 + detail；设置走系统 Settings 场景（⌘,）。窗口最小约 880×580，默认 1100×720。窄宽度时收起体重检查器。
+- macOS：侧栏 + detail；设置走系统 Settings 场景（⌘,）。**现有实现冻结，不继续打磨。**
 - 品牌色：`AppTheme.brandTeal` / `intakeAmber` / `activityGreen`。卡片用 `appSurface`，页面用 `pageBackground`。
 - 空状态用 `ContentUnavailableView`。数字用 `monospacedDigit`。
 - 体重 Mac 列表：**不要**给行加 `onTapGesture`（会抢走 `List` 选择，尤其第一列）。单元格文本 `.allowsHitTesting(false)`。
@@ -146,30 +158,30 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 - Entitlements：`com.apple.developer.healthkit`。
 - 运动：只读 `HKObjectType.workoutType()`；`HealthKitExerciseService.syncWorkouts` 默认近 90 天。
 - 体重：读+写 `HKQuantityType(.bodyMass)`。iOS 保存/编辑手动体重时双写并回填 `healthKitUUID`；删除手动记录时尝试删本 App 写入的样本。从健康导入按 `healthKitUUID` upsert（近 90 天）；打开体重/概览或回到前台时静默拉取，不弹授权。点「从健康同步」才请求权限。
-- 静息能量：只读 `HKQuantityType(.basalEnergyBurned)`，按本地日历日做累计求和，展示在概览/运动页。不写入 SwiftData，不做净热量。
-- 权限申请走 `HealthKitAccess`（读：体重 + workout + 静息能量；写：体重）。权限文案必须覆盖实际申请的类型。若再增加饮食写回，必须同步改 `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription`，且**只申请真正用到的类型**。
+- 静息能量：只读 `HKQuantityType(.basalEnergyBurned)`，按本地日历日做累计求和，展示在概览/运动页。不写入 SwiftData。概览净热量会减去该值。
+- 权限申请走 `HealthKitAccess`（读：体重 + workout + 静息能量；写：体重）。**不要申请** `dietaryEnergyConsumed`。权限文案必须覆盖实际申请的类型。
 - 不要在启动第一帧弹授权。首次点保存体重、设置里「允许写入健康」或「从健康同步」再请求。
 - Mac 改删体重不写 HK。健康来源的体重不要靠删除本地行「保持一致」——再同步会回来。
 - 运动：不要删除健康来源行来「保持一致」——再同步会回来。`ExerciseListView` 有意不做删除。
 
 ## 构建设置注意
 
-- Xcode 26.4 工程；`SUPPORTED_PLATFORMS` 含 iOS / macOS / visionOS。改 UI 时至少保证 iOS + macOS 都能编过。visionOS 未单独打磨，不要主动加 xrOS 专用 UI。
+- Xcode 26.4 工程；`SUPPORTED_PLATFORMS` 含 iOS / macOS / visionOS。日常验证以 **iOS** 为准。碰 `#if os(...)` 时 Mac 也要能编过，但不要为 Mac 补功能。visionOS 未单独打磨，不要主动加 xrOS 专用 UI。
 - App Sandbox 已开。`REGISTER_APP_GROUPS = YES` 但还没有 Group ID / Widget。
 - Mac 必须用 `bodycheck.macos.entitlements`；不要把 HealthKit 写进 Mac entitlements。
 - 无独立 Info.plist（`GENERATE_INFOPLIST_FILE = YES`）。键在 `project.pbxproj` 的 `INFOPLIST_KEY_*`。
 
 ## 构建与验证
 
-本机有 Xcode 时：
+本机有 Xcode 时，**优先编 iOS**：
 
 ```bash
-# macOS
-xcodebuild -project bodycheck.xcodeproj -scheme bodycheck -destination 'platform=macOS' build
-
 # iOS 模拟器（设备名以本机 `xcrun simctl list devices available` 为准）
 xcodebuild -project bodycheck.xcodeproj -scheme bodycheck \
-  -destination 'platform=iOS Simulator,name=iPhone 16' build
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
+
+# 仅当改到 #if os(...) 时再编 Mac，确认没破编译即可
+xcodebuild -project bodycheck.xcodeproj -scheme bodycheck -destination 'platform=macOS' build
 ```
 
 没有测试 Target。改完至少保证上述一端能编过；碰 `#if os(...)` 时两端都编。Preview 用内存 `modelContainer`。

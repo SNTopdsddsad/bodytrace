@@ -191,16 +191,9 @@ struct TodayView: View {
     // MARK: - Lead
 
     private var leadSection: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: AppTheme.spaceL) {
-                weightHero
-                todaySummary
-                    .frame(maxWidth: 340)
-            }
-            VStack(spacing: AppTheme.spaceL) {
-                weightHero
-                todaySummary
-            }
+        VStack(alignment: .leading, spacing: AppTheme.spaceL) {
+            weightHero
+            energySection
         }
     }
 
@@ -231,6 +224,11 @@ struct TodayView: View {
                     Text(latest.date, format: AppLocale.day)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Button("记录") { showQuickWeight = true }
+                        .buttonStyle(.borderless)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(AppTheme.brandTeal)
                 }
 
                 #if os(macOS)
@@ -270,58 +268,171 @@ struct TodayView: View {
         #endif
     }
 
-    private var todaySummary: some View {
-        VStack(spacing: 0) {
-            summaryRow(
-                symbol: "flame.fill",
-                tint: AppTheme.intakeAmber,
-                label: "今日摄入",
-                value: todayCalories.map { "\(Int($0.rounded()))" },
-                unit: "千卡",
-                meta: todayFoods.isEmpty ? nil : "\(todayFoods.count) 条饮食记录"
-            )
-            Divider().padding(.leading, summaryIconLeading)
-            summaryRow(
-                symbol: "timer",
-                tint: AppTheme.activityGreen,
-                label: "今日运动",
-                value: todayExerciseMinutes.map { "\($0)" },
-                unit: "分钟",
-                meta: exerciseMeta ?? healthExerciseHint
-            )
-            Divider()
-            summaryRow(
-                symbol: "bed.double.fill",
-                tint: AppTheme.activityGreen,
-                label: "今日静息能量",
-                value: todayRestingDisplay,
-                unit: "千卡",
-                meta: restingEnergyMeta
-            )
-        }
-        .frame(maxWidth: .infinity, minHeight: platformHeroMinHeight)
-        .appSurface()
-    }
-
-    private var summaryIconLeading: CGFloat {
+    private var todayIntakeKcal: Double { todayCalories ?? 0 }
+    private var todayExerciseBurnKcal: Double { todayExerciseBurn ?? 0 }
+    private var todayRestingKcalValue: Double {
         #if os(iOS)
-        16 + 36 + 16 // padding + icon + spacing
+        todayRestingKcal ?? 0
         #else
-        20 + 36 + 16
+        0
         #endif
     }
 
-    private var exerciseMeta: String? {
-        if todayExercises.isEmpty { return nil }
-        if let burn = todayExerciseBurn {
-            return "消耗 \(Int(burn.rounded())) 千卡 · 健康"
+    /// 摄入 − 有消耗数据的运动 − 静息能量。无消耗的运动只展示时长，不参与相减。
+    private var netCalories: Double? {
+        let hasIntake = todayCalories != nil
+        let hasExerciseBurn = todayExerciseBurn != nil
+        #if os(iOS)
+        let hasResting = todayRestingKcal != nil
+        #else
+        let hasResting = false
+        #endif
+        guard hasIntake || hasExerciseBurn || hasResting else { return nil }
+        return todayIntakeKcal - todayExerciseBurnKcal - todayRestingKcalValue
+    }
+
+    private var netCaloriesText: String? {
+        guard let net = netCalories else { return nil }
+        if abs(net) < 0.5 { return "0" }
+        let amount = "\(Int(abs(net).rounded()))"
+        return net > 0 ? "+\(amount)" : "−\(amount)"
+    }
+
+    private var netCaloriesTone: Color {
+        guard let net = netCalories, abs(net) >= 0.5 else { return .secondary }
+        return net > 0 ? AppTheme.intakeAmber : AppTheme.activityGreen
+    }
+
+    private var netCaloriesCaption: String {
+        guard netCalories != nil else { return "记录饮食或同步健康后计算" }
+        var parts = ["摄入 − 运动消耗 − 静息能量"]
+        if todayExerciseBurn == nil, todayExerciseMinutes != nil {
+            parts.append("未计入无消耗的运动")
         }
-        return "\(todayExercises.count) 条 · 来自健康"
+        #if os(iOS)
+        if todayRestingKcal == nil {
+            parts.append("未计入静息")
+        }
+        #else
+        parts.append("未计入静息")
+        #endif
+        return parts.joined(separator: " · ")
+    }
+
+    private var energySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("今日热量")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(netCaloriesCaption)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button("记录饮食") { showQuickFood = true }
+                    .buttonStyle(.borderless)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(AppTheme.intakeAmber)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("净热量")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(netCaloriesText ?? "—")
+                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(netCaloriesTone)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                if netCaloriesText != nil {
+                    Text("千卡")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 0) {
+                    energyCell(intakeMetric)
+                    energyRule
+                    energyCell(exerciseMetric)
+                    energyRule
+                    energyCell(restingMetric)
+                }
+                VStack(spacing: 0) {
+                    energyCell(intakeMetric)
+                    Divider()
+                    energyCell(exerciseMetric)
+                    Divider()
+                    energyCell(restingMetric)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appSurface()
+    }
+
+    private var intakeMetric: EnergyMetric {
+        EnergyMetric(
+            symbol: "fork.knife",
+            tint: AppTheme.intakeAmber,
+            label: "摄入",
+            value: todayCalories.map { "\(Int($0.rounded()))" },
+            unit: "千卡",
+            meta: todayFoods.isEmpty ? "自己填写后相加" : "\(todayFoods.count) 条记录相加"
+        )
+    }
+
+    private var exerciseMetric: EnergyMetric {
+        if let burn = todayExerciseBurn {
+            return EnergyMetric(
+                symbol: "figure.run",
+                tint: AppTheme.activityGreen,
+                label: "运动消耗",
+                value: "\(Int(burn.rounded()))",
+                unit: "千卡",
+                meta: todayExerciseMinutes.map { "\($0) 分钟 · 健康" } ?? "来自健康"
+            )
+        }
+        if let minutes = todayExerciseMinutes {
+            return EnergyMetric(
+                symbol: "figure.run",
+                tint: AppTheme.activityGreen,
+                label: "运动消耗",
+                value: "\(minutes)",
+                unit: "分钟",
+                meta: "暂无消耗数据"
+            )
+        }
+        return EnergyMetric(
+            symbol: "figure.run",
+            tint: AppTheme.activityGreen,
+            label: "运动消耗",
+            value: nil,
+            unit: "千卡",
+            meta: healthExerciseHint
+        )
+    }
+
+    private var restingMetric: EnergyMetric {
+        EnergyMetric(
+            symbol: "bed.double.fill",
+            tint: AppTheme.brandTeal,
+            label: "静息能量",
+            value: todayRestingDisplay,
+            unit: "千卡",
+            meta: restingEnergyMeta
+        )
     }
 
     private var healthExerciseHint: String {
         #if os(macOS)
-        "来自 Apple 健康（iPhone 同步）"
+        "来自健康，需 iPhone 同步"
         #else
         "在「运动」页从健康同步"
         #endif
@@ -335,57 +446,50 @@ struct TodayView: View {
         #endif
     }
 
-    private var restingEnergyMeta: String? {
+    private var restingEnergyMeta: String {
         #if os(iOS)
-        todayRestingKcal == nil ? "需授权读取健康中的静息能量" : "来自 Apple 健康"
+        todayRestingKcal == nil ? "需授权读取健康" : "健康今日合计"
         #else
-        "请在 iPhone 上从健康读取"
+        "请在 iPhone 上读取"
         #endif
     }
 
-    private func summaryRow(
-        symbol: String,
-        tint: Color,
-        label: String,
-        value: String?,
-        unit: String,
-        meta: String?
-    ) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 36, height: 36)
-                .background {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(tint.opacity(0.12))
-                }
+    private var energyRule: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.08))
+            .frame(width: 1)
+            .padding(.vertical, 8)
+    }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(label)
-                    .font(.subheadline)
+    private func energyCell(_ metric: EnergyMetric) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: metric.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(metric.tint)
+                Text(metric.label)
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(value ?? "—")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                    if value != nil {
-                        Text(unit)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if let meta {
-                    Text(meta)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
             }
-            Spacer(minLength: 0)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(metric.value ?? "—")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                Text(metric.unit)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text(metric.meta)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(AppTheme.cardPadding)
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Chart
@@ -618,6 +722,15 @@ struct TodayView: View {
         }
         .appSurface()
     }
+}
+
+private struct EnergyMetric {
+    let symbol: String
+    let tint: Color
+    let label: String
+    let value: String?
+    let unit: String
+    let meta: String
 }
 
 // MARK: - Chart helpers
