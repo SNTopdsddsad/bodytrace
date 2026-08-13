@@ -108,6 +108,12 @@ struct WeightListView: View {
     @State private var pendingDeleteIDs: Set<UUID> = []
     @State private var sortNewestFirst = true
     @State private var contentWidth: CGFloat = 800
+    #if os(iOS)
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isHealthSyncing = false
+    @State private var healthSyncMessage: String?
+    @State private var healthSyncIsError = false
+    #endif
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -752,12 +758,16 @@ struct WeightListView: View {
                 ContentUnavailableView {
                     Label("还没有体重记录", systemImage: "scalemass")
                 } description: {
-                    Text("记录第一条体重，之后就能在这里查看趋势。")
+                    Text("记录第一条体重，或从 Apple 健康同步已有记录。")
                 } actions: {
                     Button("记录体重") { editorMode = .create }
                         .buttonStyle(.borderedProminent)
                         .tint(AppTheme.brandTeal)
                         .controlSize(.large)
+                    Button("从健康同步") {
+                        Task { await syncWeightsFromHealth() }
+                    }
+                    .disabled(isHealthSyncing)
                 }
             } else {
                 List {
@@ -858,6 +868,19 @@ struct WeightListView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    Task { await syncWeightsFromHealth() }
+                } label: {
+                    if isHealthSyncing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "heart.text.square")
+                    }
+                }
+                .disabled(isHealthSyncing)
+                .accessibilityLabel("从健康同步")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     editorMode = .create
                 } label: {
                     Image(systemName: "plus.circle.fill")
@@ -882,8 +905,23 @@ struct WeightListView: View {
             Text("删除后无法恢复。")
         }
         #if os(iOS)
+        .safeAreaInset(edge: .bottom) {
+            if let healthSyncMessage {
+                Text(healthSyncMessage)
+                    .font(.footnote)
+                    .foregroundStyle(healthSyncIsError ? .red : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(10)
+                    .background(.bar)
+            }
+        }
         .task {
-            await HealthKitWeightService.shared.pushUnsyncedManualEntries(in: modelContext)
+            await reconcileWeightsFromHealth(prompt: false)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await reconcileWeightsFromHealth(prompt: false) }
+            }
         }
         #endif
     }
@@ -1008,6 +1046,39 @@ struct WeightListView: View {
         let delta = entry.weight - ordered[idx + 1].weight
         return "\(deltaText(delta)) \(weightUnit.shortLabel)"
     }
+
+    #if os(iOS)
+    @MainActor
+    private func syncWeightsFromHealth() async {
+        isHealthSyncing = true
+        healthSyncIsError = false
+        defer { isHealthSyncing = false }
+        do {
+            let count = try await HealthKitWeightService.shared.reconcile(
+                into: modelContext,
+                promptIfNeeded: true
+            )
+            healthSyncMessage = count == 0
+                ? "健康中暂无近 90 天的体重变化"
+                : "已从健康同步 \(count) 条体重"
+        } catch {
+            healthSyncIsError = true
+            healthSyncMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func reconcileWeightsFromHealth(prompt: Bool) async {
+        do {
+            _ = try await HealthKitWeightService.shared.reconcile(
+                into: modelContext,
+                promptIfNeeded: prompt
+            )
+        } catch {
+            // Silent path must not block the list.
+        }
+    }
+    #endif
 
     private func deleteEntries(_ entries: [WeightEntry]) {
         #if os(iOS)

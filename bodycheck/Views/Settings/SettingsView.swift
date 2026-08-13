@@ -143,7 +143,7 @@ struct SettingsView: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link("打开系统设置", destination: url)
             }
-            Text("在 iPhone 上记录或修改体重后，会写入 Apple 健康。Mac 上的修改不会写入健康；回到 iPhone 打开体重页后，会补写尚未同步的手动记录。")
+            Text("在 iPhone 上记录或修改体重会写入 Apple 健康；在健康里改的体重，回到 BodyTrack 或点「从健康同步」后会按样本更新。请在系统设置中同时允许读取和写入体重。Mac 上的修改不会写入健康。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } header: {

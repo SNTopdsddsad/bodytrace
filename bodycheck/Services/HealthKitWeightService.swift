@@ -2,7 +2,7 @@
 //  HealthKitWeightService.swift
 //  bodycheck
 //
-//  iOS only: write BodyTrack weight records into Apple Health.
+//  iOS only: write BodyTrack weights into Apple Health, and import bodyMass by UUID.
 //  Mac never imports this type. Local SwiftData stays available if Health is denied.
 //
 
@@ -92,6 +92,100 @@ final class HealthKitWeightService {
         }
     }
 
+    /// Pull Health samples into SwiftData, then push local manuals that have no UUID.
+    @discardableResult
+    func reconcile(into context: ModelContext, days: Int = 90, promptIfNeeded: Bool = false) async throws -> Int {
+        let imported = try await importSamples(into: context, days: days, promptIfNeeded: promptIfNeeded)
+        await pushUnsyncedManualEntries(in: context)
+        return imported
+    }
+
+    /// Upsert `bodyMass` samples by HealthKit UUID. Existing rows keep their `source`.
+    @discardableResult
+    func importSamples(into context: ModelContext, days: Int = 90, promptIfNeeded: Bool = false) async throws -> Int {
+        guard isHealthDataAvailable else {
+            if promptIfNeeded { throw HealthKitWeightError.unavailable }
+            return 0
+        }
+        if promptIfNeeded {
+            await requestAuthorization()
+        }
+
+        let samples: [HKQuantitySample]
+        do {
+            samples = try await fetchBodyMassSamples(days: days)
+        } catch {
+            if promptIfNeeded { throw error }
+            return 0
+        }
+
+        let descriptor = FetchDescriptor<WeightEntry>()
+        let existing = (try? context.fetch(descriptor)) ?? []
+        var existingByUUID: [UUID: WeightEntry] = [:]
+        for entry in existing {
+            if let uuid = entry.healthKitUUID {
+                existingByUUID[uuid] = entry
+            }
+        }
+
+        var upserted = 0
+        let kgUnit = HKUnit.gramUnit(with: .kilo)
+        for sample in samples {
+            let kg = sample.quantity.doubleValue(for: kgUnit)
+            guard kg > 0, kg < 500 else { continue }
+            let dayOnly = sample.startDate.startOfDay
+
+            if let entry = existingByUUID[sample.uuid] {
+                let weightChanged = abs(entry.weight - kg) > 0.000_1
+                let dayChanged = !entry.date.isSameDay(as: dayOnly)
+                if weightChanged || dayChanged {
+                    entry.weight = kg
+                    entry.date = dayOnly
+                    entry.updatedAt = Date()
+                    upserted += 1
+                }
+            } else {
+                let entry = WeightEntry(
+                    weight: kg,
+                    date: dayOnly,
+                    source: .healthkit,
+                    healthKitUUID: sample.uuid
+                )
+                context.insert(entry)
+                existingByUUID[sample.uuid] = entry
+                upserted += 1
+            }
+        }
+
+        if upserted > 0 {
+            try context.save()
+        }
+        return upserted
+    }
+
+    private func fetchBodyMassSamples(days: Int) async throws -> [HKQuantitySample] {
+        let end = Date()
+        let start = Calendar.current.date(byAdding: .day, value: -days, to: end) ?? end.addingTimeInterval(-90 * 86_400)
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: bodyMassType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sort]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: (samples as? [HKQuantitySample]) ?? [])
+            }
+            store.execute(query)
+        }
+    }
+
     /// Push Mac-created / older manual rows that never got a Health UUID.
     /// Only runs when write access is already granted — never prompts.
     func pushUnsyncedManualEntries(in context: ModelContext) async {
@@ -115,6 +209,17 @@ final class HealthKitWeightService {
     /// Today uses the current clock so Health does not show 00:00; other days stay at start-of-day.
     private static func sampleDate(for day: Date) -> Date {
         Calendar.current.isDateInToday(day) ? Date() : day.startOfDay
+    }
+}
+
+enum HealthKitWeightError: LocalizedError {
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            return "此设备不支持 Apple 健康数据。"
+        }
     }
 }
 #endif

@@ -12,6 +12,10 @@ import SwiftUI
 struct TodayView: View {
     var onOpenWeight: (() -> Void)?
 
+    @Environment(\.modelContext) private var modelContext
+    #if os(iOS)
+    @Environment(\.scenePhase) private var scenePhase
+    #endif
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @Query(sort: [
         SortDescriptor(\WeightEntry.date, order: .reverse),
@@ -105,8 +109,28 @@ struct TodayView: View {
             .sheet(isPresented: $showQuickFood) {
                 FoodEditorSheet()
             }
+            #if os(iOS)
+            .task {
+                await importWeightsFromHealthIfPossible()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    Task { await importWeightsFromHealthIfPossible() }
+                }
+            }
+            #endif
         }
     }
+
+    #if os(iOS)
+    @MainActor
+    private func importWeightsFromHealthIfPossible() async {
+        _ = try? await HealthKitWeightService.shared.reconcile(
+            into: modelContext,
+            promptIfNeeded: false
+        )
+    }
+    #endif
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
