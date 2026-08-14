@@ -11,7 +11,7 @@
 | Bundle ID | `yinke.bodycheck` |
 | Team | `5476A243H8` |
 | 远程仓库 | `github.com:SNTopdsddsad/bodytrace.git` |
-| 最低系统（工程） | iOS 26.4 / macOS 26.4 / visionOS 26.4 |
+| 最低系统（工程） | iOS 18.0 / macOS 26.4 / visionOS 26.4 |
 | 语言 | Swift 5（`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`） |
 | UI | SwiftUI，中文文案优先 |
 | 持久化 | SwiftData，store 名 `BodyTrack`，CloudKit 容器 `iCloud.yinke.bodycheck` |
@@ -63,6 +63,7 @@
 - 现在做 Mac 新功能
 - 自由录入运动（运动只来自 Apple 健康）
 - entitlements 里加 `com.apple.developer.healthkit.access`（临床病历；个人 Team 签不了）
+- **付费点**：无内购、无订阅、无付费墙。用户未改口前不要加 StoreKit / 会员开关 / 恢复购买
 
 ### 未完成（按优先级）
 
@@ -207,7 +208,7 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 
 ## 构建设置注意
 
-- Xcode 26.4 工程；`SUPPORTED_PLATFORMS` 含 iOS / macOS / visionOS。日常验证以 **iOS** 为准。碰 `#if os(...)` 时 Mac 也要能编过，但不要为 Mac 补功能。visionOS 未单独打磨，不要主动加 xrOS 专用 UI。
+- Xcode 26.4 工程；iOS 最低 **18.0**（主 App + Widget）。`SUPPORTED_PLATFORMS` 含 iOS / macOS / visionOS。日常验证以 **iOS** 为准。碰 `#if os(...)` 时 Mac 也要能编过，但不要为 Mac 补功能。visionOS 未单独打磨，不要主动加 xrOS 专用 UI。
 - App Sandbox 已开。`REGISTER_APP_GROUPS = YES`；Group ID `group.yinke.bodycheck` 写在 iOS entitlements 与 Widget entitlements。Mac entitlements **不要**加 App Group。
 - Widget Target 仅 iOS（`platformFilter = ios`）。编 Mac 时不要把 Widget 编进去。
 - `BodyTrackWidget/Info.plist` 必须从同步组资源拷贝里排除（工程里已有 exception），否则会 Multiple commands produce Info.plist。
