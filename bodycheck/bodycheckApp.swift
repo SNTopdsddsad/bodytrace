@@ -26,28 +26,9 @@ struct bodycheckApp: App {
                 .appChineseLocale()
                 .task {
                     await cloudSync.start()
-                    #if os(iOS)
                     await HealthKitWeightService.shared.startObserving(container: modelContainer)
-                    #endif
                 }
         }
         .modelContainer(modelContainer)
-        #if os(macOS)
-        .defaultSize(width: MacLayout.windowDefaultWidth, height: MacLayout.windowDefaultHeight)
-        .windowResizability(.contentMinSize)
-        .commands {
-            CommandGroup(replacing: .newItem) {}
-        }
-        #endif
-
-        #if os(macOS)
-        Settings {
-            SettingsView()
-                .modelContainer(modelContainer)
-                .environment(cloudSync)
-                .appChineseLocale()
-                .frame(minWidth: 520, idealWidth: 560, minHeight: 360)
-        }
-        #endif
     }
 }

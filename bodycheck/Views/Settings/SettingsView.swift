@@ -8,9 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(CloudSyncMonitor.self) private var cloudSync
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
-    #if os(iOS)
     @State private var weightWriteStatus = "检查中"
-    #endif
 
     private var weightUnitBinding: Binding<WeightUnit> {
         Binding(
@@ -20,31 +18,9 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        settingsBody
-            .appChineseLocale()
-            .task { await cloudSync.refresh() }
-    }
-
-    @ViewBuilder
-    private var settingsBody: some View {
-        #if os(macOS)
-        TabView {
-            generalPane
-                .tabItem { Label("通用", systemImage: "gearshape") }
-            syncPane
-                .tabItem { Label("同步", systemImage: "icloud") }
-            privacyPane
-                .tabItem { Label("隐私", systemImage: "hand.raised") }
-            aboutPane
-                .tabItem { Label("关于", systemImage: "info.circle") }
-        }
-        .tint(AppTheme.brandTeal)
-        #else
         Form {
             generalSection
-            #if os(iOS)
             healthSection
-            #endif
             syncSection
             privacySection
             aboutSection
@@ -52,46 +28,9 @@ struct SettingsView: View {
         .navigationTitle("设置")
         .navigationBarTitleDisplayMode(.inline)
         .tint(AppTheme.brandTeal)
-        #endif
+        .appChineseLocale()
+        .task { await cloudSync.refresh() }
     }
-
-    #if os(macOS)
-    private var generalPane: some View {
-        Form {
-            generalSection
-        }
-        .formStyle(.grouped)
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var syncPane: some View {
-        Form {
-            syncSection
-        }
-        .formStyle(.grouped)
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var privacyPane: some View {
-        Form {
-            privacySection
-        }
-        .formStyle(.grouped)
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var aboutPane: some View {
-        Form {
-            aboutSection
-        }
-        .formStyle(.grouped)
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-    #endif
 
     private var generalSection: some View {
         Section {
@@ -100,9 +39,6 @@ struct SettingsView: View {
                     Text(unit.displayName).tag(unit)
                 }
             }
-            #if os(macOS)
-            .pickerStyle(.radioGroup)
-            #endif
         } header: {
             Text("通用")
         } footer: {
@@ -127,7 +63,6 @@ struct SettingsView: View {
         }
     }
 
-    #if os(iOS)
     private var healthSection: some View {
         Section {
             LabeledContent("写入健康", value: weightWriteStatus)
@@ -153,7 +88,6 @@ struct SettingsView: View {
             weightWriteStatus = HealthKitWeightService.shared.shareStatusText
         }
     }
-    #endif
 
     private var privacySection: some View {
         Section {

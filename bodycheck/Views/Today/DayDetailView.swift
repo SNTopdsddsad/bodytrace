@@ -25,10 +25,8 @@ struct DayDetailView: View {
     @Query(sort: \ExerciseEntry.date, order: .reverse) private var exercises: [ExerciseEntry]
 
     @State private var weightEditor: WeightEditorMode?
-    #if os(iOS)
     @State private var activeKcal: Double?
     @State private var restingKcal: Double?
-    #endif
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -75,21 +73,9 @@ struct DayDetailView: View {
         return dayFoods.reduce(0) { $0 + $1.calories }
     }
 
-    private var activeValue: Double? {
-        #if os(iOS)
-        activeKcal
-        #else
-        nil
-        #endif
-    }
+    private var activeValue: Double? { activeKcal }
 
-    private var restingValue: Double? {
-        #if os(iOS)
-        restingKcal
-        #else
-        nil
-        #endif
-    }
+    private var restingValue: Double? { restingKcal }
 
     private var netCalories: Double? {
         TodayEnergyMath.net(
@@ -113,19 +99,15 @@ struct DayDetailView: View {
         }
         .pageBackground()
         .navigationTitle(day.formatted(AppLocale.dayWeekday))
-        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .sheet(item: $weightEditor) { mode in
             WeightEditorView(mode: mode)
         }
-        #if os(iOS)
         .task(id: day.startOfDay) {
             let totals = await HealthKitAccess.energyTotals(on: day)
             activeKcal = totals.active
             restingKcal = totals.resting
         }
-        #endif
     }
 
     private var weightHero: some View {
@@ -209,14 +191,10 @@ struct DayDetailView: View {
 
     private var energyCaption: String {
         guard netCalories != nil else { return "记录饮食或同步健康后计算" }
-        #if os(iOS)
         return TodayEnergyMath.caption(
             activeKcal: activeKcal,
             noteMissingResting: restingKcal == nil
         )
-        #else
-        return TodayEnergyMath.caption(activeKcal: nil, noteMissingResting: true)
-        #endif
     }
 
     private var netText: String? {
@@ -232,19 +210,11 @@ struct DayDetailView: View {
     }
 
     private var activeDisplay: String? {
-        #if os(iOS)
         activeKcal.map { "\(Int($0.rounded()))" }
-        #else
-        nil
-        #endif
     }
 
     private var restingDisplay: String? {
-        #if os(iOS)
         restingKcal.map { "\(Int($0.rounded()))" }
-        #else
-        nil
-        #endif
     }
 
     private func energyCell(_ label: String, _ value: String?, _ tint: Color) -> some View {

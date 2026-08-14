@@ -2,8 +2,7 @@
 //  ExerciseListView.swift
 //  bodycheck
 //
-//  Mac: read-only list of Health-sourced workouts (via iPhone sync / local store).
-//  iOS: import from Apple Health; no free-form Mac editing.
+//  Exercise records are imported from Apple Health. No free-form entry.
 //
 
 import SwiftData
@@ -13,13 +12,11 @@ struct ExerciseListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ExerciseEntry.date, order: .reverse) private var exercises: [ExerciseEntry]
 
-    #if os(iOS)
     @State private var isSyncing = false
     @State private var statusMessage: String?
     @State private var statusIsError = false
     @State private var todayRestingKcal: Double?
     @State private var todayActiveKcal: Double?
-    #endif
 
     private var todayExercises: [ExerciseEntry] {
         let day = Calendar.current.dayInterval(for: Date())
@@ -28,38 +25,6 @@ struct ExerciseListView: View {
 
     private var todayMinutes: Int {
         todayExercises.reduce(0) { $0 + $1.durationMinutes }
-    }
-
-    private var todayRestingDisplay: String {
-        #if os(iOS)
-        todayRestingKcal.map { "\(Int($0.rounded()))" } ?? "—"
-        #else
-        "—"
-        #endif
-    }
-
-    private var todayRestingUnit: String? {
-        #if os(iOS)
-        todayRestingKcal == nil ? nil : "千卡"
-        #else
-        nil
-        #endif
-    }
-
-    private var todayActiveDisplay: String {
-        #if os(iOS)
-        todayActiveKcal.map { "\(Int($0.rounded()))" } ?? "—"
-        #else
-        "—"
-        #endif
-    }
-
-    private var todayActiveUnit: String? {
-        #if os(iOS)
-        todayActiveKcal == nil ? nil : "千卡"
-        #else
-        nil
-        #endif
     }
 
     var body: some View {
@@ -72,14 +37,8 @@ struct ExerciseListView: View {
                 }
             }
             .navigationTitle("运动")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
-            #endif
-            #if os(macOS)
-            .navigationSubtitle(macSubtitle)
-            #endif
             .toolbar {
-                #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await syncFromHealth() }
@@ -94,9 +53,7 @@ struct ExerciseListView: View {
                     .accessibilityLabel("从健康同步")
                 }
                 IOSSettingsToolbar()
-                #endif
             }
-            #if os(iOS)
             .safeAreaInset(edge: .bottom) {
                 if let statusMessage {
                     Text(statusMessage)
@@ -108,37 +65,21 @@ struct ExerciseListView: View {
                 }
             }
             .task {
-                // Soft auto-sync on first open (won't crash if denied).
                 if exercises.isEmpty {
                     await syncFromHealth(silent: true)
                 } else {
                     await refreshEnergyTotals()
                 }
             }
-            #endif
         }
     }
-
-    #if os(macOS)
-    private var macSubtitle: String {
-        if exercises.isEmpty {
-            return "数据来自 Apple 健康"
-        }
-        return "\(exercises.count) 条 · 来自 Apple 健康 · 仅查看"
-    }
-    #endif
 
     private var emptyState: some View {
         ContentUnavailableView {
             Label("还没有运动记录", systemImage: "figure.run")
         } description: {
-            #if os(macOS)
-            Text("运动数据来自 Apple 健康，由 iPhone 同步到此 Mac。请在 iPhone 上打开 BodyTrack 并从「健康」同步锻炼记录。")
-            #else
-            Text("点右上角「从健康同步」，读取 Apple 健康中的锻炼记录。Mac 端仅可查看。")
-            #endif
+            Text("点右上角「从健康同步」，读取 Apple 健康中的锻炼记录。")
         } actions: {
-            #if os(iOS)
             Button {
                 Task { await syncFromHealth() }
             } label: {
@@ -147,7 +88,6 @@ struct ExerciseListView: View {
             .buttonStyle(.borderedProminent)
             .tint(AppTheme.brandTeal)
             .disabled(isSyncing)
-            #endif
         }
     }
 
@@ -155,23 +95,26 @@ struct ExerciseListView: View {
         List {
             Section {
                 HStack(spacing: AppTheme.space12) {
-                    exerciseSummaryTile(
-                        symbol: "timer",
+                    SummaryMetricTile(
                         label: "今日时长",
                         value: todayExercises.isEmpty ? nil : "\(todayMinutes)",
-                        unit: todayExercises.isEmpty ? nil : "分钟"
+                        unit: todayExercises.isEmpty ? nil : "分钟",
+                        symbol: "timer",
+                        tint: AppTheme.activityGreen
                     )
-                    exerciseSummaryTile(
-                        symbol: "flame.fill",
+                    SummaryMetricTile(
                         label: "活动能量",
-                        value: todayActiveUnit == nil ? nil : todayActiveDisplay,
-                        unit: todayActiveUnit
+                        value: todayActiveKcal.map { "\(Int($0.rounded()))" },
+                        unit: todayActiveKcal == nil ? nil : "千卡",
+                        symbol: "flame.fill",
+                        tint: AppTheme.activityGreen
                     )
-                    exerciseSummaryTile(
-                        symbol: "bed.double.fill",
+                    SummaryMetricTile(
                         label: "静息能量",
-                        value: todayRestingUnit == nil ? nil : todayRestingDisplay,
-                        unit: todayRestingUnit
+                        value: todayRestingKcal.map { "\(Int($0.rounded()))" },
+                        unit: todayRestingKcal == nil ? nil : "千卡",
+                        symbol: "bed.double.fill",
+                        tint: AppTheme.activityGreen
                     )
                 }
                 .listRowInsets(EdgeInsets(
@@ -183,11 +126,7 @@ struct ExerciseListView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             } footer: {
-                #if os(macOS)
-                Text("运动记录来自 Apple 健康，Mac 端仅支持查看。活动能量和静息能量请在 iPhone 上读取。")
-                #else
                 Text("活动能量、静息能量是健康今日合计。概览净热量 = 摄入 − 活动能量 − 静息能量。")
-                #endif
             }
 
             Section {
@@ -199,27 +138,8 @@ struct ExerciseListView: View {
                     .font(AppFont.listSectionHeader)
                     .textCase(nil)
             }
-            // Mac: no swipe-to-delete. iOS: also no delete of Health-sourced rows
-            // to keep Health as source of truth (re-sync restores them).
         }
-        #if os(iOS)
         .listStyle(.insetGrouped)
-        #endif
-    }
-
-    private func exerciseSummaryTile(
-        symbol: String,
-        label: String,
-        value: String?,
-        unit: String?
-    ) -> some View {
-        SummaryMetricTile(
-            label: label,
-            value: value,
-            unit: unit,
-            symbol: symbol,
-            tint: AppTheme.activityGreen
-        )
     }
 
     private func exerciseRow(_ entry: ExerciseEntry) -> some View {
@@ -256,7 +176,6 @@ struct ExerciseListView: View {
         return "\(h) 小时 \(m) 分钟"
     }
 
-    #if os(iOS)
     @MainActor
     private func syncFromHealth(silent: Bool = false) async {
         isSyncing = true
@@ -285,7 +204,6 @@ struct ExerciseListView: View {
         todayActiveKcal = totals.active
         todayRestingKcal = totals.resting
     }
-    #endif
 }
 
 #Preview {

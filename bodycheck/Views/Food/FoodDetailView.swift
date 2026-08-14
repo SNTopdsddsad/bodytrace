@@ -55,9 +55,7 @@ struct FoodDetailView: View {
         }
         .pageBackground()
         .navigationTitle("饮食详情")
-        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("编辑") {

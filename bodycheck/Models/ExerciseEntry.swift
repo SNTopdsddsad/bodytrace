@@ -2,8 +2,7 @@
 //  ExerciseEntry.swift
 //  bodycheck
 //
-//  Exercise records are sourced from Apple Health (workouts) on iOS,
-//  then available read-only on Mac via local / synced store.
+//  Exercise records are sourced from Apple Health (workouts).
 //
 
 import Foundation

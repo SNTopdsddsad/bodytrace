@@ -3,13 +3,10 @@
 //  bodycheck
 //
 
+import PhotosUI
 import SwiftData
 import SwiftUI
-
-#if os(iOS)
-import PhotosUI
 import UIKit
-#endif
 
 enum FoodEditorMode: Identifiable {
     case create
@@ -135,41 +132,19 @@ struct FoodListView: View {
                             }
                         }
                     }
-                    #if os(iOS)
                     .listStyle(.insetGrouped)
-                    #endif
                 }
             }
             .navigationTitle("饮食")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
-            #endif
-            #if os(macOS)
-            .navigationSubtitle(
-                todayFoods.isEmpty
-                    ? "今日尚未记录"
-                    : "今日 \(Int(todayCalories.rounded())) 千卡 · \(todayFoods.count) 条"
-            )
-            #endif
             .searchable(text: $searchText, prompt: "搜索食物名称")
             .toolbar {
-                #if os(iOS)
                 ToolbarItem(placement: .topBarTrailing) {
                     IOSCircleAddButton(accessibilityLabel: "添加食物") {
                         editorMode = .create
                     }
                 }
                 IOSSettingsToolbar()
-                #else
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        editorMode = .create
-                    } label: {
-                        Label("添加", systemImage: "plus")
-                    }
-                    .keyboardShortcut("n", modifiers: [.command])
-                }
-                #endif
             }
             .sheet(item: $editorMode) { mode in
                 FoodEditorSheet(mode: mode)
@@ -202,13 +177,11 @@ struct FoodEditorSheet: View {
     @State private var noteText = ""
     @State private var photoData: Data?
     @State private var validationMessage: String?
-    #if os(iOS)
     @State private var pickerItem: PhotosPickerItem?
     @State private var cameraImage: UIImage?
     @State private var showCamera = false
     @State private var showPhotoSource = false
     @State private var showLibraryPicker = false
-    #endif
 
     var body: some View {
         NavigationStack {
@@ -216,9 +189,7 @@ struct FoodEditorSheet: View {
                 Section {
                     TextField("名称", text: $nameText)
                     TextField("热量（千卡）", text: $caloriesText)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                     DatePicker("时间", selection: $date, displayedComponents: [.date, .hourAndMinute])
                         .environment(\.locale, AppLocale.chinese)
                         .environment(\.calendar, AppLocale.calendar)
@@ -229,9 +200,7 @@ struct FoodEditorSheet: View {
                         .lineLimit(2...4)
                 }
 
-                #if os(iOS)
                 photoSection
-                #endif
 
                 if let validationMessage {
                     Section {
@@ -239,11 +208,8 @@ struct FoodEditorSheet: View {
                     }
                 }
             }
-            .appFormStyle()
             .navigationTitle(mode.title)
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
@@ -256,7 +222,6 @@ struct FoodEditorSheet: View {
                 }
             }
             .onAppear { hydrate() }
-            #if os(iOS)
             .confirmationDialog("选择照片来源", isPresented: $showPhotoSource, titleVisibility: .visible) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button("拍照") { showCamera = true }
@@ -283,15 +248,10 @@ struct FoodEditorSheet: View {
             .onChange(of: pickerItem) { _, item in
                 Task { await loadPickerItem(item) }
             }
-            #endif
         }
         .appChineseLocale()
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 280, idealHeight: 320)
-        #endif
     }
 
-    #if os(iOS)
     private var photoSection: some View {
         Section {
             Button {
@@ -345,7 +305,6 @@ struct FoodEditorSheet: View {
             validationMessage = "无法读取这张照片，请换一张再试"
         }
     }
-    #endif
 
     private func hydrate() {
         switch mode {

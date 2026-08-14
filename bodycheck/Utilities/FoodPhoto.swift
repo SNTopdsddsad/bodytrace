@@ -6,28 +6,17 @@
 //
 
 import SwiftUI
-
-#if os(iOS)
 import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 enum FoodPhotoCodec {
     static let maxPixel: CGFloat = 1600
     static let jpegQuality: CGFloat = 0.72
 
     static func image(from data: Data) -> Image? {
-        #if os(iOS)
         guard let ui = UIImage(data: data) else { return nil }
         return Image(uiImage: ui)
-        #elseif os(macOS)
-        guard let ns = NSImage(data: data) else { return nil }
-        return Image(nsImage: ns)
-        #endif
     }
 
-    #if os(iOS)
     static func compressedJPEG(from image: UIImage) -> Data? {
         let resized = resize(image)
         return resized.jpegData(compressionQuality: jpegQuality)
@@ -51,7 +40,6 @@ enum FoodPhotoCodec {
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
     }
-    #endif
 }
 
 struct FoodPhotoThumb: View {

@@ -13,9 +13,7 @@ struct TodayView: View {
     var onOpenWeight: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
-    #if os(iOS)
     @Environment(\.scenePhase) private var scenePhase
-    #endif
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @Query(sort: [
         SortDescriptor(\WeightEntry.date, order: .reverse),
@@ -28,10 +26,8 @@ struct TodayView: View {
     @State private var showQuickFood = false
     @State private var chartRange: ChartRange = .days30
     @State private var openedDay: CalendarDayItem?
-    #if os(iOS)
     @State private var todayRestingKcal: Double?
     @State private var todayActiveKcal: Double?
-    #endif
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -85,12 +81,7 @@ struct TodayView: View {
             }
             .pageBackground()
             .navigationTitle("今日概览")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
-            #endif
-            #if os(macOS)
-            .navigationSubtitle(Date.now.formatted(AppLocale.dayWeekday))
-            #endif
             .toolbar { toolbarContent }
             .navigationDestination(item: $openedDay) { item in
                 DayDetailView(day: item.date)
@@ -101,7 +92,6 @@ struct TodayView: View {
             .sheet(isPresented: $showQuickFood) {
                 FoodEditorSheet(mode: .create)
             }
-            #if os(iOS)
             .task {
                 await refreshHealthSummaries()
             }
@@ -110,11 +100,9 @@ struct TodayView: View {
                     Task { await refreshHealthSummaries() }
                 }
             }
-            #endif
         }
     }
 
-    #if os(iOS)
     @MainActor
     private func refreshHealthSummaries() async {
         _ = try? await HealthKitWeightService.shared.reconcile(
@@ -125,11 +113,9 @@ struct TodayView: View {
         todayActiveKcal = totals.active
         todayRestingKcal = totals.resting
     }
-    #endif
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        #if os(iOS)
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button {
@@ -151,32 +137,6 @@ struct TodayView: View {
             .accessibilityLabel("快速记录")
         }
         IOSSettingsToolbar()
-        #else
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                showQuickFood = true
-            } label: {
-                Label("记录饮食", systemImage: "fork.knife")
-            }
-
-            Button {
-                showQuickWeight = true
-            } label: {
-                Label("记录体重", systemImage: "plus")
-            }
-            .keyboardShortcut("n", modifiers: [.command])
-
-            Menu {
-                Button("记录体重") { showQuickWeight = true }
-                Button("记录饮食") { showQuickFood = true }
-                // 运动仅来自 Apple 健康，不在此手动录入
-            } label: {
-                Image(systemName: "chevron.down")
-            }
-            .help("选择记录类型")
-            .accessibilityLabel("选择记录类型")
-        }
-        #endif
     }
 
     // MARK: - Lead
@@ -211,16 +171,6 @@ struct TodayView: View {
                         .font(AppFont.inlineAction)
                         .foregroundStyle(AppTheme.brandTeal)
                 }
-
-                #if os(macOS)
-                Divider().padding(.top, 8)
-
-                Text("数据保存在你的设备上，并通过你的私人 iCloud 在 iPhone 与 Mac 之间同步。")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
-                #endif
             } else {
                 VStack(alignment: .leading, spacing: AppTheme.space8) {
                     Text("还没有体重记录")
@@ -241,34 +191,14 @@ struct TodayView: View {
         .appSurface(padding: AppTheme.cardPadding)
     }
 
-    private var platformHeroMinHeight: CGFloat {
-        #if os(iOS)
-        140
-        #else
-        180
-        #endif
-    }
-
-    private var todayActiveKcalValue: Double? {
-        #if os(iOS)
-        todayActiveKcal
-        #else
-        nil
-        #endif
-    }
+    private var platformHeroMinHeight: CGFloat { 140 }
 
     /// 摄入 − 活动能量 − 静息能量。
     private var netCalories: Double? {
         TodayEnergyMath.net(
             intake: todayCalories,
-            activeKcal: todayActiveKcalValue,
-            restingKcal: {
-                #if os(iOS)
-                todayRestingKcal
-                #else
-                nil
-                #endif
-            }()
+            activeKcal: todayActiveKcal,
+            restingKcal: todayRestingKcal
         )
     }
 
@@ -286,16 +216,9 @@ struct TodayView: View {
 
     private var netCaloriesCaption: String {
         guard netCalories != nil else { return "记录饮食或同步健康后计算" }
-        let missingResting: Bool = {
-            #if os(iOS)
-            todayRestingKcal == nil
-            #else
-            true
-            #endif
-        }()
         return TodayEnergyMath.caption(
-            activeKcal: todayActiveKcalValue,
-            noteMissingResting: missingResting
+            activeKcal: todayActiveKcal,
+            noteMissingResting: todayRestingKcal == nil
         )
     }
 
@@ -387,35 +310,19 @@ struct TodayView: View {
     }
 
     private var todayActiveDisplay: String? {
-        #if os(iOS)
         todayActiveKcal.map { "\(Int($0.rounded()))" }
-        #else
-        nil
-        #endif
     }
 
     private var todayRestingDisplay: String? {
-        #if os(iOS)
         todayRestingKcal.map { "\(Int($0.rounded()))" }
-        #else
-        nil
-        #endif
     }
 
     private var activeEnergyMeta: String {
-        #if os(iOS)
         todayActiveKcal == nil ? "需授权读取健康" : "健康今日合计"
-        #else
-        "请在 iPhone 上读取"
-        #endif
     }
 
     private var restingEnergyMeta: String {
-        #if os(iOS)
         todayRestingKcal == nil ? "需授权读取健康" : "健康今日合计"
-        #else
-        "请在 iPhone 上读取"
-        #endif
     }
 
     private func energyCell(_ metric: EnergyMetric) -> some View {
@@ -433,7 +340,6 @@ struct TodayView: View {
 
     private var chartSection: some View {
         VStack(alignment: .leading, spacing: AppTheme.space12) {
-            #if os(iOS)
             VStack(alignment: .leading, spacing: AppTheme.space8) {
                 VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                     Text("体重趋势")
@@ -450,26 +356,6 @@ struct TodayView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
-            #else
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("体重趋势")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(chartSubtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Picker("范围", selection: $chartRange) {
-                    ForEach(ChartRange.allCases) { range in
-                        Text(range.label).tag(range)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 280)
-                .labelsHidden()
-            }
-            #endif
 
             if chartPoints.count >= 2 {
                 Chart(chartPoints) { point in
@@ -550,13 +436,7 @@ struct TodayView: View {
         .appSurface(padding: AppTheme.cardPadding)
     }
 
-    private var chartHeight: CGFloat {
-        #if os(iOS)
-        180
-        #else
-        200
-        #endif
-    }
+    private var chartHeight: CGFloat { 180 }
 
     private func openChartDay(at location: CGPoint, proxy: ChartProxy, in geo: GeometryProxy) {
         let x: CGFloat
@@ -627,35 +507,6 @@ struct TodayView: View {
                 .frame(minHeight: 140)
                 .padding(.vertical, AppTheme.space12)
             } else {
-                #if os(macOS)
-                Table(recentItems) {
-                    TableColumn("时间") { item in
-                        Text(item.date, format: AppLocale.monthDayTime)
-                            .foregroundStyle(.secondary)
-                    }
-                    .width(min: 100, ideal: 118)
-
-                    TableColumn("类型") { item in
-                        HStack(spacing: 7) {
-                            RecordDot(kind: item.dot)
-                            Text(item.typeLabel)
-                        }
-                    }
-                    .width(min: 80, ideal: 104)
-
-                    TableColumn("内容") { item in
-                        Text(item.title)
-                    }
-
-                    TableColumn("数值") { item in
-                        Text(item.valueText)
-                            .font(.body.monospacedDigit())
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                    .width(min: 90, ideal: 120)
-                }
-                .frame(minHeight: CGFloat(min(recentItems.count, 8)) * 40 + 36)
-                #else
                 VStack(spacing: 0) {
                     ForEach(recentItems) { item in
                         HStack(alignment: .center, spacing: AppTheme.space12) {
@@ -689,7 +540,6 @@ struct TodayView: View {
                         }
                     }
                 }
-                #endif
             }
         }
         .appSurface()

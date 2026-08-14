@@ -1,4 +1,4 @@
-/* App display name and system permission copy stay Chinese on Mac. */
+/* App display name and system permission copy stay Chinese. */
 CFBundleDisplayName = "BodyTrack";
 CFBundleName = "BodyTrack";
 NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";

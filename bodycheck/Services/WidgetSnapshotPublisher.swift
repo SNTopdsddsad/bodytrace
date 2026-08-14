@@ -3,13 +3,11 @@
 //  bodycheck
 //
 //  Writes a glanceable App Group summary after SwiftData changes.
-//  iOS only — Mac has no widget in this phase.
 //
 
 import SwiftData
 import SwiftUI
 
-#if os(iOS)
 enum WidgetSnapshotPublisher {
     static func publish(
         weights: [WeightEntry],
@@ -106,4 +104,3 @@ extension View {
         modifier(WidgetSnapshotSyncModifier())
     }
 }
-#endif

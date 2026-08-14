@@ -3,7 +3,6 @@
 //  bodycheck
 //
 //  iPhone visual tokens: color, type, spacing, shared chrome.
-//  Mac layout constants stay below; do not restyle Mac UI from here.
 //
 
 import SwiftUI
@@ -73,36 +72,17 @@ enum AppTheme {
     static let recordDotSize: CGFloat = 6
     static let recordDotColumn: CGFloat = 10
 
-    /// Platform-aware card radius (softer on iPhone).
-    static var cardCornerRadius: CGFloat {
-        #if os(iOS)
-        16
-        #else
-        12
-        #endif
-    }
+    static let cardCornerRadius: CGFloat = 16
 
     /// Page horizontal/vertical inset for scroll content.
-    static var contentInset: CGFloat {
-        #if os(iOS)
-        space16
-        #else
-        space24
-        #endif
-    }
+    static let contentInset: CGFloat = space16
 
     static let contentMaxWidth: CGFloat = 1120
     static let spaceL: CGFloat = space16
     static let spaceXL: CGFloat = space24
 
     /// Hero weight number size (latest weight).
-    static var heroWeightSize: CGFloat {
-        #if os(iOS)
-        48
-        #else
-        44
-        #endif
-    }
+    static let heroWeightSize: CGFloat = 48
 
     /// Net calories / daily intake hero.
     static let metricNumberSize: CGFloat = 32
@@ -110,21 +90,9 @@ enum AppTheme {
     static let compactNumberSize: CGFloat = 22
 
     /// Inner padding for primary surface cards.
-    static var cardPadding: CGFloat {
-        #if os(iOS)
-        space16
-        #else
-        22
-        #endif
-    }
+    static let cardPadding: CGFloat = space16
 
-    static var compactTilePadding: CGFloat {
-        #if os(iOS)
-        space12
-        #else
-        space16
-        #endif
-    }
+    static let compactTilePadding: CGFloat = space12
 }
 
 /// Semantic type roles. Prefer these over raw `.system(size:)`.
@@ -172,28 +140,8 @@ enum AppFont {
     static let prose = Font.callout
 }
 
-enum MacLayout {
-    static let windowDefaultWidth: CGFloat = 1100
-    static let windowDefaultHeight: CGFloat = 720
-    /// Comfortable non-fullscreen default; layout must work down to this size.
-    static let windowMinWidth: CGFloat = 880
-    static let windowMinHeight: CGFloat = 580
+// MARK: - Open settings
 
-    static let sidebarMin: CGFloat = 176
-    static let sidebarIdeal: CGFloat = 200
-    static let sidebarMax: CGFloat = 240
-
-    static let inspectorMin: CGFloat = 240
-    static let inspectorIdeal: CGFloat = 280
-    static let inspectorMax: CGFloat = 320
-
-    /// Below this content width, hide inspector by default / use compact columns.
-    static let compactContentWidth: CGFloat = 640
-}
-
-// MARK: - Open settings (iOS)
-
-#if os(iOS)
 private struct OpenSettingsActionKey: EnvironmentKey {
     static let defaultValue: () -> Void = {}
 }
@@ -218,67 +166,6 @@ struct IOSSettingsToolbar: ToolbarContent {
         }
     }
 }
-#endif
-
-/// Flexible table column widths for the weight list.
-struct WeightColumnMetrics: Equatable {
-    var date: CGFloat
-    var weight: CGFloat
-    var delta: CGFloat
-    var source: CGFloat
-    var showDelta: Bool
-    var showSource: Bool
-    var showNote: Bool
-
-    static func metrics(forAvailableWidth width: CGFloat) -> WeightColumnMetrics {
-        let w = max(width, 280)
-        if w < 420 {
-            // Very narrow: date + weight only
-            return WeightColumnMetrics(
-                date: min(120, w * 0.42),
-                weight: min(100, w * 0.32),
-                delta: 0,
-                source: 0,
-                showDelta: false,
-                showSource: false,
-                showNote: false
-            )
-        }
-        if w < 560 {
-            // Compact: date + weight + source
-            return WeightColumnMetrics(
-                date: 110,
-                weight: 88,
-                delta: 0,
-                source: 96,
-                showDelta: false,
-                showSource: true,
-                showNote: true
-            )
-        }
-        if w < 720 {
-            return WeightColumnMetrics(
-                date: 112,
-                weight: 90,
-                delta: 100,
-                source: 96,
-                showDelta: true,
-                showSource: true,
-                showNote: true
-            )
-        }
-        // Comfortable
-        return WeightColumnMetrics(
-            date: 120,
-            weight: 100,
-            delta: 110,
-            source: 100,
-            showDelta: true,
-            showSource: true,
-            showNote: true
-        )
-    }
-}
 
 // MARK: - Surface styles
 
@@ -299,19 +186,11 @@ struct SurfaceStyle: ViewModifier {
     }
 
     private var surfaceFill: Color {
-        #if os(macOS)
-        Color(nsColor: .controlBackgroundColor)
-        #else
         Color(.secondarySystemGroupedBackground)
-        #endif
     }
 
     private var separatorColor: Color {
-        #if os(macOS)
-        Color(nsColor: .separatorColor)
-        #else
         Color(.separator)
-        #endif
     }
 }
 
@@ -325,22 +204,8 @@ extension View {
             .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    @ViewBuilder
-    func appFormStyle() -> some View {
-        #if os(macOS)
-        formStyle(.grouped)
-        #else
-        self
-        #endif
-    }
-
-    @ViewBuilder
     func pageBackground() -> some View {
-        #if os(macOS)
-        background(Color(nsColor: .windowBackgroundColor))
-        #else
         background(Color(.systemGroupedBackground))
-        #endif
     }
 }
 
@@ -532,15 +397,10 @@ struct SummaryMetricTile: View {
     }
 
     private var tileFill: Color {
-        #if os(iOS)
         Color(.secondarySystemGroupedBackground)
-        #else
-        Color(nsColor: .controlBackgroundColor)
-        #endif
     }
 }
 
-#if os(iOS)
 struct IOSCircleAddButton: View {
     let accessibilityLabel: String
     let action: () -> Void
@@ -555,7 +415,6 @@ struct IOSCircleAddButton: View {
         .accessibilityLabel(accessibilityLabel)
     }
 }
-#endif
 
 struct DeltaChip: View {
     let deltaKg: Double

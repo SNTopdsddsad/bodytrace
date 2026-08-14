@@ -6,10 +6,8 @@
 //
 
 import Foundation
-import SwiftData
-
-#if os(iOS)
 import HealthKit
+import SwiftData
 
 @MainActor
 final class HealthKitExerciseService {
@@ -153,4 +151,3 @@ enum HealthKitExerciseError: LocalizedError {
         }
     }
 }
-#endif

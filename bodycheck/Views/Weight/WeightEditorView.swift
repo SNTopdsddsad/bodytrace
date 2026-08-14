@@ -42,22 +42,12 @@ struct WeightEditorView: View {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
     }
 
-    private var measurementFooter: String {
-        #if os(iOS)
-        "数值按当前设置单位输入，保存时统一换算为公斤。日期仅记录到天。首次保存会询问是否写入 Apple 健康。"
-        #else
-        "数值按当前设置单位输入，保存时统一换算为公斤。日期仅记录到天。Mac 上的修改不会写入 Apple 健康。"
-        #endif
-    }
-
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     TextField("体重", text: $weightText)
-                        #if os(iOS)
                         .keyboardType(.decimalPad)
-                        #endif
                         .focused($weightFocused)
                     LabeledContent("单位", value: weightUnit.shortLabel)
                     DatePicker("日期", selection: $date, displayedComponents: [.date])
@@ -66,7 +56,7 @@ struct WeightEditorView: View {
                 } header: {
                     Text("测量")
                 } footer: {
-                    Text(measurementFooter)
+                    Text("数值按当前设置单位输入，保存时统一换算为公斤。日期仅记录到天。首次保存会询问是否写入 Apple 健康。")
                 }
 
                 Section("备注（可选）") {
@@ -80,11 +70,8 @@ struct WeightEditorView: View {
                     }
                 }
             }
-            .appFormStyle()
             .navigationTitle(mode.title)
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
@@ -105,9 +92,6 @@ struct WeightEditorView: View {
             .tint(AppTheme.brandTeal)
         }
         .appChineseLocale()
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 360)
-        #endif
     }
 
     private func hydrate() {
@@ -164,10 +148,8 @@ struct WeightEditorView: View {
             return
         }
 
-        #if os(iOS)
         await HealthKitWeightService.shared.syncEntry(entry)
         try? modelContext.save()
-        #endif
 
         dismiss()
     }

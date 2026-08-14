@@ -6,8 +6,6 @@
 //
 
 import Foundation
-
-#if os(iOS)
 import HealthKit
 
 enum HealthKitAccess {
@@ -98,4 +96,3 @@ enum HealthKitAccess {
         }
     }
 }
-#endif

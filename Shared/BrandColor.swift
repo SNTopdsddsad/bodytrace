@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 enum BrandColor {
     /// Brand teal — primary actions & chart. #267A78 / #4FA7A3
@@ -19,15 +20,8 @@ enum BrandColor {
 
 extension Color {
     init(light: Color, dark: Color) {
-        #if os(macOS)
-        self.init(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            return NSColor(isDark ? dark : light)
-        })
-        #else
         self.init(uiColor: UIColor { trait in
             trait.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
         })
-        #endif
     }
 }

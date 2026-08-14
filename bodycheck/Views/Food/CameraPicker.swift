@@ -5,7 +5,6 @@
 //  iOS camera capture for food photos.
 //
 
-#if os(iOS)
 import SwiftUI
 import UIKit
 
@@ -47,4 +46,3 @@ struct CameraPicker: UIViewControllerRepresentable {
         }
     }
 }
-#endif

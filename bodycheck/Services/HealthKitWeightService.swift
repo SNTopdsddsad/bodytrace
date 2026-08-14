@@ -2,15 +2,13 @@
 //  HealthKitWeightService.swift
 //  bodycheck
 //
-//  iOS only: write BodyTrack weights into Apple Health, and import bodyMass by UUID.
-//  Mac never imports this type. Local SwiftData stays available if Health is denied.
+//  Write BodyTrack weights into Apple Health, and import bodyMass by UUID.
+//  Local SwiftData stays available if Health is denied.
 //
 
 import Foundation
-import SwiftData
-
-#if os(iOS)
 import HealthKit
+import SwiftData
 
 @MainActor
 final class HealthKitWeightService {
@@ -225,7 +223,7 @@ final class HealthKitWeightService {
         }
     }
 
-    /// Push Mac-created / older manual rows that never got a Health UUID.
+    /// Push older manual rows that never got a Health UUID.
     /// Only runs when write access is already granted — never prompts.
     func pushUnsyncedManualEntries(in context: ModelContext) async {
         guard isHealthDataAvailable, isSharingAuthorized else { return }
@@ -261,4 +259,3 @@ enum HealthKitWeightError: LocalizedError {
         }
     }
 }
-#endif

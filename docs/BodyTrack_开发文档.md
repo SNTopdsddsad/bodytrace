@@ -1,13 +1,14 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.18  
+**版本**：v1.19  
 **日期**：2026-08-14  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
-| v1.18 | 2026-08-14 | 工程 `IPHONEOS_DEPLOYMENT_TARGET` 从 Xcode 默认 26.4 改为 18.0，与产品口径对齐；Mac / visionOS 仍为 26.4（不上架） |
+| v1.19 | 2026-08-14 | 删除全部 Mac / visionOS 目标与专用代码；工程只编 iOS；产品仅 iPhone |
+| v1.18 | 2026-08-14 | 工程 `IPHONEOS_DEPLOYMENT_TARGET` 从 Xcode 默认 26.4 改为 18.0，与产品口径对齐 |
 | v1.16 | 2026-08-13 | iPhone 统一视觉 token：字号角色 `AppFont`、4pt 间距、品牌色抽到 `BrandColor` 与小组件共用 |
 | v1.0 | 2026-08-11 | 初稿 |
 | v1.1 | 2026-08-11 | 修正 CloudKit/HealthKit 模型与权限；补冲突策略、Deep Link、验收标准；文档迁至 `docs/` |
@@ -34,12 +35,12 @@
 
 ### 1.1 产品定位
 
-一款跨 iPhone 与 Mac 的人体体征记录工具，核心能力包括：
+一款 iPhone 人体体征记录工具，核心能力包括：
 
-- 从 Apple 健康读取体重数据（仅 iOS）
+- 从 Apple 健康读取体重数据
 - 手动记录体重、简单食物热量、运动
 - iPhone 桌面小组件支持快速记录体重
-- 数据通过 iCloud 在 iPhone 与 Mac 之间同步
+- 数据通过 iCloud 在多台 iPhone 之间同步
 
 ### 1.2 目标用户
 
@@ -70,8 +71,8 @@
 | 食物写回 HealthKit | **否**。饮食只存在 BodyTrack；健康没有餐食列表，不写 `dietaryEnergyConsumed` |
 | 小组件输入 | **否**直接输数字；跳转主 App 快速记录页 |
 | 界面语言 | 先中文；日期/时间/星期强制简体中文，不跟系统语言走 |
-| 最低系统 | iOS 18+ / macOS 15+ |
-| 平台节奏 | **先做完 iPhone**；Mac 已有壳冻结，未宣布重启前不补 Mac 功能 |
+| 最低系统 | iOS 18+ |
+| 平台节奏 | **仅 iPhone**。Mac / visionOS 代码已删除 |
 | 付费 | **无**。不做内购、订阅、付费墙；功能不按会员开关 |
 
 ---
@@ -83,13 +84,13 @@
 | 层级 | 技术 | 说明 |
 |------|------|------|
 | 语言 | Swift 6 | 注意严格并发（`Sendable` 等） |
-| UI | SwiftUI | iOS + macOS 共享 |
+| UI | SwiftUI | iPhone |
 | 数据持久化 | SwiftData | 本地业务数据 |
 | 跨设备同步 | CloudKit（SwiftData） | iPhone ↔ Mac |
 | 健康数据 | HealthKit | **仅 iOS Target** |
 | 小组件 | WidgetKit + App Intents | **仅 iOS** |
 | 本机共享 | App Groups | App ↔ Widget 摘要 |
-| 最低系统 | iOS 18+ / macOS 15+ | 可按用户群下调 |
+| 最低系统 | iOS 18+ | 可按用户群下调 |
 
 ### 2.2 架构原则
 
@@ -587,7 +588,7 @@ Widget kind:            WeightWidget
 | 体重单位默认 | kg | 已定 |
 | 食物是否写回 HealthKit | **否** | 已定 |
 | 小组件是否直接输入数字 | 否（跳转 App） | 已定 |
-| 最低系统版本 | iOS 18.0（工程已对齐）；Mac / visionOS 26.4 仅本地编译，不上架 | 已定 |
+| 最低系统版本 | iOS 18.0；仅 iPhone（iPad 随 iOS 运行，不上 Mac / visionOS） | 已定 |
 | 今日热量是否含运动 | 否（摄入与消耗分开展示） | 已定 |
 | Bundle ID / 显示名 / CloudKit 容器 | `yinke.bodycheck` / BodyTrack / `iCloud.yinke.bodycheck` | 已定 |
 | App Group | `group.yinke.bodycheck` | 已定 |
