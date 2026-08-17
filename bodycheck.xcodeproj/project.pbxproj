@@ -367,6 +367,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重、静息能量和活动能量，以便展示运动、体重与今日消耗。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";
@@ -410,6 +411,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BodyTrack;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用相机拍摄饮食照片。";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "需要读取 Apple 健康中的锻炼记录、体重、静息能量和活动能量，以便展示运动、体重与今日消耗。";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "需要将你在 BodyTrack 中记录或修改的体重写入 Apple 健康。";

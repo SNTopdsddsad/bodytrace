@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BodyTrack 隐私政策</title>
+  <meta name="description" content="BodyTrack 隐私政策：说明体重、饮食、健康与 iCloud 数据如何使用与存储。" />
+  <style>
+    :root {
+      --ink: #1c2423;
+      --muted: #5b6866;
+      --line: #d7e0de;
+      --bg: #f6f8f7;
+      --card: #ffffff;
+      --teal: #267a78;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.7;
+    }
+    main {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    header { margin-bottom: 2rem; }
+    .eyebrow {
+      color: var(--teal);
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+    h1 { font-size: 1.75rem; line-height: 1.25; margin: 0.35rem 0 0.75rem; }
+    h2 { font-size: 1.15rem; margin: 2rem 0 0.6rem; }
+    p, li { font-size: 0.98rem; }
+    .meta { color: var(--muted); font-size: 0.92rem; }
+    a { color: var(--teal); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      background: var(--card);
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #eef4f3; }
+    nav { margin-top: 2.5rem; font-size: 0.92rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">BODYTRACK</div>
+      <h1>隐私政策</h1>
+      <p class="meta">生效日期：2026 年 8 月 17 日<br />开发者：丹青　·　应用 Bundle ID：yinke.bodycheck</p>
+    </header>
+
+    <p>本政策说明 BodyTrack 如何处理你的信息。使用本应用即表示你已阅读本政策。</p>
+
+    <h2>1. 我们是谁</h2>
+    <p>BodyTrack 由个人开发者丹青提供，用于在 iPhone 上记录体重、饮食热量，并从 Apple 健康读取运动与能量数据。</p>
+    <p>联系邮箱：<a href="mailto:xuwudi404@gmail.com">xuwudi404@gmail.com</a></p>
+
+    <h2>2. 我们收集哪些信息</h2>
+    <p>本应用<strong>没有账号系统</strong>，不收集姓名、手机号、邮箱作为注册信息。</p>
+    <p>你主动记录，或在授权后从 Apple 健康导入时，可能产生以下数据：</p>
+    <p><strong>健康信息</strong></p>
+    <ul>
+      <li>体重（公斤）、称重日期、可选备注</li>
+      <li>记录来源（手动或健康同步）以及用于对账的健康样本标识</li>
+    </ul>
+    <p><strong>健身信息</strong></p>
+    <ul>
+      <li>从 Apple 健康导入的锻炼：名称、时长、锻炼自带的消耗（如有）</li>
+      <li>今日活动能量、今日静息能量：仅用于当天展示净热量，<strong>不写入</strong>本应用数据库</li>
+    </ul>
+    <p><strong>你创建的内容</strong></p>
+    <ul>
+      <li>饮食名称、千卡、时间、可选备注</li>
+      <li>可选的饮食照片（由你拍摄或从相册选取，以压缩 JPEG 保存）</li>
+    </ul>
+    <p><strong>偏好设置（仅本机）</strong></p>
+    <ul>
+      <li>体重显示单位（公斤 / 磅）</li>
+      <li>上次打开的分页</li>
+    </ul>
+    <p>小组件只读取本机 App Group 中的摘要（最新体重、今日热量差等），不单独向开发者上传数据。</p>
+
+    <h2>3. 我们如何使用这些信息</h2>
+    <p>只用于提供应用功能：</p>
+    <ul>
+      <li>展示今日概览、列表、趋势和日详情</li>
+      <li>计算净热量（当日饮食摄入 − 活动能量 − 静息能量）</li>
+      <li>在你授权后，把手动记录的体重写入 Apple 健康，或从健康导入体重与锻炼</li>
+      <li>更新桌面小组件上的摘要</li>
+    </ul>
+    <p><strong>不会</strong>用于广告、营销画像、跨 App 追踪，也<strong>不会出售</strong>给第三方。</p>
+
+    <h2>4. 数据存在哪里</h2>
+    <ul>
+      <li><strong>本机</strong>：SwiftData 本地数据库；小组件摘要在 App Group 中。</li>
+      <li><strong>iCloud（可选）</strong>：若你已登录 iCloud 且系统同步可用，记录会写入你自己的 iCloud 私人数据库（容器 iCloud.yinke.bodycheck），以便在你的多台 iPhone 之间同步。开发者无法在控制台里点开查看你的私人记录。未登录 iCloud、关闭同步或无网络时，本机记录仍可读写。</li>
+      <li><strong>Apple 健康（可选）</strong>：仅在你授权后读写。写入类型只有体重；饮食不会写入健康。</li>
+    </ul>
+    <p>数据不会上传到开发者自建的服务器。同步与健康存储分别走 Apple 的 iCloud 与健康服务。</p>
+
+    <h2>5. 系统权限</h2>
+    <p>本应用只在你使用对应功能时申请权限，启动时不会立刻弹窗。</p>
+    <table>
+      <thead>
+        <tr><th>权限</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>健康 · 读取</td><td>体重、锻炼、活动能量、静息能量</td></tr>
+        <tr><td>健康 · 写入</td><td>仅体重</td></tr>
+        <tr><td>相机</td><td>拍摄饮食照片</td></tr>
+        <tr><td>相册</td><td>选择饮食照片</td></tr>
+      </tbody>
+    </table>
+
+    <h2>6. 我们不做什么</h2>
+    <ul>
+      <li>不申请临床病历（Health Records）</li>
+      <li>不把饮食热量写入 Apple 健康</li>
+      <li>不使用广告标识符，不做跨 App / 网站追踪</li>
+      <li>不接入统计分析、崩溃上报或其他第三方数据 SDK</li>
+      <li>无内购、无订阅、无付费墙</li>
+    </ul>
+
+    <h2>7. 第三方</h2>
+    <p>除 Apple 系统能力（HealthKit、CloudKit / iCloud、小组件）外，本应用不向其他公司共享你的记录。Apple 对上述系统服务有自己的隐私条款。</p>
+
+    <h2>8. 保留与删除</h2>
+    <ul>
+      <li>在应用内删除单条体重或饮食记录后，本机对应数据即删除；若该条体重曾由本应用写入健康，会尝试删除本应用写入的那条健康样本。</li>
+      <li>从健康同步来的体重或锻炼，若只在本应用里删掉，下次同步仍可能从健康再次导入。请在「健康」App 中管理那些源数据。</li>
+      <li>删除本应用会清除本机数据库和小组件摘要。iCloud 中已同步的数据遵循 Apple 对 iCloud 的保留与删除规则；你也可以关闭本应用的 iCloud 同步。</li>
+    </ul>
+
+    <h2>9. 未成年人</h2>
+    <p>本应用面向有能力自行记录体重与饮食的个人用户，不专门面向儿童，也不明知收集儿童信息。若你是监护人并认为未成年人使用了本应用，可联系我们协助处理。</p>
+
+    <h2>10. 不是医疗建议</h2>
+    <p>BodyTrack 是个人记录工具，<strong>不是医疗器械</strong>，不提供诊断、治疗或营养处方。净热量与趋势仅供你自己参考，不能替代执业医师或注册营养师的意见。</p>
+
+    <h2>11. 政策更新</h2>
+    <p>若收集范围或使用方式发生变化，我们会更新本政策及生效日期，并在应用内或产品页面提示。重大变更时，建议你重新阅读后再继续使用。</p>
+
+    <h2>12. 联系我们</h2>
+    <p>隐私相关问题请发送邮件至 <a href="mailto:xuwudi404@gmail.com">xuwudi404@gmail.com</a>。我们会在合理期限内回复。</p>
+
+    <nav>
+      <a href="./support.html">支持与帮助</a>
+    </nav>
+  </main>
+</body>
+</html>
