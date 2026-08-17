@@ -44,10 +44,10 @@
 - iPhone 壳：`TabView`；设置是 toolbar sheet
 - 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
 - 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
-- 今日概览：最新体重、热量卡可切「今日 / 总计」（总计 = 近 30 天净值相加）、肥肉块示意（100 克 = 800 千卡）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
+- 今日概览：顶部对照表一眼给出今天 / 最近 / 目标三句结论。没记饮食不算吃了 0。达标时间按窗口首末日体重线性粗算。有数据后再展开热量细节和趋势图。点趋势图某一天进入日详情
 - iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
-- 设置：个人资料（用户名、年龄、性别、身高、目标体重）；体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
+- 设置：个人资料仍可打开同一编辑页（主入口在概览）；体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
 - 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页 `docs/privacy-policy.html`、`docs/support.html`（URL 待托管）
 - 隐私清单：`bodycheck/PrivacyInfo.xcprivacy`、`BodyTrackWidget/PrivacyInfo.xcprivacy`
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
@@ -112,7 +112,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 
 1. **体重只存 kg**。界面用 `WeightUnit` 换算。偏好键：`AppStorage("weightUnit")`，值为 `"kg"` | `"lb"`。
 2. **允许多条体重/日**。最新体重 = 按 `date` 最新的一条；同一天用 `createdAt` 决胜，不是「每日一条」。
-3. **今日摄入** = 当日 `FoodEntry.calories` 之和。**净热量** = 摄入 − 活动能量 − 静息能量。不要再减「运动消耗」合计（活动能量已含锻炼）。缺项按 0，并在文案标明未计入。
+3. **今日摄入** = 当日 `FoodEntry.calories` 之和。**净热量** = 摄入 − 活动能量 − 静息能量。不要再减「运动消耗」合计（活动能量已含锻炼）。缺项按 0，并在文案标明未计入。**概览回答「今天有没有多吃」时：当天没有饮食记录就不下结论**，不要把摄入当成 0。
 4. **锻炼行的 `caloriesBurned == nil` 只展示时长**，不另做热量合计。热量合计以健康活动能量 / 静息能量为准。
 5. **「今日」** 用设备当前时区 `Calendar.current`（见 `Date+CalendarDay` / `dayInterval`）。
 6. **体重日期只到天**：`WeightEditorView` 保存 `date.startOfDay`。饮食保留时分。
@@ -125,6 +125,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 13. **Widget 只读 App Group 摘要**，不跑 SwiftData / CloudKit。suite 为 nil 时跳过摘要更新并打日志，禁止强制解包。
 14. **小组件不输入数字**。点按打开 `bodytrack://log-weight`，由主 App 弹出 `WeightEditorView`。
 15. **肥肉换算只做约数**：100 克 = 800 千卡（`FatMeatEquivalent`）。文案用「约等于 / 少了 / 多了」，不得写成当天体脂变化。常数留在本地，不要进 SwiftData / CloudKit。概览用最多 3 块大图主视觉；日详情最多 5 块；中尺寸小组件配一块肥肉图，超过 100 克用 ×N。贴图放 `Shared/Assets.xcassets`，主 App 与小组件共用。
+16. **概览三块结论来自记录，标题用陈述不用问句**。到达目标按窗口首末日体重线性粗算（`WeightPace`），文案必须带「大约 / 粗算」，不得写成医学预测。间隔不足 7 天或变化小于 0.05 kg 不报天数。
 
 ## 数据模型
 

@@ -9,6 +9,7 @@ import SwiftUI
 struct ProfileEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @Environment(\.dismiss) private var dismiss
     @Query private var profiles: [UserProfile]
 
     @State private var nameText = ""
@@ -66,14 +67,22 @@ struct ProfileEditorView: View {
                     FormErrorText(message: validationMessage)
                 }
             }
-
-            Section {
-                Button("保存") { save() }
-            }
         }
         .navigationTitle("个人资料")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("取消") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") { save() }
+                    .fontWeight(.semibold)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
         .onAppear(perform: loadIfNeeded)
+        .tint(AppTheme.brandTeal)
     }
 
     private func loadIfNeeded() {
@@ -152,6 +161,7 @@ struct ProfileEditorView: View {
         record.updatedAt = Date()
         validationMessage = nil
         try? modelContext.save()
+        dismiss()
     }
 
     private static func formatNumber(_ value: Double) -> String {
@@ -162,9 +172,17 @@ struct ProfileEditorView: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        ProfileEditorView()
+struct ProfileEditorSheet: View {
+    var body: some View {
+        NavigationStack {
+            ProfileEditorView()
+        }
+        .tint(AppTheme.brandTeal)
+        .appChineseLocale()
     }
-    .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
+}
+
+#Preview {
+    ProfileEditorSheet()
+        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
 }
