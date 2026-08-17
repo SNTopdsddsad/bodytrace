@@ -43,11 +43,11 @@ enum HealthKitAccess {
     }
 
     static func todayRestingEnergyKcal() async -> Double? {
-        await cumulativeKcal(type: basalEnergyType, on: Date())
+        await energyTotals(on: Date()).resting
     }
 
     static func todayActiveEnergyKcal() async -> Double? {
-        await cumulativeKcal(type: activeEnergyType, on: Date())
+        await energyTotals(on: Date()).active
     }
 
     static func todayEnergyTotals() async -> (active: Double?, resting: Double?) {
@@ -55,23 +55,28 @@ enum HealthKitAccess {
     }
 
     static func energyTotals(on date: Date) async -> (active: Double?, resting: Double?) {
-        async let active = cumulativeKcal(type: activeEnergyType, on: date)
-        async let resting = cumulativeKcal(type: basalEnergyType, on: date)
+        let day = Calendar.current.dayInterval(for: date)
+        return await energyTotals(from: day.start, to: day.end)
+    }
+
+    static func energyTotals(from start: Date, to end: Date) async -> (active: Double?, resting: Double?) {
+        async let active = cumulativeKcal(type: activeEnergyType, from: start, to: end)
+        async let resting = cumulativeKcal(type: basalEnergyType, from: start, to: end)
         return await (active, resting)
     }
 
-    /// Cumulative energy for the local calendar day of `date`. Nil if unavailable or denied.
+    /// Cumulative energy in `[start, end)`. Nil if unavailable or denied.
     private static func cumulativeKcal(
         type: HKQuantityType,
-        on date: Date,
+        from start: Date,
+        to end: Date,
         store: HKHealthStore = HKHealthStore()
     ) async -> Double? {
         guard isAvailable else { return nil }
 
-        let day = Calendar.current.dayInterval(for: date)
         let predicate = HKQuery.predicateForSamples(
-            withStart: day.start,
-            end: day.end,
+            withStart: start,
+            end: end,
             options: .strictStartDate
         )
 

@@ -8,6 +8,24 @@
 
 import Foundation
 
+/// 概览热量卡：今日净值，或近 `totalDayCount` 天合计。
+nonisolated enum EnergyScope: String, CaseIterable, Identifiable {
+    case today
+    case total
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .today: "今日热量"
+        case .total: "累计热量"
+        }
+    }
+
+    /// 总计回看的本地日历日数（含今天）。
+    static let totalDayCount = 30
+}
+
 nonisolated enum TodayEnergyMath {
     static func net(
         intake: Double?,

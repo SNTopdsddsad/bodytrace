@@ -26,8 +26,12 @@ struct TodayView: View {
     @State private var showQuickFood = false
     @State private var chartRange: ChartRange = .days30
     @State private var openedDay: CalendarDayItem?
+    @AppStorage("energyScope") private var energyScope: EnergyScope = .today
     @State private var todayRestingKcal: Double?
     @State private var todayActiveKcal: Double?
+    @State private var periodRestingKcal: Double?
+    @State private var periodActiveKcal: Double?
+    @State private var periodEnergyLoaded = false
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -53,6 +57,27 @@ struct TodayView: View {
     private var todayCalories: Double? {
         guard !todayFoods.isEmpty else { return nil }
         return todayFoods.reduce(0) { $0 + $1.calories }
+    }
+
+    private var periodInterval: (start: Date, end: Date) {
+        let calendar = Calendar.current
+        let today = calendar.dayInterval(for: Date())
+        let start = calendar.date(
+            byAdding: .day,
+            value: -(EnergyScope.totalDayCount - 1),
+            to: today.start
+        ) ?? today.start
+        return (start, today.end)
+    }
+
+    private var periodFoods: [FoodEntry] {
+        let range = periodInterval
+        return foods.filter { $0.date >= range.start && $0.date < range.end }
+    }
+
+    private var periodCalories: Double? {
+        guard !periodFoods.isEmpty else { return nil }
+        return periodFoods.reduce(0) { $0 + $1.calories }
     }
 
     private var chartPoints: [WeightChartPoint] {
@@ -95,6 +120,11 @@ struct TodayView: View {
             .task {
                 await refreshHealthSummaries()
             }
+            .onChange(of: energyScope) { _, scope in
+                if scope == .total {
+                    Task { await refreshPeriodEnergy() }
+                }
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     Task { await refreshHealthSummaries() }
@@ -109,9 +139,21 @@ struct TodayView: View {
             into: modelContext,
             promptIfNeeded: false
         )
-        let totals = await HealthKitAccess.todayEnergyTotals()
-        todayActiveKcal = totals.active
-        todayRestingKcal = totals.resting
+        let todayTotals = await HealthKitAccess.todayEnergyTotals()
+        todayActiveKcal = todayTotals.active
+        todayRestingKcal = todayTotals.resting
+        if energyScope == .total {
+            await refreshPeriodEnergy()
+        }
+    }
+
+    @MainActor
+    private func refreshPeriodEnergy() async {
+        let range = periodInterval
+        let periodTotals = await HealthKitAccess.energyTotals(from: range.start, to: range.end)
+        periodActiveKcal = periodTotals.active
+        periodRestingKcal = periodTotals.resting
+        periodEnergyLoaded = true
     }
 
     @ToolbarContentBuilder
@@ -193,34 +235,70 @@ struct TodayView: View {
 
     private var platformHeroMinHeight: CGFloat { 140 }
 
+    private var displayedIntake: Double? {
+        energyScope == .today ? todayCalories : periodCalories
+    }
+
+    private var displayedActiveKcal: Double? {
+        energyScope == .today ? todayActiveKcal : periodActiveKcal
+    }
+
+    private var displayedRestingKcal: Double? {
+        energyScope == .today ? todayRestingKcal : periodRestingKcal
+    }
+
+    private var displayedFoodCount: Int {
+        energyScope == .today ? todayFoods.count : periodFoods.count
+    }
+
     /// 摄入 − 活动能量 − 静息能量。
     private var netCalories: Double? {
         TodayEnergyMath.net(
-            intake: todayCalories,
-            activeKcal: todayActiveKcal,
-            restingKcal: todayRestingKcal
+            intake: displayedIntake,
+            activeKcal: displayedActiveKcal,
+            restingKcal: displayedRestingKcal
         )
     }
 
     private var netCaloriesCaption: String {
-        guard netCalories != nil else { return "记录饮食或同步健康后计算" }
-        return TodayEnergyMath.caption(
-            activeKcal: todayActiveKcal,
-            noteMissingResting: todayRestingKcal == nil
+        if energyScope == .total && !periodEnergyLoaded {
+            return "正在合计近 \(EnergyScope.totalDayCount) 天"
+        }
+        let empty: String = energyScope == .today
+            ? "记录饮食或同步健康后计算"
+            : "近 \(EnergyScope.totalDayCount) 天还没有可合计的记录"
+        guard netCalories != nil else { return empty }
+        let formula = TodayEnergyMath.caption(
+            activeKcal: displayedActiveKcal,
+            noteMissingResting: displayedRestingKcal == nil
         )
+        if energyScope == .total {
+            return "近 \(EnergyScope.totalDayCount) 天区间总和 · \(formula)"
+        }
+        return formula
     }
 
     private var energySection: some View {
         VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
-                    Text("今日热量")
-                        .font(AppFont.sectionTitle)
-                    Text(netCaloriesCaption)
-                        .font(AppFont.sectionSubtitle)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .center, spacing: AppTheme.space8) {
+                Text(energyScope.title)
+                    .font(AppFont.sectionTitle)
+                Spacer(minLength: AppTheme.space8)
+                Picker("热量范围", selection: $energyScope) {
+                    Text("今日").tag(EnergyScope.today)
+                    Text("总计").tag(EnergyScope.total)
                 }
+                .pickerStyle(.segmented)
+                .frame(width: 132)
+                .labelsHidden()
+                .accessibilityLabel("热量范围")
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(netCaloriesCaption)
+                    .font(AppFont.sectionSubtitle)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: AppTheme.space8)
                 Button("记录饮食") { showQuickFood = true }
                     .buttonStyle(.borderless)
@@ -228,38 +306,44 @@ struct TodayView: View {
                     .foregroundStyle(AppTheme.intakeAmber)
             }
 
-            if let netCalories {
-                FatMeatEquivalentView(netKcal: netCalories, style: .hero)
+            if energyScope == .total && !periodEnergyLoaded {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppTheme.space16)
             } else {
-                HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
-                    Text("净热量")
-                        .font(AppFont.inlineAction)
-                        .foregroundStyle(.secondary)
-                    MeasurementValue(
-                        value: "—",
-                        unit: nil,
-                        tint: .secondary,
-                        size: .metric,
-                        dimmed: true
-                    )
-                    Spacer(minLength: 0)
+                if let netCalories {
+                    FatMeatEquivalentView(netKcal: netCalories, style: .hero)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
+                        Text("净热量")
+                            .font(AppFont.inlineAction)
+                            .foregroundStyle(.secondary)
+                        MeasurementValue(
+                            value: "—",
+                            unit: nil,
+                            tint: .secondary,
+                            size: .metric,
+                            dimmed: true
+                        )
+                        Spacer(minLength: 0)
+                    }
                 }
-            }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 0) {
-                    energyCell(intakeMetric)
-                    VerticalHairline()
-                    energyCell(activeMetric)
-                    VerticalHairline()
-                    energyCell(restingMetric)
-                }
-                VStack(spacing: 0) {
-                    energyCell(intakeMetric)
-                    Divider()
-                    energyCell(activeMetric)
-                    Divider()
-                    energyCell(restingMetric)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 0) {
+                        energyCell(intakeMetric)
+                        VerticalHairline()
+                        energyCell(activeMetric)
+                        VerticalHairline()
+                        energyCell(restingMetric)
+                    }
+                    VStack(spacing: 0) {
+                        energyCell(intakeMetric)
+                        Divider()
+                        energyCell(activeMetric)
+                        Divider()
+                        energyCell(restingMetric)
+                    }
                 }
             }
         }
@@ -273,9 +357,9 @@ struct TodayView: View {
             symbol: "fork.knife",
             tint: AppTheme.intakeAmber,
             label: "摄入",
-            value: todayCalories.map { "\(Int($0.rounded()))" },
+            value: displayedIntake.map { "\(Int($0.rounded()))" },
             unit: "千卡",
-            meta: todayFoods.isEmpty ? "自己填写后相加" : "\(todayFoods.count) 条记录相加"
+            meta: intakeMeta
         )
     }
 
@@ -284,7 +368,7 @@ struct TodayView: View {
             symbol: "flame.fill",
             tint: AppTheme.activityGreen,
             label: "活动能量",
-            value: todayActiveDisplay,
+            value: displayedActiveKcal.map { "\(Int($0.rounded()))" },
             unit: "千卡",
             meta: activeEnergyMeta
         )
@@ -295,26 +379,33 @@ struct TodayView: View {
             symbol: "bed.double.fill",
             tint: AppTheme.brandTeal,
             label: "静息能量",
-            value: todayRestingDisplay,
+            value: displayedRestingKcal.map { "\(Int($0.rounded()))" },
             unit: "千卡",
             meta: restingEnergyMeta
         )
     }
 
-    private var todayActiveDisplay: String? {
-        todayActiveKcal.map { "\(Int($0.rounded()))" }
-    }
-
-    private var todayRestingDisplay: String? {
-        todayRestingKcal.map { "\(Int($0.rounded()))" }
+    private var intakeMeta: String {
+        if displayedFoodCount == 0 {
+            return energyScope == .today ? "自己填写后相加" : "近 \(EnergyScope.totalDayCount) 天没有饮食"
+        }
+        return energyScope == .today
+            ? "\(displayedFoodCount) 条记录相加"
+            : "近 \(EnergyScope.totalDayCount) 天 \(displayedFoodCount) 条相加"
     }
 
     private var activeEnergyMeta: String {
-        todayActiveKcal == nil ? "需授权读取健康" : "健康今日合计"
+        if displayedActiveKcal == nil { return "需授权读取健康" }
+        return energyScope == .today
+            ? "健康今日合计"
+            : "健康近 \(EnergyScope.totalDayCount) 天合计"
     }
 
     private var restingEnergyMeta: String {
-        todayRestingKcal == nil ? "需授权读取健康" : "健康今日合计"
+        if displayedRestingKcal == nil { return "需授权读取健康" }
+        return energyScope == .today
+            ? "健康今日合计"
+            : "健康近 \(EnergyScope.totalDayCount) 天合计"
     }
 
     private func energyCell(_ metric: EnergyMetric) -> some View {

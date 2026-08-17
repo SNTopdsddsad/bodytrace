@@ -44,7 +44,7 @@
 - iPhone 壳：`TabView`；设置是 toolbar sheet
 - 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
 - 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
-- 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、肥肉块示意（100 克 = 800 千卡，最多 5 块）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
+- 今日概览：最新体重、热量卡可切「今日 / 总计」（总计 = 近 30 天净值相加）、肥肉块示意（100 克 = 800 千卡）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
 - iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
 - 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
@@ -54,7 +54,7 @@
 - iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量、活动能量（不入库）
 - iOS 体重 ↔ 健康：写回 `bodyMass` 并回填 UUID；导入按 UUID upsert；`HKObserverQuery` + 后台投递（唤醒进程，不弹到前台）；未授权时本地仍可用
 - App 图标：深色进度环（`Assets.xcassets/AppIcon`）
-- iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（净热量 + 约合克肥肉，不放图）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）
+- iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（肥肉图 + 克数 + 净热量）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）
 - App Group `group.yinke.bodycheck`：主 App 写摘要，Widget 只读摘要，不跑 SwiftData / CloudKit
 - 2026-08-14：删除全部 Mac / visionOS 目标与专用代码
 
@@ -124,7 +124,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 12. 无网 / 无 iCloud：本地照常读写，UI 不阻塞。
 13. **Widget 只读 App Group 摘要**，不跑 SwiftData / CloudKit。suite 为 nil 时跳过摘要更新并打日志，禁止强制解包。
 14. **小组件不输入数字**。点按打开 `bodytrack://log-weight`，由主 App 弹出 `WeightEditorView`。
-15. **肥肉换算只做约数**：100 克 = 800 千卡（`FatMeatEquivalent`）。文案必须是「约等于 / 少攒下 / 多出来」，不得写成当天体脂变化。常数留在本地，不要进 SwiftData / CloudKit。概览用最多 3 块大图主视觉；日详情最多 5 块；小组件只出克数，不放图。
+15. **肥肉换算只做约数**：100 克 = 800 千卡（`FatMeatEquivalent`）。文案用「约等于 / 少了 / 多了」，不得写成当天体脂变化。常数留在本地，不要进 SwiftData / CloudKit。概览用最多 3 块大图主视觉；日详情最多 5 块；中尺寸小组件配一块肥肉图，超过 100 克用 ×N。贴图放 `Shared/Assets.xcassets`，主 App 与小组件共用。
 
 ## 数据模型
 

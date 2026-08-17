@@ -186,7 +186,67 @@ struct WeightWidgetView: View {
     @ViewBuilder
     private var netBlock: some View {
         if let net = snapshot.displayedTodayNetCalories {
-            let meat = FatMeatEquivalent.widgetCaption(netKcal: net)
+            if let presentation = FatMeatEquivalent.presentation(netKcal: net) {
+                meatNetBlock(presentation, net: net)
+            } else {
+                kcalOnlyBlock(net)
+            }
+        } else {
+            Text("—")
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+            Text("记录后计算")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func meatNetBlock(_ presentation: FatMeatEquivalent.Presentation, net: Double) -> some View {
+        let units = presentation.unitFractions(maxVisible: 1)
+        return HStack(alignment: .center, spacing: 8) {
+            ZStack(alignment: .bottomTrailing) {
+                WidgetFatChunkImage(fraction: units.fractions.first ?? 1)
+                    .frame(width: 56, height: 44)
+
+                if presentation.wholeBlocks > 1 {
+                    Text("×\(presentation.wholeBlocks)")
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(netTint, in: Capsule())
+                }
+            }
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(presentation.verb)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(netTint)
+                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(presentation.grams)")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.7)
+                        .lineLimit(1)
+                        .foregroundStyle(netTint)
+                    Text("克")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(netTint)
+                }
+                Text("\(netText(net)) 千卡")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(presentation.verb) \(presentation.grams) 克肥肉，\(netText(net)) 千卡")
+    }
+
+    private func kcalOnlyBlock(_ net: Double) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(netText(net))
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
@@ -198,24 +258,11 @@ struct WeightWidgetView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
-            if let meat {
-                Text(meat)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(netTint)
-                    .lineLimit(1)
-            }
             Text(snapshot.displayedNetCaption ?? "摄入 − 活动能量 − 静息能量")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(meat == nil ? 2 : 1)
+                .lineLimit(2)
                 .minimumScaleFactor(0.8)
-        } else {
-            Text("—")
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
-            Text("记录后计算")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -233,6 +280,18 @@ struct WeightWidgetView: View {
         return deltaKg > 0
             ? "↑ \(absText) \(unit.shortLabel)"
             : "↓ \(absText) \(unit.shortLabel)"
+    }
+}
+
+private struct WidgetFatChunkImage: View {
+    var fraction: Double
+
+    var body: some View {
+        let scale = min(max(fraction, 0.45), 1)
+        Image("FatMeatChunk")
+            .resizable()
+            .scaledToFit()
+            .scaleEffect(scale, anchor: .bottom)
     }
 }
 

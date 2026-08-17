@@ -78,7 +78,7 @@ struct FatMeatEquivalentView: View {
                 .foregroundStyle(presentation.isSurplus ? AppTheme.intakeAmber : AppTheme.activityGreen)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if presentation.showsBlocks || !units.fractions.isEmpty {
+            if !units.fractions.isEmpty {
                 chunkStage(
                     fractions: units.fractions,
                     overflow: units.overflowLabel,

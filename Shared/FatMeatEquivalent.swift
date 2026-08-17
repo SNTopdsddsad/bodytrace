@@ -11,8 +11,6 @@ nonisolated enum FatMeatEquivalent {
     static let kcalPer100Grams: Double = 800
     static let gramsPerBlock: Double = 100
     static let maxVisibleBlocks: Int = 5
-    /// 小于该克数只出文字，不画碎渣图。
-    static let minVisibleGrams: Int = 20
 
     static var kcalPerGram: Double { kcalPer100Grams / gramsPerBlock }
 
@@ -21,12 +19,13 @@ nonisolated enum FatMeatEquivalent {
         var isSurplus: Bool
         var caption: String
         var widgetCaption: String
-        var fullBlocks: Int
-        var partialFraction: Double?
-        var extraBlocksLabel: String?
-        var showsBlocks: Bool
 
-        var verb: String { isSurplus ? "多出来" : "少攒下" }
+        var verb: String { isSurplus ? "多了" : "少了" }
+
+        /// 整块数（向下取整）。150 克 → 1，不是 2。
+        var wholeBlocks: Int {
+            grams / Int(FatMeatEquivalent.gramsPerBlock)
+        }
 
         /// 每项 0...1，代表一块 100 克里画多少。超出 `maxVisible` 的进 overflow。
         func unitFractions(maxVisible: Int) -> (fractions: [Double], overflowLabel: String?) {
@@ -42,11 +41,13 @@ nonisolated enum FatMeatEquivalent {
                     remaining = 0
                 }
             }
-            if remaining > 0 {
-                let more = max(1, Int((Double(remaining) / Double(block)).rounded()))
-                return (fractions, "还有 \(more) 块")
+            if remaining >= block {
+                return (fractions, "还有 \(remaining / block) 块")
             }
-            return (fractions, extraBlocksLabel)
+            if remaining > 0 {
+                return (fractions, "还有 \(remaining) 克")
+            }
+            return (fractions, nil)
         }
     }
 
@@ -59,41 +60,13 @@ nonisolated enum FatMeatEquivalent {
     static func presentation(netKcal: Double) -> Presentation? {
         guard let grams = grams(fromNetKcal: netKcal) else { return nil }
         let surplus = netKcal > 0
-        let caption = surplus
-            ? "约等于 \(grams) 克肥肉"
-            : "约等于少攒下 \(grams) 克肥肉"
-        let widgetCaption = "约 \(grams) 克肥肉"
-
-        var fullBlocks = 0
-        var partialFraction: Double?
-        var extraBlocksLabel: String?
-        let showsBlocks = grams >= minVisibleGrams
-        if showsBlocks {
-            let capGrams = maxVisibleBlocks * Int(gramsPerBlock)
-            if grams > capGrams {
-                fullBlocks = maxVisibleBlocks
-                let totalBlocks = Int((Double(grams) / gramsPerBlock).rounded())
-                if totalBlocks > maxVisibleBlocks {
-                    extraBlocksLabel = "共约 \(totalBlocks) 块"
-                }
-            } else {
-                fullBlocks = grams / Int(gramsPerBlock)
-                let remainder = grams % Int(gramsPerBlock)
-                if remainder > 0 {
-                    partialFraction = Double(remainder) / gramsPerBlock
-                }
-            }
-        }
-
         return Presentation(
             grams: grams,
             isSurplus: surplus,
-            caption: caption,
-            widgetCaption: widgetCaption,
-            fullBlocks: fullBlocks,
-            partialFraction: partialFraction,
-            extraBlocksLabel: extraBlocksLabel,
-            showsBlocks: showsBlocks
+            caption: surplus
+                ? "约等于多了 \(grams) 克肥肉"
+                : "约等于少了 \(grams) 克肥肉",
+            widgetCaption: "约 \(grams) 克肥肉"
         )
     }
 
