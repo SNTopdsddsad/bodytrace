@@ -178,12 +178,19 @@ struct ExerciseListView: View {
 
     @MainActor
     private func syncFromHealth(silent: Bool = false) async {
+        if silent && HealthAutoImport.isPaused {
+            await refreshEnergyTotals()
+            return
+        }
         isSyncing = true
         defer { isSyncing = false }
         statusIsError = false
         do {
             try await HealthKitExerciseService.shared.requestAuthorization()
-            let count = try await HealthKitExerciseService.shared.syncWorkouts(into: modelContext)
+            let count = try await HealthKitExerciseService.shared.syncWorkouts(
+                into: modelContext,
+                userInitiated: !silent
+            )
             await refreshEnergyTotals()
             if !silent {
                 statusMessage = count == 0

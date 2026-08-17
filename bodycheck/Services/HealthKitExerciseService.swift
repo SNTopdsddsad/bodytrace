@@ -32,7 +32,13 @@ final class HealthKitExerciseService {
 
     /// Import workouts from the last `days` days (default 90).
     @discardableResult
-    func syncWorkouts(into context: ModelContext, days: Int = 90) async throws -> Int {
+    func syncWorkouts(into context: ModelContext, days: Int = 90, userInitiated: Bool = false) async throws -> Int {
+        if userInitiated {
+            HealthAutoImport.resume()
+        } else if HealthAutoImport.isPaused {
+            return 0
+        }
+
         guard isHealthDataAvailable else {
             throw HealthKitExerciseError.unavailable
         }

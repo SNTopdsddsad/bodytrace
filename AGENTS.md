@@ -47,7 +47,7 @@
 - 今日概览：顶部对照表一眼给出今天 / 最近 / 目标三句结论。没记饮食不算吃了 0。达标时间按窗口首末日体重线性粗算。有数据后再展开热量细节和趋势图。点趋势图某一天进入日详情
 - iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
-- 设置：个人资料仍可打开同一编辑页（主入口在概览）；体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
+- 设置：个人资料仍可打开同一编辑页（主入口在概览）；体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；用户可「清除我的全部数据」（体重 / 饮食 / 运动 / 个人资料 / 小组件摘要；尝试删本应用写入健康的手动体重；清除后暂停自动从健康导入，直到用户再点同步）；完整隐私政策页（读 `PrivacyPolicy.md`）
 - 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页 `docs/privacy-policy.html`、`docs/support.html`（URL 待托管）
 - 隐私清单：`bodycheck/PrivacyInfo.xcprivacy`、`BodyTrackWidget/PrivacyInfo.xcprivacy`
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
@@ -126,6 +126,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 14. **小组件不输入数字**。点按打开 `bodytrack://log-weight`，由主 App 弹出 `WeightEditorView`。
 15. **肥肉换算只做约数**：100 克 = 800 千卡（`FatMeatEquivalent`）。文案用「约等于 / 少了 / 多了」，不得写成当天体脂变化。常数留在本地，不要进 SwiftData / CloudKit。概览用最多 3 块大图主视觉；日详情最多 5 块；中尺寸小组件配一块肥肉图，超过 100 克用 ×N。贴图放 `Shared/Assets.xcassets`，主 App 与小组件共用。
 16. **概览三块结论来自记录，标题用陈述不用问句**。到达目标按窗口首末日体重线性粗算（`WeightPace`），文案必须带「大约 / 粗算」，不得写成医学预测。间隔不足 7 天或变化小于 0.05 kg 不报天数。
+17. **用户可清除自己的全部数据**。设置里「清除我的全部数据」必须始终可点。清的是本应用保存的体重 / 饮食 / 运动 / 个人资料和小组件摘要，以及本应用写入健康的手动体重。不要删健康 App 里其他来源的样本。清除后禁止静默从健康再导入，直到用户再点「从健康同步」。体重单位等显示偏好可保留。
 
 ## 数据模型
 

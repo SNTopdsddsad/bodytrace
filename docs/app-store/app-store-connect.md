@@ -235,6 +235,9 @@ How to review Health:
 4. Workouts are imported from Apple Health only. There is no manual exercise editor.
 5. Denying Health still allows local weight and food logging.
 
+Delete my data:
+Settings (gear) → 数据 → 「清除我的全部数据」. This deletes all BodyTrack records (weight, food, workouts imported into the app, profile) and the widget snapshot. Samples this app wrote to Health are removed when possible. Other Health sources are left intact. After deletion the app does not auto-import from Health until the user taps 「从健康同步」.
+
 Widget:
 Add the BodyTrack / 体重 widget on the Home Screen. Tap it to open bodytrack://log-weight and the weight editor. The widget does not accept numeric input.
 

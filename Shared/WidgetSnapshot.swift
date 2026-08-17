@@ -140,6 +140,29 @@ nonisolated enum WidgetSnapshotStore {
         reloadTimelines()
     }
 
+    static func clear() {
+        guard let defaults = AppGroup.userDefaults else {
+            print("App Group suite unavailable, skip widget snapshot")
+            return
+        }
+        for key in [
+            AppGroup.snapshotKey,
+            AppGroup.latestWeightKey,
+            AppGroup.latestWeightDateKey,
+            AppGroup.previousWeightKey,
+            AppGroup.todayCaloriesKey,
+            AppGroup.todayFoodCountKey,
+            AppGroup.todayNetCaloriesKey,
+            AppGroup.netCaptionKey,
+            AppGroup.calorieDayStartKey,
+            AppGroup.weightUnitKey
+        ] {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.synchronize()
+        reloadTimelines()
+    }
+
     static func reloadTimelines() {
         #if canImport(WidgetKit)
         WidgetCenter.shared.reloadTimelines(ofKind: widgetKind)

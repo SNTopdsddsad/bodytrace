@@ -101,3 +101,20 @@ enum HealthKitAccess {
         }
     }
 }
+
+/// After the user deletes all their data, skip silent Health imports until they tap sync again.
+enum HealthAutoImport {
+    static let pausedKey = "healthAutoImportPaused"
+
+    static var isPaused: Bool {
+        UserDefaults.standard.bool(forKey: pausedKey)
+    }
+
+    static func pause() {
+        UserDefaults.standard.set(true, forKey: pausedKey)
+    }
+
+    static func resume() {
+        UserDefaults.standard.set(false, forKey: pausedKey)
+    }
+}

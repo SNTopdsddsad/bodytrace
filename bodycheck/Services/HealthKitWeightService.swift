@@ -140,6 +140,12 @@ final class HealthKitWeightService {
     /// Upsert `bodyMass` samples by HealthKit UUID. Existing rows keep their `source`.
     @discardableResult
     func importSamples(into context: ModelContext, days: Int = 90, promptIfNeeded: Bool = false) async throws -> Int {
+        if promptIfNeeded {
+            HealthAutoImport.resume()
+        } else if HealthAutoImport.isPaused {
+            return 0
+        }
+
         guard isHealthDataAvailable else {
             if promptIfNeeded { throw HealthKitWeightError.unavailable }
             return 0
