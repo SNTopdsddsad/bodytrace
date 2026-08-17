@@ -34,7 +34,7 @@
 建议下一件（上架门槛，按顺序）：
 
 1. **真机验收**：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件已能添加，顺手确认 A7 数据、A8 点按记体重、A10 单位一致  
-2. CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`）；没部署不要 Archive / TestFlight  
+2. CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`、`CD_UserProfile`）；没部署不要 Archive / TestFlight  
 3. 把 `docs/privacy-policy.html` / `docs/support.html` 托管成公开 https（GitHub Pages 步骤见 `docs/app-store/README.md`），再按 `docs/app-store/app-store-connect.md` 填商店后台与营养标签；截图需真机实拍
 
 ## 当前进度（2026-08）
@@ -47,7 +47,7 @@
 - 今日概览：最新体重、热量卡可切「今日 / 总计」（总计 = 近 30 天净值相加）、肥肉块示意（100 克 = 800 千卡）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
 - iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
-- 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
+- 设置：个人资料（用户名、年龄、性别、身高、目标体重）；体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
 - 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页 `docs/privacy-policy.html`、`docs/support.html`（URL 待托管）
 - 隐私清单：`bodycheck/PrivacyInfo.xcprivacy`、`BodyTrackWidget/PrivacyInfo.xcprivacy`
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
@@ -72,12 +72,12 @@
 
 - [x] Widget + App Group + Deep Link（见「当前进度」）
 - [ ] 真机验收：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件 A7/A8/A10
-- [ ] CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`）；没部署不要 Archive / TestFlight
+- [ ] CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`、`CD_UserProfile`）；没部署不要 Archive / TestFlight
 - [ ] 上架材料：托管隐私政策 / 支持页 URL，按 `docs/app-store/app-store-connect.md` 填 ASC；截图未拍
 
 产品增强（非门槛，用户未点名先别做）：
 
-- [ ] 目标体重与差距
+- [x] 目标体重与差距（个人资料里的目标体重；概览对照最新体重）
 - [ ] 本地提醒（称重 / 记饮食）
 - [ ] 常用食物 / 食物库
 - [ ] 步数（要再申请健康类型）
@@ -128,11 +128,12 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 
 ## 数据模型
 
-三个 `@Model`：`WeightEntry`、`FoodEntry`、`ExerciseEntry`。公共字段：`id`、`date`、`note?`、`createdAt`、`updatedAt`。
+四个 `@Model`：`WeightEntry`、`FoodEntry`、`ExerciseEntry`、`UserProfile`。记录类公共字段：`id`、`date`、`note?`、`createdAt`、`updatedAt`。
 
 - `WeightEntry.weight`：kg。`source` 存 `WeightSource.rawValue`（`manual` / `healthkit`）。`healthKitUUID` 用于体重对账。
 - `FoodEntry.calories`：kcal。`healthKitUUID` 仍保留（CloudKit 不能删字段），**不要**用来写健康。`photoData` 可选 JPEG，`@Attribute(.externalStorage)`。
 - `ExerciseEntry`：比文档初稿多了 `source`（默认 `healthkit`）和 `healthKitUUID`。导入用 UUID upsert，禁止按名称+日期盲目插入。
+- `UserProfile`：无账号。用户名、可选年龄、性别（`sexRaw`）、身高厘米、目标体重公斤。可能因同步出现多条，界面取 `updatedAt` 最新一条。热量仍不靠资料估算。
 
 改模型时：给新属性默认值或设为可选；同步更新 Preview 的 `modelContainer(for:)` 列表；更新开发文档 §3。
 
@@ -168,6 +169,7 @@ Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release
 - `CD_WeightEntry`
 - `CD_FoodEntry`（含可选 `CD_photoData`）
 - `CD_ExerciseEntry`
+- `CD_UserProfile`
 
 步骤（每次改了模型字段后都要再做一遍）：
 

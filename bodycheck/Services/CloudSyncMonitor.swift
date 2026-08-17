@@ -20,7 +20,7 @@ enum CloudKitConfig {
     static let didResetWedgedCloudStoreKey = "didResetWedgedCloudStoreAfterSchemaBootstrap"
 
     static var schema: Schema {
-        Schema([WeightEntry.self, FoodEntry.self, ExerciseEntry.self])
+        Schema([WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self])
     }
 
     static var cloudConfiguration: ModelConfiguration {

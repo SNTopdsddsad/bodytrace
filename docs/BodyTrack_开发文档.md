@@ -1,12 +1,13 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.23  
+**版本**：v1.24  
 **日期**：2026-08-17  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.24 | 2026-08-17 | 个人资料：用户名、年龄、性别、身高、目标体重；概览显示姓名与距目标差距。新表 `CD_UserProfile`，上架前须随 schema 部署 Production |
 | v1.23 | 2026-08-17 | 概览热量卡「今日 / 总计」切换；总计为近 30 天净值相加，小组件仍只显示今日 |
 | v1.22 | 2026-08-17 | 中尺寸小组件热量差配肥肉图（一块 + 克数；超过 100 克用 ×N） |
 | v1.21 | 2026-08-17 | 热量差用肥肉块示意：100 克 = 800 千卡；概览/日详情最多 5 块；小组件只出克数 |
@@ -248,12 +249,25 @@ final class ExerciseEntry {
         self.updatedAt = Date()
     }
 }
+
+@Model
+final class UserProfile {
+    var id: UUID
+    var name: String
+    var age: Int?
+    var sexRaw: String                 // UserSex: unspecified / female / male
+    var heightCm: Double?              // 厘米
+    var targetWeightKg: Double?        // 公斤
+    var createdAt: Date
+    var updatedAt: Date
+}
 ```
 
 **说明**：
 
 - 使用 `createdAt` / `updatedAt` 便于排查同步与展示「最近修改」
 - 体重统一 **kg** 存储；界面按用户偏好转换
+- `UserProfile` 无账号，取 `updatedAt` 最新一条；身高存厘米，目标体重存公斤
 - 单位偏好、授权引导状态等 **非业务实体** 使用 `AppStorage` / `UserDefaults`（主 App）；需给 Widget 用的摘要字段进 App Group（见 §5.4）
 
 **设置相关键（建议）**：
@@ -454,7 +468,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 ### 6.1 iPhone 主要页面
 
 1. **今日概览**
-   - 最新体重 + 与上条差值
+   - 最新体重 + 与上条差值；有资料时显示用户名与距目标体重差距
    - 热量卡：标题旁「今日 / 总计」切换。今日为当天净值；总计为近 30 天摄入 − 活动 − 静息。同一套肥肉主视觉 + 三列分项
    - 快捷入口：记录体重 / 记录食物
    - 点趋势图某一天进入日详情（当天体重、饮食、运动、热量）
@@ -471,6 +485,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
    - 简单记录列表
 
 5. **设置**
+   - 个人资料：用户名、年龄、性别、身高、目标体重
    - HealthKit 授权状态与引导（仅 iOS）
    - 单位切换（kg / lb）
    - 数据与隐私说明入口

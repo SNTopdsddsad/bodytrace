@@ -3,11 +3,13 @@
 //  bodycheck
 //
 
+import SwiftData
 import SwiftUI
 
 struct SettingsView: View {
     @Environment(CloudSyncMonitor.self) private var cloudSync
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
+    @Query private var profiles: [UserProfile]
     @State private var weightWriteStatus = "检查中"
 
     private var weightUnitBinding: Binding<WeightUnit> {
@@ -19,6 +21,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            profileSection
             generalSection
             healthSection
             syncSection
@@ -30,6 +33,29 @@ struct SettingsView: View {
         .tint(AppTheme.brandTeal)
         .appChineseLocale()
         .task { await cloudSync.refresh() }
+    }
+
+    private var profile: UserProfile? {
+        UserProfile.current(from: profiles)
+    }
+
+    private var profileSection: some View {
+        Section {
+            NavigationLink {
+                ProfileEditorView()
+            } label: {
+                LabeledContent("个人资料", value: profileSummary)
+            }
+        } header: {
+            Text("我")
+        } footer: {
+            Text("资料只用于本应用展示，不单独上传给开发者。打开 iCloud 时会随私人库同步。")
+        }
+    }
+
+    private var profileSummary: String {
+        let name = profile?.trimmedName ?? ""
+        return name.isEmpty ? "未填写" : name
     }
 
     private var generalSection: some View {
@@ -94,6 +120,12 @@ struct SettingsView: View {
             Text("BodyTrack 不会将健康数据用于广告或出售给第三方。")
                 .font(AppFont.prose)
                 .foregroundStyle(.secondary)
+            NavigationLink("查看完整隐私政策") {
+                PrivacyPolicyView()
+            }
+            if let mail = AppLegal.supportMailURL {
+                Link("邮件询问隐私问题", destination: mail)
+            }
         } header: {
             Text("数据与隐私")
         }
@@ -110,4 +142,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environment(CloudSyncMonitor(kind: .cloudEnabled))
+        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
 }

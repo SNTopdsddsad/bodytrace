@@ -366,5 +366,5 @@ struct FoodEditorSheet: View {
 
 #Preview {
     FoodListView()
-        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self], inMemory: true)
+        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
 }

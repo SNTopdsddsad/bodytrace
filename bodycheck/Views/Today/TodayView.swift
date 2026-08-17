@@ -21,6 +21,7 @@ struct TodayView: View {
     ]) private var weights: [WeightEntry]
     @Query(sort: \FoodEntry.date, order: .reverse) private var foods: [FoodEntry]
     @Query(sort: \ExerciseEntry.date, order: .reverse) private var exercises: [ExerciseEntry]
+    @Query private var profiles: [UserProfile]
 
     @State private var showQuickWeight = false
     @State private var showQuickFood = false
@@ -41,12 +42,30 @@ struct TodayView: View {
         weights.sorted(by: WeightEntry.chronologicalDescending)
     }
 
+    private var profile: UserProfile? {
+        UserProfile.current(from: profiles)
+    }
+
     private var latestWeight: WeightEntry? { orderedWeights.first }
     private var previousWeight: WeightEntry? { orderedWeights.count > 1 ? orderedWeights[1] : nil }
 
     private var weightDelta: Double? {
         guard let latest = latestWeight, let previous = previousWeight else { return nil }
         return latest.weight - previous.weight
+    }
+
+    private var profileName: String {
+        profile?.trimmedName ?? ""
+    }
+
+    private var targetGapText: String? {
+        guard let target = profile?.targetWeightKg, let latest = latestWeight else { return nil }
+        let gap = latest.weight - target
+        let amount = String(format: "%.1f", weightUnit.fromKilograms(abs(gap)))
+        let unit = weightUnit.shortLabel
+        if abs(gap) < 0.05 { return "已达到目标" }
+        if gap > 0 { return "距目标还需减 \(amount) \(unit)" }
+        return "距目标还需增 \(amount) \(unit)"
     }
 
     private var todayFoods: [FoodEntry] {
@@ -192,6 +211,10 @@ struct TodayView: View {
 
     private var weightHero: some View {
         VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
+            if !profileName.isEmpty {
+                Text(profileName)
+                    .font(AppFont.sectionTitle)
+            }
             SectionEyebrow(text: "最新体重")
 
             if let latest = latestWeight {
@@ -212,6 +235,9 @@ struct TodayView: View {
                         .buttonStyle(.borderless)
                         .font(AppFont.inlineAction)
                         .foregroundStyle(AppTheme.brandTeal)
+                }
+                if let targetText = targetGapText {
+                    TintedChip(text: targetText, tint: AppTheme.brandTeal)
                 }
             } else {
                 VStack(alignment: .leading, spacing: AppTheme.space8) {
@@ -759,5 +785,5 @@ struct RecentRecord: Identifiable {
 
 #Preview {
     TodayView()
-        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self], inMemory: true)
+        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
 }

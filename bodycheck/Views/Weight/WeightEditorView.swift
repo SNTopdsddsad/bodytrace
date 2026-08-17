@@ -157,5 +157,5 @@ struct WeightEditorView: View {
 
 #Preview {
     WeightEditorView(mode: .create)
-        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self], inMemory: true)
+        .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
 }

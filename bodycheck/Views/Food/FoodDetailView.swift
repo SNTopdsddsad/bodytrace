@@ -112,5 +112,5 @@ struct FoodDetailView: View {
             entry: FoodEntry(name: "燕麦", calories: 320, date: .now)
         )
     }
-    .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self], inMemory: true)
+    .modelContainer(for: [WeightEntry.self, FoodEntry.self, ExerciseEntry.self, UserProfile.self], inMemory: true)
 }
