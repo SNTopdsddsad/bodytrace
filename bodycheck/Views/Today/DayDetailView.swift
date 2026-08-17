@@ -167,6 +167,10 @@ struct DayDetailView: View {
                 Spacer(minLength: 0)
             }
 
+            if let netCalories {
+                FatMeatEquivalentView(netKcal: netCalories, style: .compact)
+            }
+
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 0) {
                     energyCell("摄入", intake.map { "\(Int($0.rounded()))" }, AppTheme.intakeAmber)

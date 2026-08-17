@@ -35,7 +35,7 @@
 
 1. **真机验收**：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件已能添加，顺手确认 A7 数据、A8 点按记体重、A10 单位一致  
 2. CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`）；没部署不要 Archive / TestFlight  
-3. 上架用隐私政策 URL、App Privacy 营养标签
+3. 把 `docs/privacy-policy.html` / `docs/support.html` 托管成公开 https（GitHub Pages 步骤见 `docs/app-store/README.md`），再按 `docs/app-store/app-store-connect.md` 填商店后台与营养标签；截图需真机实拍
 
 ## 当前进度（2026-08）
 
@@ -44,15 +44,17 @@
 - iPhone 壳：`TabView`；设置是 toolbar sheet
 - 体重 CRUD（手动，`source = manual`）；同日多条用 `createdAt` 决胜；iOS 列表有筛选
 - 饮食 CRUD：名称 + 千卡 + 可选备注；按本地日历日分组；点进详情；iOS 拍照/相册（先选来源）；`photoData` 可选 JPEG 外置存储
-- 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
+- 今日概览：最新体重、净热量（摄入 − 活动能量 − 静息能量）、肥肉块示意（100 克 = 800 千卡，最多 5 块）、三列分项、趋势图、最近记录。点趋势图某一天进入日详情（当天体重/饮食/运动/热量）
 - iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
-- 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；隐私与关于
+- 设置：体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；完整隐私政策页（读 `PrivacyPolicy.md`）
+- 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页 `docs/privacy-policy.html`、`docs/support.html`（URL 待托管）
+- 隐私清单：`bodycheck/PrivacyInfo.xcprivacy`、`BodyTrackWidget/PrivacyInfo.xcprivacy`
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
 - iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量、活动能量（不入库）
 - iOS 体重 ↔ 健康：写回 `bodyMass` 并回填 UUID；导入按 UUID upsert；`HKObserverQuery` + 后台投递（唤醒进程，不弹到前台）；未授权时本地仍可用
 - App 图标：深色进度环（`Assets.xcassets/AppIcon`）
-- iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（净热量）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）
+- iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（净热量 + 约合克肥肉，不放图）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）
 - App Group `group.yinke.bodycheck`：主 App 写摘要，Widget 只读摘要，不跑 SwiftData / CloudKit
 - 2026-08-14：删除全部 Mac / visionOS 目标与专用代码
 
@@ -71,7 +73,7 @@
 - [x] Widget + App Group + Deep Link（见「当前进度」）
 - [ ] 真机验收：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件 A7/A8/A10
 - [ ] CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`）；没部署不要 Archive / TestFlight
-- [ ] 上架用隐私政策 URL、App Privacy 营养标签
+- [ ] 上架材料：托管隐私政策 / 支持页 URL，按 `docs/app-store/app-store-connect.md` 填 ASC；截图未拍
 
 产品增强（非门槛，用户未点名先别做）：
 
@@ -99,7 +101,7 @@ bodycheck/                     # 主 App 源码（同步进 Target）
   Services/                    # CloudSyncMonitor；HealthKit* / WidgetSnapshotPublisher
   Views/{Today,Weight,Food,Exercise,Settings}/
   Utilities/                   # 主题（AppTheme / AppFont）、日界
-Shared/                        # App + Widget 共享：App Group、摘要、Deep Link、WeightUnit、BrandColor
+Shared/                        # App + Widget 共享：App Group、摘要、Deep Link、WeightUnit、BrandColor、FatMeatEquivalent
 BodyTrackWidget/               # iOS Widget Extension（kind = WeightWidget）
 docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Target
 ```
@@ -122,6 +124,7 @@ docs/BodyTrack_开发文档.md     # 产品与架构规格；不要打进 App Ta
 12. 无网 / 无 iCloud：本地照常读写，UI 不阻塞。
 13. **Widget 只读 App Group 摘要**，不跑 SwiftData / CloudKit。suite 为 nil 时跳过摘要更新并打日志，禁止强制解包。
 14. **小组件不输入数字**。点按打开 `bodytrack://log-weight`，由主 App 弹出 `WeightEditorView`。
+15. **肥肉换算只做约数**：100 克 = 800 千卡（`FatMeatEquivalent`）。文案必须是「约等于 / 少攒下 / 多出来」，不得写成当天体脂变化。常数留在本地，不要进 SwiftData / CloudKit。概览用最多 3 块大图主视觉；日详情最多 5 块；小组件只出克数，不放图。
 
 ## 数据模型
 

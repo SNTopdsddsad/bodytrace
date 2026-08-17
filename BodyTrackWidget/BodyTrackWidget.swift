@@ -186,6 +186,7 @@ struct WeightWidgetView: View {
     @ViewBuilder
     private var netBlock: some View {
         if let net = snapshot.displayedTodayNetCalories {
+            let meat = FatMeatEquivalent.widgetCaption(netKcal: net)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(netText(net))
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
@@ -197,10 +198,16 @@ struct WeightWidgetView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
+            if let meat {
+                Text(meat)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(netTint)
+                    .lineLimit(1)
+            }
             Text(snapshot.displayedNetCaption ?? "摄入 − 活动能量 − 静息能量")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .lineLimit(meat == nil ? 2 : 1)
                 .minimumScaleFactor(0.8)
         } else {
             Text("—")

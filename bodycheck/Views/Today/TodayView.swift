@@ -202,18 +202,6 @@ struct TodayView: View {
         )
     }
 
-    private var netCaloriesText: String? {
-        guard let net = netCalories else { return nil }
-        if abs(net) < 0.5 { return "0" }
-        let amount = "\(Int(abs(net).rounded()))"
-        return net > 0 ? "+\(amount)" : "−\(amount)"
-    }
-
-    private var netCaloriesTone: Color {
-        guard let net = netCalories, abs(net) >= 0.5 else { return .secondary }
-        return net > 0 ? AppTheme.intakeAmber : AppTheme.activityGreen
-    }
-
     private var netCaloriesCaption: String {
         guard netCalories != nil else { return "记录饮食或同步健康后计算" }
         return TodayEnergyMath.caption(
@@ -240,18 +228,22 @@ struct TodayView: View {
                     .foregroundStyle(AppTheme.intakeAmber)
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
-                Text("净热量")
-                    .font(AppFont.inlineAction)
-                    .foregroundStyle(.secondary)
-                MeasurementValue(
-                    value: netCaloriesText ?? "—",
-                    unit: netCaloriesText == nil ? nil : "千卡",
-                    tint: netCaloriesTone,
-                    size: .metric,
-                    dimmed: netCaloriesText == nil
-                )
-                Spacer(minLength: 0)
+            if let netCalories {
+                FatMeatEquivalentView(netKcal: netCalories, style: .hero)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
+                    Text("净热量")
+                        .font(AppFont.inlineAction)
+                        .foregroundStyle(.secondary)
+                    MeasurementValue(
+                        value: "—",
+                        unit: nil,
+                        tint: .secondary,
+                        size: .metric,
+                        dimmed: true
+                    )
+                    Spacer(minLength: 0)
+                }
             }
 
             ViewThatFits(in: .horizontal) {

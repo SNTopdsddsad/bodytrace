@@ -89,6 +89,15 @@ enum AppTheme {
     /// Three-column tiles and list summary numbers.
     static let compactNumberSize: CGFloat = 22
 
+    /// 概览主视觉：单块肥肉。
+    static let fatMeatHeroSingleHeight: CGFloat = 148
+    /// 概览多块并排时的高度。
+    static let fatMeatHeroRowHeight: CGFloat = 108
+    /// 日详情小块。
+    static let fatMeatBlockWidth: CGFloat = 72
+    static let fatMeatBlockHeight: CGFloat = 56
+    static let fatMeatBlockRadius: CGFloat = 10
+
     /// Inner padding for primary surface cards.
     static let cardPadding: CGFloat = space16
 

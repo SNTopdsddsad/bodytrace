@@ -1,12 +1,14 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.19  
-**日期**：2026-08-14  
+**版本**：v1.21  
+**日期**：2026-08-17  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.21 | 2026-08-17 | 热量差用肥肉块示意：100 克 = 800 千卡；概览/日详情最多 5 块；小组件只出克数 |
+| v1.20 | 2026-08-17 | 上架材料：隐私政策正文、App Store Connect 填写稿、App 内政策页；URL 仍待托管 |
 | v1.19 | 2026-08-14 | 删除全部 Mac / visionOS 目标与专用代码；工程只编 iOS；产品仅 iPhone |
 | v1.18 | 2026-08-14 | 工程 `IPHONEOS_DEPLOYMENT_TARGET` 从 Xcode 默认 26.4 改为 18.0，与产品口径对齐 |
 | v1.16 | 2026-08-13 | iPhone 统一视觉 token：字号角色 `AppFont`、4pt 间距、品牌色抽到 `BrandColor` 与小组件共用 |
@@ -66,6 +68,7 @@
 | 体重单位存储 | 始终 **kg**；界面可切换显示为 lb |
 | 体重条数 | **允许多条/日**（列表全保留；「最新体重」取 `date` 最新一条，同一天用 `createdAt` 决胜） |
 | 今日热量公式 | **今日摄入** = 当日 `FoodEntry.calories` 之和；**净热量** = 摄入 − 活动能量 − 静息能量 |
+| 肥肉示意 | **100 克肥肉 = 800 千卡**热量差。文案用「约等于 / 少攒下」，不是当天体脂变化。概览与日详情最多 5 块图；小组件只出克数 |
 | 锻炼无消耗 | 列表行 `caloriesBurned == nil` 只展示时长，不另做合计 |
 | 「今日」边界 | 使用设备 **当前时区** 的 `Calendar.current` 日界（00:00–24:00） |
 | 食物写回 HealthKit | **否**。饮食只存在 BodyTrack；健康没有餐食列表，不写 `dietaryEnergyConsumed` |
@@ -376,6 +379,7 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 - 最新体重（按用户单位）
 - 与上一条的差值（↑ / ↓）
 - 今日热量差（净热量 = 摄入 − 活动能量 − 静息能量；缺项标明未计入）
+- 约合克肥肉（只出文字：约 N 克肥肉；100 克 = 800 千卡）
 - 「记录体重」按钮
 
 ### 5.3 跨设备同步
@@ -448,7 +452,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 1. **今日概览**
    - 最新体重 + 与上条差值
-   - 今日热量：净热量（摄入 − 活动能量 − 静息能量）+ 三列分项
+   - 今日热量：肥肉主视觉（克数为大数字，最多 3 大块；100 克 = 800 千卡）+ 净热量千卡 + 三列分项
    - 快捷入口：记录体重 / 记录食物
    - 点趋势图某一天进入日详情（当天体重、饮食、运动、热量）
 
@@ -514,12 +518,15 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 ## 8. 隐私与审核注意事项
 
+填写稿与对外页面见 `docs/app-store/`（不要打进 App Target）。
+
 1. 只申请真正用到的 HealthKit 类型（见 §5.1）
-2. 上架需提供 **隐私政策 URL**，说明健康数据用途、存储（本机 + 用户 iCloud）、不用于广告、不卖给第三方
-3. 填写 App Privacy 营养标签（Health & Fitness 相关数据）
-4. 小组件避免展示过于敏感的信息（MVP 仅体重与当日摄入合计可接受）
+2. 上架需提供 **隐私政策 URL**，说明健康数据用途、存储（本机 + 用户 iCloud）、不用于广告、不卖给第三方。正文已写：`docs/privacy-policy.html`（与 `bodycheck/PrivacyPolicy.md`、设置里的「隐私政策」一致）。**公开 https 地址仍待托管**（推荐 GitHub Pages，步骤见 `docs/app-store/README.md`）
+3. 填写 App Privacy 营养标签：披露健康、健身、照片、其他用户内容；仅 App 功能；关联用户；不追踪。逐步选项见 `docs/app-store/app-store-connect.md` §4
+4. 小组件避免展示过于敏感的信息（MVP 仅体重与当日热量差可接受）
 5. App Store 分类建议：**Health & Fitness**
-6. 审核备注建议写明：如何授权健康、如何从小组件记体重、测试账号（若有）
+6. 审核备注、商店文案、年龄分级、截图清单见同一填写稿。无账号，不要编测试号
+7. 支持页：`docs/support.html`，上线后填「技术支持 URL」
 
 ---
 
@@ -593,7 +600,7 @@ Widget kind:            WeightWidget
 | Bundle ID / 显示名 / CloudKit 容器 | `yinke.bodycheck` / BodyTrack / `iCloud.yinke.bodycheck` | 已定 |
 | App Group | `group.yinke.bodycheck` | 已定 |
 | 是否上架多区 / 仅中文 | 先中文 | 待定 |
-| 隐私政策 URL | 上架前准备 | **待定** |
+| 隐私政策 URL | 正文已就绪；托管后填 `https://sntopdsddsad.github.io/bodytrace/privacy-policy.html` | **待上线** |
 
 ---
 
