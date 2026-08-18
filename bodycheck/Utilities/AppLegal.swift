@@ -9,7 +9,7 @@ import Foundation
 
 enum AppLegal {
     static let developerName = "丹青"
-    static let supportEmail = "xuwudi404@gmail.com"
+    static let supportEmail = "xuwudi404@outlook.com"
     static let privacyPolicyFileName = "PrivacyPolicy"
 
     static var supportMailURL: URL? {

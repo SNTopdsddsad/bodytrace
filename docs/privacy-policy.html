@@ -60,18 +60,23 @@
     <header>
       <div class="eyebrow">BODYTRACK</div>
       <h1>隐私政策</h1>
-      <p class="meta">生效日期：2026 年 8 月 17 日<br />开发者：丹青　·　应用 Bundle ID：yinke.bodycheck</p>
+      <p class="meta">生效日期：2026 年 8 月 18 日<br />开发者：丹青　·　应用 Bundle ID：yinke.bodycheck</p>
     </header>
 
     <p>本政策说明 BodyTrack 如何处理你的信息。使用本应用即表示你已阅读本政策。</p>
 
     <h2>1. 我们是谁</h2>
     <p>BodyTrack 由个人开发者丹青提供，用于在 iPhone 上记录体重、饮食热量，并从 Apple 健康读取运动与能量数据。</p>
-    <p>联系邮箱：<a href="mailto:xuwudi404@gmail.com">xuwudi404@gmail.com</a></p>
+    <p>联系邮箱：<a href="mailto:xuwudi404@outlook.com">xuwudi404@outlook.com</a></p>
 
     <h2>2. 我们收集哪些信息</h2>
-    <p>本应用<strong>没有账号系统</strong>，不收集姓名、手机号、邮箱作为注册信息。</p>
+    <p>本应用<strong>没有账号系统</strong>，不收集手机号、邮箱作为注册信息。</p>
     <p>你主动记录，或在授权后从 Apple 健康导入时，可能产生以下数据：</p>
+    <p><strong>个人资料（由你在应用内填写）</strong></p>
+    <ul>
+      <li>用户名、年龄、性别、身高、目标体重</li>
+      <li>用于概览展示与对照目标体重，<strong>不</strong>用来自行估算基础代谢</li>
+    </ul>
     <p><strong>健康信息</strong></p>
     <ul>
       <li>体重（公斤）、称重日期、可选备注</li>
@@ -85,12 +90,13 @@
     <p><strong>你创建的内容</strong></p>
     <ul>
       <li>饮食名称、千卡、时间、可选备注</li>
-      <li>可选的饮食照片（由你拍摄或从相册选取，以压缩 JPEG 保存）</li>
+      <li>可选的饮食照片（由你拍摄，或用系统照片选择器选取<strong>你点中的那一张</strong>，以压缩 JPEG 保存；不会读取整个相册）</li>
     </ul>
     <p><strong>偏好设置（仅本机）</strong></p>
     <ul>
       <li>体重显示单位（公斤 / 磅）</li>
       <li>上次打开的分页</li>
+      <li>清除全部数据后是否暂停自动从健康导入</li>
     </ul>
     <p>小组件只读取本机 App Group 中的摘要（最新体重、今日热量差等），不单独向开发者上传数据。</p>
 
@@ -99,7 +105,7 @@
     <ul>
       <li>展示今日概览、列表、趋势和日详情</li>
       <li>计算净热量（当日饮食摄入 − 活动能量 − 静息能量）</li>
-      <li>在你授权后，把手动记录的体重写入 Apple 健康，或从健康导入体重与锻炼</li>
+      <li>在你授权后，把手动记录的体重写入 Apple 健康，或从健康导入体重与锻炼。授权后，本应用可能在后台读取健康中新增的体重和锻炼并写入本机列表，直到你「清除我的全部数据」</li>
       <li>更新桌面小组件上的摘要</li>
     </ul>
     <p><strong>不会</strong>用于广告、营销画像、跨 App 追踪，也<strong>不会出售</strong>给第三方。</p>
@@ -107,7 +113,7 @@
     <h2>4. 数据存在哪里</h2>
     <ul>
       <li><strong>本机</strong>：SwiftData 本地数据库；小组件摘要在 App Group 中。</li>
-      <li><strong>iCloud（可选）</strong>：若你已登录 iCloud 且系统同步可用，记录会写入你自己的 iCloud 私人数据库（容器 iCloud.yinke.bodycheck），以便在你的多台 iPhone 之间同步。开发者无法在控制台里点开查看你的私人记录。未登录 iCloud、关闭同步或无网络时，本机记录仍可读写。</li>
+      <li><strong>iCloud（可选）</strong>：若你已登录 iCloud 且系统同步可用，体重、饮食（含可选照片）、从健康导入的锻炼、以及个人资料会写入你自己的 iCloud 私人数据库（容器 iCloud.yinke.bodycheck），以便在你的多台 iPhone 之间同步。开发者无法在控制台里点开查看你的私人记录。未登录 iCloud、关闭同步或无网络时，本机记录仍可读写。</li>
       <li><strong>Apple 健康（可选）</strong>：仅在你授权后读写。写入类型只有体重；饮食不会写入健康。</li>
     </ul>
     <p>数据不会上传到开发者自建的服务器。同步与健康存储分别走 Apple 的 iCloud 与健康服务。</p>
@@ -121,10 +127,12 @@
       <tbody>
         <tr><td>健康 · 读取</td><td>体重、锻炼、活动能量、静息能量</td></tr>
         <tr><td>健康 · 写入</td><td>仅体重</td></tr>
-        <tr><td>相机</td><td>拍摄饮食照片</td></tr>
-        <tr><td>相册</td><td>选择饮食照片</td></tr>
+        <tr><td>相机</td><td>仅在你点「拍照」时拍摄饮食照片</td></tr>
+        <tr><td>照片</td><td>仅在你点「从相册选择」时，用系统选择器读取你选中的那一张</td></tr>
       </tbody>
     </table>
+    <p>不申请：位置、麦克风、通讯录、跟踪（IDFA）、临床病历（Health Records）、饮食热量写入健康。</p>
+    <p>拒绝健康权限时，仍可在本应用内手动记录体重和饮食。可随时在 iPhone「设置」中更改授权。</p>
 
     <h2>6. 我们不做什么</h2>
     <ul>
@@ -156,7 +164,7 @@
     <p>若收集范围或使用方式发生变化，我们会更新本政策及生效日期，并在应用内或产品页面提示。重大变更时，建议你重新阅读后再继续使用。</p>
 
     <h2>12. 联系我们</h2>
-    <p>隐私相关问题请发送邮件至 <a href="mailto:xuwudi404@gmail.com">xuwudi404@gmail.com</a>。我们会在合理期限内回复。</p>
+    <p>隐私相关问题请发送邮件至 <a href="mailto:xuwudi404@outlook.com">xuwudi404@outlook.com</a>。我们会在合理期限内回复。</p>
 
     <nav>
       <a href="./support.html">支持与帮助</a>

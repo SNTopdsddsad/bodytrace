@@ -34,8 +34,8 @@
 建议下一件（上架门槛，按顺序）：
 
 1. **真机验收**：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件已能添加，顺手确认 A7 数据、A8 点按记体重、A10 单位一致  
-2. CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`、`CD_UserProfile`）；没部署不要 Archive / TestFlight  
-3. 把 `docs/privacy-policy.html` / `docs/support.html` 托管成公开 https（GitHub Pages 步骤见 `docs/app-store/README.md`），再按 `docs/app-store/app-store-connect.md` 填商店后台与营养标签；截图需真机实拍
+2. CloudKit Production schema 已部署（2026-08-18）。Archive 走 Release，已用 `bodycheck.Release.entitlements`  
+3. 对外页已托管：隐私政策 `https://app.aigcwe.com/privacy/privacy-policy.html`，支持页 `https://app.aigcwe.com/privacy/support.html`。按 `docs/app-store/app-store-connect.md` 填商店后台与营养标签；截图需真机实拍
 
 ## 当前进度（2026-08）
 
@@ -48,7 +48,7 @@
 - iPhone 视觉 token：`AppTheme` / `AppFont`（4pt 间距、字号角色、卡片/行组件）；品牌色与小组件共用 `BrandColor`
 - 日期/时间强制简体中文（`AppLocale` / `zh-Hans`）
 - 设置：个人资料仍可打开同一编辑页（主入口在概览）；体重单位 kg/lb；iCloud 真实账号状态；健康授权入口；用户可「清除我的全部数据」（体重 / 饮食 / 运动 / 个人资料 / 小组件摘要；尝试删本应用写入健康的手动体重；清除后暂停自动从健康导入，直到用户再点同步）；完整隐私政策页（读 `PrivacyPolicy.md`）
-- 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页 `docs/privacy-policy.html`、`docs/support.html`（URL 待托管）
+- 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页已托管在 `https://app.aigcwe.com/privacy/`
 - 隐私清单：`bodycheck/PrivacyInfo.xcprivacy`、`BodyTrackWidget/PrivacyInfo.xcprivacy`
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
 - iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量、活动能量（不入库）
@@ -72,8 +72,8 @@
 
 - [x] Widget + App Group + Deep Link（见「当前进度」）
 - [ ] 真机验收：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件 A7/A8/A10
-- [ ] CloudKit **Development → Production** schema 部署（含 `CD_FoodEntry` 的 `CD_photoData`、`CD_UserProfile`）；没部署不要 Archive / TestFlight
-- [ ] 上架材料：托管隐私政策 / 支持页 URL，按 `docs/app-store/app-store-connect.md` 填 ASC；截图未拍
+- [x] CloudKit **Development → Production** schema 部署（2026-08-18，Production 已有 `CD_WeightEntry` / `CD_FoodEntry` / `CD_ExerciseEntry` / `CD_UserProfile`）
+- [x] 上架材料：隐私政策 / 支持页已托管（`https://app.aigcwe.com/privacy/`）；按 `docs/app-store/app-store-connect.md` 填 ASC；截图未拍
 
 产品增强（非门槛，用户未点名先别做）：
 
@@ -153,7 +153,7 @@ ModelConfiguration(
 ## CloudKit
 
 - 容器：`iCloud.yinke.bodycheck`
-- iOS entitlements：`bodycheck/bodycheck.entitlements`（HealthKit + iCloud + `aps-environment`）
+- iOS entitlements：Debug 用 `bodycheck/bodycheck.entitlements`（CloudKit `Development`）；Release / Archive / TestFlight 用 `bodycheck/bodycheck.Release.entitlements`（CloudKit `Production`，`aps-environment` = `production`）。Widget 没有 CloudKit，不用改。
 - iOS Background Modes：`remote-notification` 必须是数组，写在仓库根目录 `Info.plist`。不要放进 `bodycheck/`（文件系统同步组会再拷一份，编译报 Multiple commands produce Info.plist）。不要用 `INFOPLIST_KEY_UIBackgroundModes = "remote-notification"`（会生成字符串，CloudKit 会报 client bug）
 - 无 iCloud 账号时本地照常读写；UI 必须反映 `CKAccountStatus` 和 `NSPersistentCloudKitContainer` 的 import/export 事件
 - **CloudKit ≠ iCloud 云盘**：记录不会出现在「文件 / iCloud Drive」。开发阶段到 [CloudKit 控制台](https://icloud.developer.apple.com/) 选 `iCloud.yinke.bodycheck` → **Development** → **Private Database** 查看 `CD_WeightEntry` 等
@@ -163,7 +163,8 @@ ModelConfiguration(
 
 ### 发布前必须：Development schema → Production
 
-Xcode Debug / 真机开发走 **Development**。TestFlight、App Store、Release 包走 **Production**。  
+Xcode Debug / 真机开发走 **Development**（`bodycheck.entitlements`）。TestFlight、App Store、Archive 走 **Release**，用 `bodycheck.Release.entitlements` 连 **Production**。  
+不要把 Debug 那份改成 Production，日常真机会污染线上库。  
 **Production 不会自动带上 Development 里的表。** 忘了部署，上架用户会同步失败，控制台 Production 里只有空的 `Users`。
 
 当前 Development 已有、必须一并部署的类型：

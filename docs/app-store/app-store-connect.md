@@ -1,6 +1,6 @@
 # App Store Connect 填写稿
 
-主语言：**简体中文**。版本 **1.0**（Build 用 Xcode `CURRENT_PROJECT_VERSION`，当前为 1）。
+主语言：**简体中文**。版本 **1.0**（Build 用 Xcode `CURRENT_PROJECT_VERSION`，当前为 2）。
 
 ---
 
@@ -55,7 +55,7 @@
 
 选 **是**。
 
-依据：用户打开 iCloud 时，体重 / 饮食（含可选照片）/ 从健康导入的锻炼会进入用户的 CloudKit 私人数据库，属于离开本机、需披露的收集。无第三方统计或广告 SDK。
+依据：用户打开 iCloud 时，个人资料、体重 / 饮食（含可选照片）/ 从健康导入的锻炼会进入用户的 CloudKit 私人数据库，属于离开本机、需披露的收集。无第三方统计或广告 SDK。
 
 **是否用于追踪用户？**
 
@@ -63,20 +63,21 @@
 
 ### 4.2 勾选的数据类型
 
-只勾下面四类，其他全部不勾。
+只勾下面五类，其他全部不勾。
 
 | 大类 | 类型 | 勾选 |
 |------|------|------|
+| 联系信息 | 姓名 | 是（应用内用户名，可选） |
 | 健康与健身 | 健康 | 是（体重、备注、健康样本对账标识） |
 | 健康与健身 | 健身 | 是（从健康导入的锻炼） |
 | 用户内容 | 照片或视频 | 是（可选饮食照片） |
-| 用户内容 | 其他用户内容 | 是（饮食名称、千卡、文字备注） |
+| 用户内容 | 其他用户内容 | 是（饮食名称、千卡、文字备注、年龄、性别、身高、目标体重） |
 
-不要勾：联系信息、标识符、位置、财务、浏览记录、使用数据、诊断、敏感信息、购买项目。活动能量与静息能量只当场展示、不入库，不必再单独加类型；健身已因锻炼记录而勾选。
+不要勾：邮箱、电话、标识符、位置、财务、浏览记录、使用数据、诊断、敏感信息、购买项目。活动能量与静息能量只当场展示、不入库，不必再单独加类型；健身已因锻炼记录而勾选。性别在此按「其他用户内容」披露，不要勾「敏感信息」。
 
 ### 4.3 每个类型的细项
 
-四个类型填法相同：
+五个类型填法相同：
 
 | 问 | 答 |
 |----|----|
@@ -92,7 +93,7 @@
 
 填完点发布 / 保存。产品页预览应只有：
 
-- **与你关联的数据**：健康与健身、用户内容
+- **与你关联的数据**：联系信息（姓名）、健康与健身、用户内容
 - 无「用于追踪你的数据」
 
 ---
@@ -105,8 +106,8 @@
 
 | 字段 | URL |
 |------|-----|
-| 隐私政策 URL | `https://sntopdsddsad.github.io/bodytrace/privacy-policy.html` |
-| 技术支持 URL | `https://sntopdsddsad.github.io/bodytrace/support.html` |
+| 隐私政策 URL | `https://app.aigcwe.com/privacy/privacy-policy.html` |
+| 技术支持 URL | `https://app.aigcwe.com/privacy/support.html` |
 | 营销 URL | 留空 |
 
 用无痕窗口打开，确认是完整中文政策，不是 GitHub 登录页或 404。
@@ -244,10 +245,10 @@ Add the BodyTrack / 体重 widget on the Home Screen. Tap it to open bodytrack:/
 iCloud:
 Records sync with the user’s private CloudKit database when iCloud is available. The app works offline and without an iCloud account.
 
-Contact: xuwudi404@gmail.com
+Contact: xuwudi404@outlook.com
 ```
 
-**联系信息**：名字填开发者账号持有人；电话填你能接到审核电话的号码；邮箱 `xuwudi404@gmail.com`。
+**联系信息**：名字填开发者账号持有人；电话填你能接到审核电话的号码；邮箱 `xuwudi404@outlook.com`。
 
 **附件**：一般不用。若审核要演示授权，按备注逐步点即可。
 
@@ -282,7 +283,7 @@ Contact: xuwudi404@gmail.com
 
 1. CloudKit 控制台已把 Development schema **Deploy 到 Production**（`CD_WeightEntry`、`CD_FoodEntry` 含 `CD_photoData`、`CD_ExerciseEntry`）。没有就停。
 2. 真机打开过主 App，小组件能加上。
-3. Release 包不要再用 Development CloudKit 环境：Archive 用 Release；若 entitlements 里 `com.apple.developer.icloud-container-environment` 仍是 `Development`，上架包会连错环境。Archive 前改成 `Production`，或为 Release 单独做一份 entitlements。`aps-environment` 上架应为 `production`（Xcode 打 App Store 包时通常会处理推送环境，仍建议打包后看签名 entitlements）。
+3. Archive 走 Release，已指向 `bodycheck/bodycheck.Release.entitlements`（CloudKit `Production`，`aps-environment` = `production`）。日常 Run 仍用 `bodycheck.entitlements`（Development）。不要把 Debug 那份改成 Production。打包后可在 Organizer 里看签名 entitlements，确认 `icloud-container-environment` 是 `Production`。
 4. 隐私政策 URL、支持 URL 已用无痕窗口打开确认。
 5. 目的地选 **Any iOS Device (arm64)**，Scheme 用 `bodycheck`，Product → Archive → Distribute App → App Store Connect。
 

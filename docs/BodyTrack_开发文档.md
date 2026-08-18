@@ -544,12 +544,12 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 填写稿与对外页面见 `docs/app-store/`（不要打进 App Target）。
 
 1. 只申请真正用到的 HealthKit 类型（见 §5.1）
-2. 上架需提供 **隐私政策 URL**，说明健康数据用途、存储（本机 + 用户 iCloud）、不用于广告、不卖给第三方。正文已写：`docs/privacy-policy.html`（与 `bodycheck/PrivacyPolicy.md`、设置里的「隐私政策」一致）。**公开 https 地址仍待托管**（推荐 GitHub Pages，步骤见 `docs/app-store/README.md`）
+2. 上架需提供 **隐私政策 URL**，说明健康数据用途、存储（本机 + 用户 iCloud）、不用于广告、不卖给第三方。正文：`docs/privacy-policy.html`（与 `bodycheck/PrivacyPolicy.md`、设置里的「隐私政策」一致）。公开地址：`https://app.aigcwe.com/privacy/privacy-policy.html`
 3. 填写 App Privacy 营养标签：披露健康、健身、照片、其他用户内容；仅 App 功能；关联用户；不追踪。逐步选项见 `docs/app-store/app-store-connect.md` §4
 4. 小组件避免展示过于敏感的信息（MVP 仅体重与当日热量差可接受）
 5. App Store 分类建议：**Health & Fitness**
 6. 审核备注、商店文案、年龄分级、截图清单见同一填写稿。无账号，不要编测试号
-7. 支持页：`docs/support.html`，上线后填「技术支持 URL」
+7. 支持页：`https://app.aigcwe.com/privacy/support.html`
 
 ---
 
@@ -623,7 +623,7 @@ Widget kind:            WeightWidget
 | Bundle ID / 显示名 / CloudKit 容器 | `yinke.bodycheck` / BodyTrack / `iCloud.yinke.bodycheck` | 已定 |
 | App Group | `group.yinke.bodycheck` | 已定 |
 | 是否上架多区 / 仅中文 | 先中文 | 待定 |
-| 隐私政策 URL | 正文已就绪；托管后填 `https://sntopdsddsad.github.io/bodytrace/privacy-policy.html` | **待上线** |
+| 隐私政策 URL | `https://app.aigcwe.com/privacy/privacy-policy.html` | 已上线 |
 
 ---
 

@@ -8,10 +8,10 @@
 
 | # | 事项 | 说明 |
 |---|------|------|
-| 1 | **托管隐私政策 / 支持页** | 仓库已有可上网的页面：`docs/privacy-policy.html`、`docs/support.html`。按下面「GitHub Pages」上线后，把 https 地址填进 App Store Connect。没上线就不要提审。 |
+| 1 | **托管隐私政策 / 支持页** | 已上线。填 App Store Connect：隐私政策 `https://app.aigcwe.com/privacy/privacy-policy.html`，支持页 `https://app.aigcwe.com/privacy/support.html`。 |
 | 2 | **截图** | 文案和构图在 `app-store-connect.md` §7。必须用真机或 iPhone 模拟器实拍，仓库里没有成品图。 |
-| 3 | **CloudKit Development → Production** | 没部署不要 Archive / TestFlight。步骤见 `AGENTS.md`「发布前必须」。 |
-| 4 | **确认对外署名** | 隐私政策和版权默认写开发者 **丹青**、邮箱 **xuwudi404@gmail.com**。若 Apple Developer 账号法定名称不同，改政策页、本目录文案和 App Store Connect 版权三项一起改。 |
+| 3 | **CloudKit Development → Production** | Schema 已于 2026-08-18 部署。Archive 走 Release，`bodycheck.Release.entitlements` 连 Production。 |
+| 4 | **确认对外署名** | 隐私政策和版权默认写开发者 **丹青**、邮箱 **xuwudi404@outlook.com**。若 Apple Developer 账号法定名称不同，改政策页、本目录文案和 App Store Connect 版权三项一起改。 |
 
 真机验收（开发文档 A1–A6、A9 与小组件 A7/A8/A10）仍建议在提审前做完。
 
@@ -24,23 +24,14 @@
 | [../support.html](../support.html) | 对外支持页（填「技术支持 URL」） |
 | `bodycheck/PrivacyPolicy.md` | 与网页版一致的正文；App 内「设置 → 隐私政策」读取这份 |
 
-## GitHub Pages（推荐，免费 https）
+## 对外 URL（已托管）
 
-仓库是 `SNTopdsddsad/bodytrace`。把含 `docs/*.html` 的提交推到 GitHub 后：
+- 隐私政策：`https://app.aigcwe.com/privacy/privacy-policy.html`
+- 支持页：`https://app.aigcwe.com/privacy/support.html`
 
-1. 打开仓库 **Settings → Pages**
-2. Build and deployment：**Deploy from a branch**
-3. Branch：`main`，文件夹：`/docs`
-4. Save，等 1–2 分钟
+源文件仍在仓库 `docs/`。改政策后把这两个 HTML 再上传到服务器同一目录。用无痕窗口打开，确认不用登录就能看到全文。
 
-上线后地址（大小写按 GitHub 用户名实际显示）：
-
-- 隐私政策：`https://sntopdsddsad.github.io/bodytrace/privacy-policy.html`
-- 支持页：`https://sntopdsddsad.github.io/bodytrace/support.html`
-
-用浏览器无痕窗口打开，确认**不用登录 GitHub**就能看到全文。然后把这两个 URL 填进 App Store Connect。
-
-不要用需要登录的语雀 / Notion 文档当隐私政策，审核常判无效。
+不要用语雀 / Notion 文档当隐私政策，审核常判无效。
 
 ## 不要在本阶段做的事
 
