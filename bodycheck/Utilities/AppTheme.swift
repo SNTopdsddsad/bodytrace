@@ -9,9 +9,8 @@ import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case today
-    case weight
     case food
-    case exercise
+    case weight
 
     var id: String { rawValue }
 
@@ -20,7 +19,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .today: "概览"
         case .weight: "体重"
         case .food: "饮食"
-        case .exercise: "运动"
         }
     }
 
@@ -29,7 +27,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .today: "rectangle.3.group"
         case .weight: "scalemass"
         case .food: "fork.knife"
-        case .exercise: "figure.run"
         }
     }
 }

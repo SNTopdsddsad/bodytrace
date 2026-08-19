@@ -28,6 +28,9 @@ struct ContentView: View {
         .onAppear {
             if let restored = AppSection(rawValue: lastSectionRaw) {
                 section = restored
+            } else {
+                section = .today
+                lastSectionRaw = AppSection.today.rawValue
             }
         }
         .onChange(of: section) { _, newValue in
@@ -76,12 +79,10 @@ struct ContentView: View {
         switch section {
         case .today:
             TodayView(onOpenWeight: { self.section = .weight })
-        case .weight:
-            WeightListView()
         case .food:
             FoodListView()
-        case .exercise:
-            ExerciseListView()
+        case .weight:
+            WeightListView()
         }
     }
 }

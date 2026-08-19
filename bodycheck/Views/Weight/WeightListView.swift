@@ -402,6 +402,10 @@ struct WeightListView: View {
                 into: modelContext,
                 promptIfNeeded: true
             )
+            _ = try? await HealthKitExerciseService.shared.syncWorkouts(
+                into: modelContext,
+                userInitiated: true
+            )
             healthSyncMessage = count == 0
                 ? "健康中暂无新的体重记录"
                 : "已从健康同步 \(count) 条体重"

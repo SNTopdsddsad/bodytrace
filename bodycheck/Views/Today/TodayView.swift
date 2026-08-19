@@ -66,6 +66,19 @@ struct TodayView: View {
         return foods.filter { $0.date >= day.start && $0.date < day.end }
     }
 
+    private var todayExercises: [ExerciseEntry] {
+        let day = Calendar.current.dayInterval(for: Date())
+        return exercises.filter { $0.date >= day.start && $0.date < day.end }
+    }
+
+    /// 今天没有锻炼就不展示。文案例如「今天有 2 次锻炼，共 77 分钟」。
+    private var todayExerciseSummary: String? {
+        let count = todayExercises.count
+        guard count > 0 else { return nil }
+        let minutes = todayExercises.reduce(0) { $0 + $1.durationMinutes }
+        return "今天有 \(count) 次锻炼，共 \(minutes) 分钟"
+    }
+
     private var todayCalories: Double? {
         guard !todayFoods.isEmpty else { return nil }
         return todayFoods.reduce(0) { $0 + $1.calories }
@@ -234,6 +247,10 @@ struct TodayView: View {
             into: modelContext,
             promptIfNeeded: false
         )
+        _ = try? await HealthKitExerciseService.shared.syncWorkouts(
+            into: modelContext,
+            userInitiated: false
+        )
         let todayTotals = await HealthKitAccess.todayEnergyTotals()
         todayActiveKcal = todayTotals.active
         todayRestingKcal = todayTotals.resting
@@ -309,6 +326,10 @@ struct TodayView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if let todayExerciseSummary {
+                    todayExerciseSummaryRow(todayExerciseSummary)
+                }
+
                 if let net = todayNetCalories, FatMeatEquivalent.presentation(netKcal: net) != nil {
                     FatMeatEquivalentView(netKcal: net, style: .compact)
                 }
@@ -316,8 +337,37 @@ struct TodayView: View {
                 energyBreakdown
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(eatVerdict)。\(eatCaption)")
+            .accessibilityLabel(eatInsightAccessibilityLabel)
         }
+    }
+
+    private var eatInsightAccessibilityLabel: String {
+        if let todayExerciseSummary {
+            return "\(eatVerdict)。\(eatCaption)。\(todayExerciseSummary)"
+        }
+        return "\(eatVerdict)。\(eatCaption)"
+    }
+
+    private func todayExerciseSummaryRow(_ summary: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
+            Image(systemName: "figure.run")
+                .font(AppFont.icon)
+                .foregroundStyle(AppTheme.activityGreen)
+                .accessibilityHidden(true)
+            Text(summary)
+                .font(AppFont.sectionSubtitle)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, AppTheme.space12)
+        .padding(.vertical, AppTheme.space8)
+        .background(
+            AppTheme.activityGreen.opacity(AppTheme.chipFillOpacity),
+            in: RoundedRectangle(cornerRadius: AppTheme.iconWellRadius, style: .continuous)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(summary)
     }
 
     private var energyBreakdown: some View {
@@ -548,7 +598,7 @@ struct TodayView: View {
                 ContentUnavailableView(
                     "还没有记录",
                     systemImage: "list.bullet",
-                    description: Text("记录体重、饮食或运动后会显示在这里。")
+                    description: Text("记录体重、饮食后，或从健康同步到运动后会显示在这里。")
                 )
                 .frame(minHeight: 140)
                 .padding(.vertical, AppTheme.space12)
