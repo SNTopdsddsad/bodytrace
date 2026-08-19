@@ -78,7 +78,7 @@ struct ContentView: View {
     private func detail(for section: AppSection) -> some View {
         switch section {
         case .today:
-            TodayView(onOpenWeight: { self.section = .weight })
+            TodayView()
         case .food:
             FoodListView()
         case .weight:

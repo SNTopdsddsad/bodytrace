@@ -2,56 +2,135 @@
 //  TodayInsights.swift
 //  bodycheck
 //
-//  概览三块结论：顶部对照表一眼看完；下面才是细节。
+//  概览：热量主卡 + 体重摘要条。
 //
 
 import SwiftUI
 
-struct TodayGlanceBoard<Rows: View>: View {
-    @ViewBuilder var rows: () -> Rows
+struct WeightSummaryBar: View {
+    let recentText: String
+    var recentTint: Color = .primary
+    var recentDeltaKg: Double? = nil
+    var weightUnit: WeightUnit = .kg
+    let recentHint: String
+    let recentAction: () -> Void
+    let goalText: String
+    var goalTint: Color = .primary
+    let goalHint: String
+    let goalAction: () -> Void
+    var goalFilled: Bool = true
 
     var body: some View {
-        VStack(spacing: 0) {
-            rows()
+        Group {
+            if goalFilled {
+                HStack(alignment: .top, spacing: 0) {
+                    cell(
+                        label: "最近",
+                        value: recentText,
+                        tint: recentTint,
+                        showsDelta: true,
+                        hint: recentHint,
+                        action: recentAction
+                    )
+                    VerticalHairline()
+                    cell(
+                        label: "目标",
+                        value: goalText,
+                        tint: goalTint,
+                        hint: goalHint,
+                        action: goalAction
+                    )
+                }
+            } else {
+                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
+                    HStack(alignment: .center, spacing: AppTheme.space8) {
+                        Text("最近")
+                            .font(AppFont.compactUnit)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: AppTheme.space8)
+                        Button(action: goalAction) {
+                            Text("填写目标体重")
+                                .font(AppFont.inlineAction)
+                                .foregroundStyle(.tertiary)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("填写目标体重")
+                        .accessibilityHint(goalHint)
+                    }
+                    Button(action: recentAction) {
+                        recentValue
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("最近，\(recentText)")
+                    .accessibilityHint(recentHint)
+                }
+                .padding(.horizontal, AppTheme.cardPadding)
+                .padding(.vertical, AppTheme.space12)
+            }
         }
         .appSurface()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("今日结论")
+        .accessibilityLabel("体重摘要")
     }
-}
 
-struct TodayGlanceRow: View {
-    let label: String
-    let value: String
-    var tint: Color = .primary
-    var actionHint: String
-    var action: () -> Void
+    private var recentValue: some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
+            Text(recentText)
+                .font(AppFont.rowTitleEmphasis)
+                .foregroundStyle(recentTint)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+            if let recentDeltaKg {
+                DeltaChip(deltaKg: recentDeltaKg, unit: weightUnit)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-    var body: some View {
+    private func cell(
+        label: String,
+        value: String,
+        tint: Color,
+        showsDelta: Bool = false,
+        hint: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            HStack(alignment: .center, spacing: AppTheme.space12) {
+            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
                 Text(label)
                     .font(AppFont.compactUnit)
                     .foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .leading)
-                Text(value)
-                    .font(AppFont.rowTitleEmphasis)
-                    .foregroundStyle(tint)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: AppTheme.space8)
-                Image(systemName: "chevron.right")
-                    .font(AppFont.inlineAction)
-                    .foregroundStyle(.tertiary)
+                if showsDelta {
+                    recentValue
+                } else {
+                    Text(value)
+                        .font(AppFont.rowTitleEmphasis)
+                        .foregroundStyle(tint)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.horizontal, AppTheme.cardPadding)
             .padding(.vertical, AppTheme.space12)
-            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .topLeading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(label)，\(value)")
-        .accessibilityHint(actionHint)
+        .accessibilityLabel(accessibilityText(label: label, value: value, deltaKg: showsDelta ? recentDeltaKg : nil))
+        .accessibilityHint(hint)
+    }
+
+    private func accessibilityText(label: String, value: String, deltaKg: Double?) -> String {
+        guard let deltaKg else { return "\(label)，\(value)" }
+        if abs(deltaKg) < 0.000_1 { return "\(label)，\(value)，持平" }
+        let change = weightUnit.format(abs(deltaKg))
+        return deltaKg > 0 ? "\(label)，\(value)，重了 \(change)" : "\(label)，\(value)，轻了 \(change)"
     }
 }
 

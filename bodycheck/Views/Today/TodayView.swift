@@ -10,8 +10,6 @@ import SwiftData
 import SwiftUI
 
 struct TodayView: View {
-    var onOpenWeight: (() -> Void)?
-
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
@@ -30,6 +28,7 @@ struct TodayView: View {
     @State private var openedDay: CalendarDayItem?
     @State private var todayRestingKcal: Double?
     @State private var todayActiveKcal: Double?
+    @State private var energyAsOf = Date()
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -84,7 +83,7 @@ struct TodayView: View {
         return todayFoods.reduce(0) { $0 + $1.calories }
     }
 
-    /// 没记饮食时不算「吃了 0」，今天热量结论为空。
+    /// 没记饮食时不算「吃了 0」，不给出差值。
     private var todayNetCalories: Double? {
         guard todayCalories != nil else { return nil }
         return TodayEnergyMath.net(
@@ -94,42 +93,35 @@ struct TodayView: View {
         )
     }
 
-    private var eatGlance: String {
-        guard todayCalories != nil, let net = todayNetCalories else { return "还没记饮食" }
-        if let meat = FatMeatEquivalent.presentation(netKcal: net) {
-            return net > 0
-                ? "多吃了 · 约 \(meat.grams) 克肥肉"
-                : "没有吃多 · 约少了 \(meat.grams) 克"
-        }
-        return "差不多打平"
+    /// 活动能量 + 静息能量。两项都没有则不展示数字。
+    private var todayHealthBurnKcal: Double? {
+        if todayActiveKcal == nil && todayRestingKcal == nil { return nil }
+        return (todayActiveKcal ?? 0) + (todayRestingKcal ?? 0)
     }
 
-    private var eatVerdict: String {
-        guard todayCalories != nil, let net = todayNetCalories else {
-            return "还没记今天的饮食"
-        }
-        if FatMeatEquivalent.presentation(netKcal: net) == nil {
-            return "今天差不多打平"
-        }
-        return net > 0 ? "今天多吃了" : "今天没有吃多"
+    private var energyCompletenessText: String {
+        var parts: [String] = []
+        if todayCalories == nil { parts.append("未记饮食") }
+        if todayActiveKcal == nil { parts.append("未计入活动能量") }
+        if todayRestingKcal == nil { parts.append("未计入静息") }
+        if parts.isEmpty { parts.append("按当前记录计算") }
+        parts.append("截至 \(energyAsOf.formatted(AppLocale.time))")
+        return parts.joined(separator: " · ")
     }
 
-    private var eatVerdictTint: Color {
-        guard todayCalories != nil, let net = todayNetCalories,
-              FatMeatEquivalent.presentation(netKcal: net) != nil else {
-            return .secondary
+    private var healthBurnMeta: String {
+        switch (todayActiveKcal != nil, todayRestingKcal != nil) {
+        case (true, true): "活动 + 静息"
+        case (true, false): "仅活动能量"
+        case (false, true): "仅静息"
+        case (false, false): "需授权读取健康"
         }
-        return net > 0 ? AppTheme.intakeAmber : AppTheme.activityGreen
     }
 
-    private var eatCaption: String {
-        guard todayCalories != nil else {
-            return "记下今天吃了什么，这里会对照消耗告诉你热量有没有多出来。"
-        }
-        return TodayEnergyMath.caption(
-            activeKcal: todayActiveKcal,
-            noteMissingResting: todayRestingKcal == nil
-        )
+    private var deltaMeta: String {
+        if todayCalories == nil { return "记饮食后计算" }
+        if todayActiveKcal == nil || todayRestingKcal == nil { return "缺项按 0" }
+        return "摄入 − 健康消耗"
     }
 
     private var chartPoints: [WeightChartPoint] {
@@ -148,12 +140,17 @@ struct TodayView: View {
         switch weightTrend {
         case .notEnough:
             return latestWeight == nil ? "还没记体重" : "再记一次才看得出"
-        case .flat(let window):
-            return "近 \(window.spanDays) 天几乎没变"
-        case .down(let window):
-            return "近 \(window.spanDays) 天轻了 \(weightUnit.format(abs(window.deltaKg)))"
-        case .up(let window):
-            return "近 \(window.spanDays) 天重了 \(weightUnit.format(abs(window.deltaKg)))"
+        case .flat(let window), .down(let window), .up(let window):
+            return "近 \(window.spanDays) 天"
+        }
+    }
+
+    private var trendDeltaKg: Double? {
+        switch weightTrend {
+        case .flat(let window), .down(let window), .up(let window):
+            return window.deltaKg
+        case .notEnough:
+            return nil
         }
     }
 
@@ -194,22 +191,15 @@ struct TodayView: View {
         }
     }
 
-    private var recentItems: [RecentRecord] {
-        RecentRecord.build(weights: weights, foods: foods, exercises: exercises, unit: weightUnit, limit: 8)
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: AppTheme.spaceL) {
-                    glanceBoard
-                    if todayCalories != nil {
-                        eatInsightCard
-                    }
+                    eatInsightCard
+                    weightSummaryBar
                     if latestWeight != nil {
                         trendInsightCard
                     }
-                    recentSection
                 }
                 .padding(AppTheme.contentInset)
                 .appReadableWidth()
@@ -254,6 +244,7 @@ struct TodayView: View {
         let todayTotals = await HealthKitAccess.todayEnergyTotals()
         todayActiveKcal = todayTotals.active
         todayRestingKcal = todayTotals.resting
+        energyAsOf = Date()
     }
 
     @ToolbarContentBuilder
@@ -281,36 +272,6 @@ struct TodayView: View {
         IOSSettingsToolbar()
     }
 
-    // MARK: - 一眼结论
-
-    private var glanceBoard: some View {
-        TodayGlanceBoard {
-            TodayGlanceRow(
-                label: "今天",
-                value: eatGlance,
-                tint: eatVerdictTint,
-                actionHint: "记录饮食",
-                action: { showQuickFood = true }
-            )
-            Divider().padding(.leading, AppTheme.cardPadding + 36 + AppTheme.space12)
-            TodayGlanceRow(
-                label: "最近",
-                value: trendGlance,
-                tint: trendVerdictTint,
-                actionHint: "记录体重",
-                action: { showQuickWeight = true }
-            )
-            Divider().padding(.leading, AppTheme.cardPadding + 36 + AppTheme.space12)
-            TodayGlanceRow(
-                label: "目标",
-                value: goalGlance,
-                tint: goalArrivalTint,
-                actionHint: hasProfileContent ? "编辑资料" : "填写个人资料",
-                action: { showProfileEditor = true }
-            )
-        }
-    }
-
     // MARK: - 今天热量
 
     private var eatInsightCard: some View {
@@ -321,7 +282,11 @@ struct TodayView: View {
             action: { showQuickFood = true }
         ) {
             VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
-                Text(eatCaption)
+                energyBreakdown
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(eatInsightAccessibilityLabel)
+
+                Text(energyCompletenessText)
                     .font(AppFont.sectionSubtitle)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -330,22 +295,55 @@ struct TodayView: View {
                     todayExerciseSummaryRow(todayExerciseSummary)
                 }
 
-                if let net = todayNetCalories, FatMeatEquivalent.presentation(netKcal: net) != nil {
-                    FatMeatEquivalentView(netKcal: net, style: .compact)
+                Button {
+                    openedDay = CalendarDayItem(date: Date().startOfDay)
+                } label: {
+                    HStack(spacing: AppTheme.space8) {
+                        Text("消耗详情")
+                            .font(AppFont.sectionSubtitle)
+                        Spacer(minLength: AppTheme.space8)
+                        Image(systemName: "chevron.right")
+                            .font(AppFont.inlineAction)
+                    }
+                    .foregroundStyle(AppTheme.activityGreen)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-
-                energyBreakdown
+                .buttonStyle(.plain)
+                .accessibilityLabel("消耗详情")
+                .accessibilityHint("查看活动能量、静息和当天运动")
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(eatInsightAccessibilityLabel)
         }
     }
 
     private var eatInsightAccessibilityLabel: String {
+        var parts = [
+            "今天热量",
+            "摄入 \(intakeMetric.value.map { "\($0) 千卡" } ?? "未记")",
+            "健康消耗 \(healthBurnMetric.value.map { "\($0) 千卡" } ?? "未计入")",
+            "差值 \(deltaMetric.value.map { "\($0) 千卡" } ?? "未计算")",
+            energyCompletenessText
+        ]
         if let todayExerciseSummary {
-            return "\(eatVerdict)。\(eatCaption)。\(todayExerciseSummary)"
+            parts.append(todayExerciseSummary)
         }
-        return "\(eatVerdict)。\(eatCaption)"
+        return parts.joined(separator: "。")
+    }
+
+    private var weightSummaryBar: some View {
+        WeightSummaryBar(
+            recentText: trendGlance,
+            recentTint: trendVerdictTint,
+            recentDeltaKg: trendDeltaKg,
+            weightUnit: weightUnit,
+            recentHint: "记录体重",
+            recentAction: { showQuickWeight = true },
+            goalText: goalGlance,
+            goalTint: goalArrivalTint,
+            goalHint: hasProfileContent ? "编辑资料" : "填写个人资料",
+            goalAction: { showProfileEditor = true },
+            goalFilled: profile?.targetWeightKg != nil
+        )
     }
 
     private func todayExerciseSummaryRow(_ summary: String) -> some View {
@@ -375,16 +373,16 @@ struct TodayView: View {
             HStack(alignment: .top, spacing: 0) {
                 energyCell(intakeMetric)
                 VerticalHairline()
-                energyCell(activeMetric)
+                energyCell(healthBurnMetric)
                 VerticalHairline()
-                energyCell(restingMetric)
+                energyCell(deltaMetric)
             }
             VStack(spacing: 0) {
                 energyCell(intakeMetric)
                 Divider()
-                energyCell(activeMetric)
+                energyCell(healthBurnMetric)
                 Divider()
-                energyCell(restingMetric)
+                energyCell(deltaMetric)
             }
         }
     }
@@ -396,30 +394,42 @@ struct TodayView: View {
             label: "摄入",
             value: todayCalories.map { "\(Int($0.rounded()))" },
             unit: "千卡",
-            meta: todayFoods.isEmpty ? "自己填写后相加" : "\(todayFoods.count) 条记录相加"
+            meta: todayFoods.isEmpty ? "未记" : "\(todayFoods.count) 条记录"
         )
     }
 
-    private var activeMetric: EnergyMetric {
+    private var healthBurnMetric: EnergyMetric {
         EnergyMetric(
             symbol: "flame.fill",
             tint: AppTheme.activityGreen,
-            label: "活动能量",
-            value: todayActiveKcal.map { "\(Int($0.rounded()))" },
+            label: "健康消耗",
+            value: todayHealthBurnKcal.map { "\(Int($0.rounded()))" },
             unit: "千卡",
-            meta: todayActiveKcal == nil ? "需授权读取健康" : "健康今日合计"
+            meta: healthBurnMeta
         )
     }
 
-    private var restingMetric: EnergyMetric {
+    private var deltaMetric: EnergyMetric {
         EnergyMetric(
-            symbol: "bed.double.fill",
-            tint: AppTheme.brandTeal,
-            label: "静息能量",
-            value: todayRestingKcal.map { "\(Int($0.rounded()))" },
+            symbol: "equal.circle.fill",
+            tint: deltaTint,
+            label: "当前差值",
+            value: deltaText,
             unit: "千卡",
-            meta: todayRestingKcal == nil ? "需授权读取健康" : "健康今日合计"
+            meta: deltaMeta
         )
+    }
+
+    private var deltaText: String? {
+        guard let net = todayNetCalories else { return nil }
+        if abs(net) < 0.5 { return "0" }
+        let amount = "\(Int(abs(net).rounded()))"
+        return net > 0 ? "+\(amount)" : "−\(amount)"
+    }
+
+    private var deltaTint: Color {
+        guard let net = todayNetCalories, abs(net) >= 0.5 else { return .secondary }
+        return net > 0 ? AppTheme.intakeAmber : AppTheme.activityGreen
     }
 
     private func energyCell(_ metric: EnergyMetric) -> some View {
@@ -562,84 +572,6 @@ struct TodayView: View {
         if abs(nearest.day.timeIntervalSince(date)) > 36 * 3_600 { return nil }
         return nearest.day.startOfDay
     }
-
-    // MARK: - Recent
-
-    private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
-                    Text("最近记录")
-                        .font(AppFont.sectionTitle)
-                    Text("体重、饮食与运动")
-                        .font(AppFont.sectionSubtitle)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    onOpenWeight?()
-                } label: {
-                    HStack(spacing: AppTheme.space2) {
-                        Text("体重")
-                        Image(systemName: "chevron.right")
-                            .font(AppFont.inlineAction)
-                    }
-                    .font(AppFont.sectionSubtitle)
-                    .foregroundStyle(AppTheme.brandTeal)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, AppTheme.cardPadding)
-            .padding(.vertical, AppTheme.space12)
-
-            Divider()
-
-            if recentItems.isEmpty {
-                ContentUnavailableView(
-                    "还没有记录",
-                    systemImage: "list.bullet",
-                    description: Text("记录体重、饮食后，或从健康同步到运动后会显示在这里。")
-                )
-                .frame(minHeight: 140)
-                .padding(.vertical, AppTheme.space12)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(recentItems) { item in
-                        HStack(alignment: .center, spacing: AppTheme.space12) {
-                            RecordDot(kind: item.dot)
-                                .frame(width: AppTheme.recordDotColumn)
-
-                            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
-                                Text(item.title)
-                                    .font(AppFont.rowTitle)
-                                    .lineLimit(1)
-                                HStack(spacing: AppTheme.space4) {
-                                    Text(item.typeLabel)
-                                    Text("·")
-                                    Text(item.date, format: AppLocale.monthDayTime)
-                                }
-                                .font(AppFont.rowMeta)
-                                .foregroundStyle(.secondary)
-                            }
-
-                            Spacer(minLength: AppTheme.space8)
-
-                            Text(item.valueText)
-                                .font(AppFont.rowValue)
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.trailing)
-                        }
-                        .padding(.horizontal, AppTheme.cardPadding)
-                        .padding(.vertical, AppTheme.space12)
-                        if item.id != recentItems.last?.id {
-                            Divider().padding(.leading, AppTheme.cardPadding + AppTheme.recordDotColumn + AppTheme.space12)
-                        }
-                    }
-                }
-            }
-        }
-        .appSurface()
-    }
 }
 
 private struct EnergyMetric {
@@ -711,62 +643,6 @@ struct WeightChartPoint: Identifiable {
             }
             return WeightChartPoint(id: day, day: day, weightKg: last.weight)
         }
-    }
-}
-
-struct RecentRecord: Identifiable {
-    let id: String
-    let date: Date
-    let typeLabel: String
-    let title: String
-    let valueText: String
-    let dot: RecordDot.Kind
-
-    static func build(
-        weights: [WeightEntry],
-        foods: [FoodEntry],
-        exercises: [ExerciseEntry],
-        unit: WeightUnit,
-        limit: Int
-    ) -> [RecentRecord] {
-        var items: [RecentRecord] = []
-        items += weights.map {
-            RecentRecord(
-                id: "w-\($0.id.uuidString)",
-                date: $0.createdAt,
-                typeLabel: "体重",
-                title: $0.note?.isEmpty == false ? ($0.note ?? "体重") : "体重记录",
-                valueText: unit.format($0.weight),
-                dot: .weight
-            )
-        }
-        items += foods.map {
-            RecentRecord(
-                id: "f-\($0.id.uuidString)",
-                date: $0.date,
-                typeLabel: "饮食",
-                title: $0.name,
-                valueText: "\(Int($0.calories.rounded())) 千卡",
-                dot: .food
-            )
-        }
-        items += exercises.map {
-            let value: String
-            if let burn = $0.caloriesBurned {
-                value = "\($0.durationMinutes) 分钟 · \(Int(burn.rounded())) 千卡"
-            } else {
-                value = "\($0.durationMinutes) 分钟"
-            }
-            return RecentRecord(
-                id: "e-\($0.id.uuidString)",
-                date: $0.date,
-                typeLabel: "运动",
-                title: $0.name,
-                valueText: value,
-                dot: .activity
-            )
-        }
-        return Array(items.sorted { $0.date > $1.date }.prefix(limit))
     }
 }
 
