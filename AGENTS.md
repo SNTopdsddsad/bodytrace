@@ -51,7 +51,7 @@
 - 上架材料草稿：`docs/app-store/`（商店文案、营养标签、审核备注）；对外页已托管在 `https://app.aigcwe.com/privacy/`
 - 隐私清单：`bodycheck/PrivacyInfo.xcprivacy`、`BodyTrackWidget/PrivacyInfo.xcprivacy`
 - SwiftData CloudKit：`BodyTrackCloud` + `iCloud.yinke.bodycheck`；失败回退本地；旧库可一次性迁移
-- iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量、活动能量（不入库）。无运动 Tab：锻炼只读，展示在概览最近记录和日详情。概览热量卡有锻炼时显示「今天有 N 次锻炼，共 M 分钟」，没有则不展示
+- iOS 运动：导入 workout → `ExerciseEntry`（按 `healthKitUUID` upsert）；读取今日静息能量、活动能量（不入库）。无运动 Tab：锻炼只读，展示在概览最近记录和日详情。概览热量卡有锻炼时显示「今天有 N 次锻炼，共 M 分钟」，没有则不展示。日详情当天没有锻炼时只显示「没有运动记录」和「？」。点问号再弹出如何在「健康」补记（搜索 → 健身记录 → 体能训练 → 添加）。不在本应用手写运动，也不跳转到「健身」App
 - iOS 体重 ↔ 健康：写回 `bodyMass` 并回填 UUID；导入按 UUID upsert；`HKObserverQuery` + 后台投递（唤醒进程，不弹到前台）；未授权时本地仍可用
 - App 图标：深色进度环（`Assets.xcassets/AppIcon`）
 - iPhone 小组件：`BodyTrackWidget`（Bundle `yinke.bodycheck.widget`）；小尺寸最新体重，中尺寸体重 + 今日热量差（肥肉图 + 克数 + 净热量）；点按走 Deep Link `bodytrack://log-weight` 打开记体重，不在小组件里输数字。**真机图库已能加上**（2026-08-13，用户确认）

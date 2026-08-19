@@ -16,6 +16,9 @@ struct CalendarDayItem: Identifiable, Hashable {
 struct DayDetailView: View {
     let day: Date
 
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @Query(sort: [
         SortDescriptor(\WeightEntry.date, order: .reverse),
@@ -27,6 +30,10 @@ struct DayDetailView: View {
     @State private var weightEditor: WeightEditorMode?
     @State private var activeKcal: Double?
     @State private var restingKcal: Double?
+    @State private var isExerciseSyncing = false
+    @State private var exerciseSyncMessage: String?
+    @State private var exerciseSyncIsError = false
+    @State private var showExerciseHelp = false
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -103,10 +110,16 @@ struct DayDetailView: View {
         .sheet(item: $weightEditor) { mode in
             WeightEditorView(mode: mode)
         }
+        .sheet(isPresented: $showExerciseHelp) {
+            exerciseHelpSheet
+        }
         .task(id: day.startOfDay) {
-            let totals = await HealthKitAccess.energyTotals(on: day)
-            activeKcal = totals.active
-            restingKcal = totals.resting
+            await refreshHealthForDay(userInitiated: false)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await refreshHealthForDay(userInitiated: false) }
+            }
         }
     }
 
@@ -289,31 +302,204 @@ struct DayDetailView: View {
     }
 
     private var exerciseSection: some View {
-        daySection(title: "当天运动", empty: dayExercises.isEmpty ? "没有运动记录" : nil) {
-            ForEach(dayExercises) { entry in
-                HStack(alignment: .center, spacing: AppTheme.space12) {
-                    VStack(alignment: .leading, spacing: AppTheme.stackTight) {
-                        Text(entry.name)
-                            .font(AppFont.rowTitle)
-                        Text(entry.date, format: AppLocale.time)
-                            .font(AppFont.rowMeta)
-                            .foregroundStyle(.secondary)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("当天运动")
+                .font(AppFont.sectionTitle)
+                .padding(.horizontal, AppTheme.cardPadding)
+                .padding(.top, AppTheme.space12)
+                .padding(.bottom, AppTheme.space8)
+
+            if dayExercises.isEmpty {
+                HStack(alignment: .center, spacing: AppTheme.space8) {
+                    Text("没有运动记录")
+                        .font(AppFont.emptyBody)
+                        .foregroundStyle(.secondary)
                     Spacer(minLength: AppTheme.space8)
-                    VStack(alignment: .trailing, spacing: AppTheme.stackTight) {
-                        Text("\(entry.durationMinutes) 分钟")
-                            .font(AppFont.rowValue)
-                        if let burn = entry.caloriesBurned {
-                            Text("\(Int(burn.rounded())) 千卡")
-                                .font(AppFont.rowMeta)
-                                .foregroundStyle(.secondary)
+                    Button {
+                        exerciseSyncMessage = nil
+                        exerciseSyncIsError = false
+                        showExerciseHelp = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(AppFont.icon)
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("如何补记锻炼")
+                    .accessibilityHint("没戴手表时，可在健康里补记后再同步")
+                }
+                .padding(.horizontal, AppTheme.cardPadding)
+                .padding(.bottom, AppTheme.space8)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(dayExercises) { entry in
+                        HStack(alignment: .center, spacing: AppTheme.space12) {
+                            VStack(alignment: .leading, spacing: AppTheme.stackTight) {
+                                Text(entry.name)
+                                    .font(AppFont.rowTitle)
+                                Text(entry.date, format: AppLocale.time)
+                                    .font(AppFont.rowMeta)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: AppTheme.space8)
+                            VStack(alignment: .trailing, spacing: AppTheme.stackTight) {
+                                Text("\(entry.durationMinutes) 分钟")
+                                    .font(AppFont.rowValue)
+                                if let burn = entry.caloriesBurned {
+                                    Text("\(Int(burn.rounded())) 千卡")
+                                        .font(AppFont.rowMeta)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, AppTheme.space8)
+                        if entry.id != dayExercises.last?.id {
+                            Divider()
                         }
                     }
                 }
-                .padding(.vertical, AppTheme.space8)
-                if entry.id != dayExercises.last?.id {
-                    Divider()
+                .padding(.horizontal, AppTheme.cardPadding)
+                .padding(.bottom, AppTheme.space8)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appSurface()
+    }
+
+    private var exerciseHelpSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppTheme.stackLoose) {
+                    Text("没戴手表时，健康不会自动记上这次运动。请在「健康」App 里补一条体能训练，「健身」App 主要是看圆环，不能在那里手补。")
+                        .font(AppFont.emptyBody)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: AppTheme.stackDefault) {
+                        hintStep(1, "打开 Apple 健康")
+                        hintStep(2, "点底部「搜索」，进入「健身记录」")
+                        hintStep(3, "点「体能训练」，再点右上角添加")
+                        hintStep(4, "填写运动类型、开始时间和结束时间")
+                        hintStep(5, "如果知道大致消耗，可填写千卡")
+                        hintStep(6, "回到 BodyTrack 重新同步")
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("补记步骤。打开 Apple 健康。点底部搜索，进入健身记录。点体能训练，再点右上角添加。填写运动类型、开始时间和结束时间。如果知道大致消耗，可填写千卡。回到 BodyTrack 重新同步。")
+
+                    VStack(spacing: AppTheme.space8) {
+                        Button {
+                            openHealthApp()
+                        } label: {
+                            Label("打开 Apple 健康", systemImage: "heart.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .tint(AppTheme.activityGreen)
+
+                        Button {
+                            Task { await refreshHealthForDay(userInitiated: true) }
+                        } label: {
+                            if isExerciseSyncing {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Label("从健康同步", systemImage: "arrow.triangle.2.circlepath")
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .tint(AppTheme.brandTeal)
+                        .disabled(isExerciseSyncing)
+                        .accessibilityLabel("从健康同步")
+                    }
+
+                    if let exerciseSyncMessage {
+                        Text(exerciseSyncMessage)
+                            .font(AppFont.formError)
+                            .foregroundStyle(exerciseSyncIsError ? AppTheme.danger : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                .padding(AppTheme.cardPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("如何补记锻炼")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { showExerciseHelp = false }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .tint(AppTheme.brandTeal)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func hintStep(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
+            Text("\(number).")
+                .font(AppFont.rowValue)
+                .foregroundStyle(AppTheme.activityGreen)
+                .monospacedDigit()
+            Text(text)
+                .font(AppFont.emptyBody)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func openHealthApp() {
+        guard let url = URL(string: "x-apple-health://") else { return }
+        openURL(url) { accepted in
+            if !accepted {
+                exerciseSyncIsError = true
+                exerciseSyncMessage = "打不开 Apple 健康，请在主屏幕手动打开。"
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshHealthForDay(userInitiated: Bool) async {
+        if userInitiated {
+            isExerciseSyncing = true
+            exerciseSyncIsError = false
+            exerciseSyncMessage = nil
+        }
+        defer {
+            if userInitiated { isExerciseSyncing = false }
+        }
+
+        do {
+            if userInitiated {
+                try await HealthKitExerciseService.shared.requestAuthorization()
+            }
+            let count = try await HealthKitExerciseService.shared.syncWorkouts(
+                into: modelContext,
+                userInitiated: userInitiated
+            )
+            let totals = await HealthKitAccess.energyTotals(on: day)
+            activeKcal = totals.active
+            restingKcal = totals.resting
+            if userInitiated {
+                if dayExercises.isEmpty {
+                    exerciseSyncMessage = count == 0
+                        ? "健康中暂无新的锻炼。补记后回到这里再同步一次。"
+                        : "已同步健康，这一天仍没有锻炼。"
+                } else {
+                    showExerciseHelp = false
+                }
+            }
+        } catch {
+            if userInitiated {
+                exerciseSyncIsError = true
+                exerciseSyncMessage = error.localizedDescription
             }
         }
     }
