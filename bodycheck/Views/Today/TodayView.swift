@@ -12,6 +12,7 @@ import SwiftUI
 struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openSettings) private var openSettings
     @AppStorage("weightUnit") private var weightUnitRaw: String = WeightUnit.kg.rawValue
     @Query(sort: [
         SortDescriptor(\WeightEntry.date, order: .reverse),
@@ -19,16 +20,15 @@ struct TodayView: View {
     ]) private var weights: [WeightEntry]
     @Query(sort: \FoodEntry.date, order: .reverse) private var foods: [FoodEntry]
     @Query(sort: \ExerciseEntry.date, order: .reverse) private var exercises: [ExerciseEntry]
-    @Query private var profiles: [UserProfile]
 
     @State private var showQuickWeight = false
     @State private var showQuickFood = false
-    @State private var showProfileEditor = false
     @State private var chartRange: ChartRange = .days30
     @State private var openedDay: CalendarDayItem?
     @State private var todayRestingKcal: Double?
     @State private var todayActiveKcal: Double?
     @State private var energyAsOf = Date()
+    @State private var healthConnected = false
 
     private var weightUnit: WeightUnit {
         WeightUnit(rawValue: weightUnitRaw) ?? .kg
@@ -38,26 +38,12 @@ struct TodayView: View {
         weights.sorted(by: WeightEntry.chronologicalDescending)
     }
 
-    private var profile: UserProfile? {
-        UserProfile.current(from: profiles)
-    }
-
     private var latestWeight: WeightEntry? { orderedWeights.first }
     private var previousWeight: WeightEntry? { orderedWeights.count > 1 ? orderedWeights[1] : nil }
 
     private var weightDelta: Double? {
         guard let latest = latestWeight, let previous = previousWeight else { return nil }
         return latest.weight - previous.weight
-    }
-
-    private var hasProfileContent: Bool {
-        guard let profile else { return false }
-        if !profile.trimmedName.isEmpty { return true }
-        if profile.age != nil { return true }
-        if profile.sex != .unspecified { return true }
-        if profile.heightCm != nil { return true }
-        if profile.targetWeightKg != nil { return true }
-        return false
     }
 
     private var todayFoods: [FoodEntry] {
@@ -162,35 +148,6 @@ struct TodayView: View {
         }
     }
 
-    private var goalArrival: WeightPace.Arrival {
-        WeightPace.arrival(
-            latestKg: latestWeight?.weight,
-            targetKg: profile?.targetWeightKg,
-            samples: paceSamples
-        )
-    }
-
-    private var goalGlance: String {
-        switch goalArrival {
-        case .needWeight:
-            return "先记体重"
-        case .needTarget:
-            return "还没填目标"
-        case .needMoreData:
-            return "再记几天"
-        case .reached:
-            return "已经达到"
-        case .tooSlow:
-            return "几乎没变"
-        case .wrongWay:
-            return "在远离目标"
-        case .tooFar:
-            return "要两年以上"
-        case .estimated(let days, _):
-            return WeightPace.formatDuration(days: days)
-        }
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -217,9 +174,6 @@ struct TodayView: View {
             .sheet(isPresented: $showQuickFood) {
                 FoodEditorSheet(mode: .create)
             }
-            .sheet(isPresented: $showProfileEditor) {
-                ProfileEditorSheet()
-            }
             .task {
                 await refreshHealthSummaries()
             }
@@ -245,6 +199,23 @@ struct TodayView: View {
         todayActiveKcal = todayTotals.active
         todayRestingKcal = todayTotals.resting
         energyAsOf = Date()
+        refreshHealthConnection()
+    }
+
+    private func refreshHealthConnection() {
+        healthConnected = HealthKitWeightService.shared.isSharingAuthorized
+            || todayActiveKcal != nil
+            || todayRestingKcal != nil
+    }
+
+    @MainActor
+    private func handleHealthStatusTap() async {
+        if healthConnected {
+            openSettings()
+            return
+        }
+        await HealthKitWeightService.shared.requestAuthorization()
+        await refreshHealthSummaries()
     }
 
     @ToolbarContentBuilder
@@ -286,34 +257,70 @@ struct TodayView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(eatInsightAccessibilityLabel)
 
-                Text(energyCompletenessText)
-                    .font(AppFont.sectionSubtitle)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
+                    Text(energyCompletenessText)
+                        .font(AppFont.rowMeta)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(alignment: .center, spacing: AppTheme.space8) {
+                        healthCaptionRow
+                        Spacer(minLength: AppTheme.space8)
+                        consumptionDetailLink
+                    }
+                }
 
                 if let todayExerciseSummary {
                     todayExerciseSummaryRow(todayExerciseSummary)
                 }
-
-                Button {
-                    openedDay = CalendarDayItem(date: Date().startOfDay)
-                } label: {
-                    HStack(spacing: AppTheme.space8) {
-                        Text("消耗详情")
-                            .font(AppFont.sectionSubtitle)
-                        Spacer(minLength: AppTheme.space8)
-                        Image(systemName: "chevron.right")
-                            .font(AppFont.inlineAction)
-                    }
-                    .foregroundStyle(AppTheme.activityGreen)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("消耗详情")
-                .accessibilityHint("查看活动能量、静息和当天运动")
             }
         }
+    }
+
+    private var healthCaptionRow: some View {
+        Button {
+            Task { await handleHealthStatusTap() }
+        } label: {
+            HStack(spacing: AppTheme.space4) {
+                Image(systemName: healthConnected ? "heart.fill" : "heart")
+                    .font(AppFont.badge)
+                    .foregroundStyle(healthConnected ? AppTheme.activityGreen : .secondary)
+                    .accessibilityHidden(true)
+                Text(healthConnected ? "Apple 健康已连接" : "未连接 Apple 健康")
+                    .font(AppFont.badge)
+                    .foregroundStyle(healthConnected ? AppTheme.activityGreen : .secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, AppTheme.chipHorizontal)
+            .padding(.vertical, AppTheme.chipVertical)
+            .background(
+                (healthConnected ? AppTheme.activityGreen : Color.secondary).opacity(AppTheme.chipFillOpacity),
+                in: Capsule()
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .accessibilityLabel(healthConnected ? "Apple 健康已连接" : "未连接 Apple 健康")
+        .accessibilityHint(healthConnected ? "打开设置查看健康授权" : "允许读取健康数据")
+    }
+
+    private var consumptionDetailLink: some View {
+        Button {
+            openedDay = CalendarDayItem(date: Date().startOfDay)
+        } label: {
+            HStack(spacing: AppTheme.space2) {
+                Text("消耗详情")
+                Image(systemName: "chevron.right")
+            }
+            .font(AppFont.inlineAction)
+            .foregroundStyle(AppTheme.activityGreen)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("消耗详情")
+        .accessibilityHint("查看活动能量、静息和当天运动")
     }
 
     private var eatInsightAccessibilityLabel: String {
@@ -337,12 +344,7 @@ struct TodayView: View {
             recentDeltaKg: trendDeltaKg,
             weightUnit: weightUnit,
             recentHint: "记录体重",
-            recentAction: { showQuickWeight = true },
-            goalText: goalGlance,
-            goalTint: goalArrivalTint,
-            goalHint: hasProfileContent ? "编辑资料" : "填写个人资料",
-            goalAction: { showProfileEditor = true },
-            goalFilled: profile?.targetWeightKg != nil
+            recentAction: { showQuickWeight = true }
         )
     }
 
@@ -544,14 +546,6 @@ struct TodayView: View {
     }
 
     private var chartHeight: CGFloat { 160 }
-
-    private var goalArrivalTint: Color {
-        switch goalArrival {
-        case .estimated, .reached: AppTheme.brandTeal
-        case .wrongWay, .tooFar: AppTheme.intakeAmber
-        case .needWeight, .needTarget, .needMoreData, .tooSlow: .secondary
-        }
-    }
 
     private func openChartDay(at location: CGPoint, proxy: ChartProxy, in geo: GeometryProxy) {
         let x: CGFloat

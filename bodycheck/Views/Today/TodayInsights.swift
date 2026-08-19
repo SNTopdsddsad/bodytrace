@@ -14,106 +14,23 @@ struct WeightSummaryBar: View {
     var weightUnit: WeightUnit = .kg
     let recentHint: String
     let recentAction: () -> Void
-    let goalText: String
-    var goalTint: Color = .primary
-    let goalHint: String
-    let goalAction: () -> Void
-    var goalFilled: Bool = true
 
     var body: some View {
-        Group {
-            if goalFilled {
-                HStack(alignment: .top, spacing: 0) {
-                    cell(
-                        label: "最近",
-                        value: recentText,
-                        tint: recentTint,
-                        showsDelta: true,
-                        hint: recentHint,
-                        action: recentAction
-                    )
-                    VerticalHairline()
-                    cell(
-                        label: "目标",
-                        value: goalText,
-                        tint: goalTint,
-                        hint: goalHint,
-                        action: goalAction
-                    )
-                }
-            } else {
-                VStack(alignment: .leading, spacing: AppTheme.stackTight) {
-                    HStack(alignment: .center, spacing: AppTheme.space8) {
-                        Text("最近")
-                            .font(AppFont.compactUnit)
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: AppTheme.space8)
-                        Button(action: goalAction) {
-                            Text("填写目标体重")
-                                .font(AppFont.inlineAction)
-                                .foregroundStyle(.tertiary)
-                                .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("填写目标体重")
-                        .accessibilityHint(goalHint)
-                    }
-                    Button(action: recentAction) {
-                        recentValue
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("最近，\(recentText)")
-                    .accessibilityHint(recentHint)
-                }
-                .padding(.horizontal, AppTheme.cardPadding)
-                .padding(.vertical, AppTheme.space12)
-            }
-        }
-        .appSurface()
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("体重摘要")
-    }
-
-    private var recentValue: some View {
-        HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
-            Text(recentText)
-                .font(AppFont.rowTitleEmphasis)
-                .foregroundStyle(recentTint)
-                .multilineTextAlignment(.leading)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
-            if let recentDeltaKg {
-                DeltaChip(deltaKg: recentDeltaKg, unit: weightUnit)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func cell(
-        label: String,
-        value: String,
-        tint: Color,
-        showsDelta: Bool = false,
-        hint: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
+        Button(action: recentAction) {
             VStack(alignment: .leading, spacing: AppTheme.stackTight) {
-                Text(label)
+                Text("最近")
                     .font(AppFont.compactUnit)
                     .foregroundStyle(.secondary)
-                if showsDelta {
-                    recentValue
-                } else {
-                    Text(value)
+                HStack(alignment: .firstTextBaseline, spacing: AppTheme.space8) {
+                    Text(recentText)
                         .font(AppFont.rowTitleEmphasis)
-                        .foregroundStyle(tint)
+                        .foregroundStyle(recentTint)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let recentDeltaKg {
+                        DeltaChip(deltaKg: recentDeltaKg, unit: weightUnit)
+                    }
                 }
             }
             .padding(.horizontal, AppTheme.cardPadding)
@@ -122,15 +39,18 @@ struct WeightSummaryBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityText(label: label, value: value, deltaKg: showsDelta ? recentDeltaKg : nil))
-        .accessibilityHint(hint)
+        .appSurface()
+        .accessibilityLabel(accessibilityText)
+        .accessibilityHint(recentHint)
     }
 
-    private func accessibilityText(label: String, value: String, deltaKg: Double?) -> String {
-        guard let deltaKg else { return "\(label)，\(value)" }
-        if abs(deltaKg) < 0.000_1 { return "\(label)，\(value)，持平" }
-        let change = weightUnit.format(abs(deltaKg))
-        return deltaKg > 0 ? "\(label)，\(value)，重了 \(change)" : "\(label)，\(value)，轻了 \(change)"
+    private var accessibilityText: String {
+        guard let recentDeltaKg else { return "最近，\(recentText)" }
+        if abs(recentDeltaKg) < 0.000_1 { return "最近，\(recentText)，持平" }
+        let change = weightUnit.format(abs(recentDeltaKg))
+        return recentDeltaKg > 0
+            ? "最近，\(recentText)，重了 \(change)"
+            : "最近，\(recentText)，轻了 \(change)"
     }
 }
 
