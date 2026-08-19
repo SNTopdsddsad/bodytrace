@@ -1,12 +1,13 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.34  
+**版本**：v1.35  
 **日期**：2026-08-19  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.35 | 2026-08-19 | Debug / Release 都连 CloudKit Production。改模型后仍须在控制台把 Development schema Deploy 到 Production |
 | v1.34 | 2026-08-19 | 概览体重摘要条隐藏「目标」和到达时间，只留「最近」。个人资料里仍可填目标体重 |
 | v1.33 | 2026-08-19 | 概览去掉「今天：多吃了 / 没有吃多」。热量主卡直接展示摄入、健康消耗、当前差值和数据完整状态，并提供消耗详情入口。「最近」与「目标」合成体重摘要条，放在热量主卡下方 |
 | v1.32 | 2026-08-19 | 日详情当天没有锻炼时，提示去 Apple 健康补记（搜索 → 健身记录 → 体能训练），再回到 BodyTrack 同步。不在本应用手写运动，也不跳转「健身」App |
@@ -426,7 +427,7 @@ let modelConfiguration = ModelConfiguration(
 - CloudKit 容器 ID：`iCloud.yinke.bodycheck`（与 Bundle `yinke.bodycheck` 对齐）
 - 首次用自动签名编译时，Xcode 会向开发者账号注册 iCloud / Push / CloudKit
 - 模型属性必须可选或带默认值；**不要**使用 `@Attribute(.unique)`
-- 开发环境 schema 随第一次写入自动生成；上架前须在 CloudKit 控制台部署到 Production
+- Debug / Release 都连 Production。改 `@Model` 后须在 CloudKit 控制台把 Development schema Deploy 到 Production；App 不会再给 Development 自动建表
 - 无 iCloud 账号或容器创建失败时 App 仍可单机使用
 - Widget **不**直接操作完整 CloudKit 同步
 

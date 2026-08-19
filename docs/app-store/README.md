@@ -10,7 +10,7 @@
 |---|------|------|
 | 1 | **托管隐私政策 / 支持页** | 已上线。填 App Store Connect：隐私政策 `https://app.aigcwe.com/privacy/privacy-policy.html`，支持页 `https://app.aigcwe.com/privacy/support.html`。 |
 | 2 | **截图** | 文案和构图在 `app-store-connect.md` §7。必须用真机或 iPhone 模拟器实拍，仓库里没有成品图。 |
-| 3 | **CloudKit Development → Production** | Schema 已于 2026-08-18 部署。Archive 走 Release，`bodycheck.Release.entitlements` 连 Production。 |
+| 3 | **CloudKit Development → Production** | Schema 已于 2026-08-18 部署。Debug / Release 都连 Production。 |
 | 4 | **确认对外署名** | 隐私政策和版权默认写开发者 **丹青**、邮箱 **xuwudi404@outlook.com**。若 Apple Developer 账号法定名称不同，改政策页、本目录文案和 App Store Connect 版权三项一起改。 |
 
 真机验收（开发文档 A1–A6、A9 与小组件 A7/A8/A10）仍建议在提审前做完。

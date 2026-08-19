@@ -283,7 +283,7 @@ Contact: xuwudi404@outlook.com
 
 1. CloudKit 控制台已把 Development schema **Deploy 到 Production**（`CD_WeightEntry`、`CD_FoodEntry` 含 `CD_photoData`、`CD_ExerciseEntry`）。没有就停。
 2. 真机打开过主 App，小组件能加上。
-3. Archive 走 Release，已指向 `bodycheck/bodycheck.Release.entitlements`（CloudKit `Production`，`aps-environment` = `production`）。日常 Run 仍用 `bodycheck.entitlements`（Development）。不要把 Debug 那份改成 Production。打包后可在 Organizer 里看签名 entitlements，确认 `icloud-container-environment` 是 `Production`。
+3. Debug / Release 都连 CloudKit `Production`（`bodycheck.entitlements` 与 `bodycheck.Release.entitlements`，`aps-environment` = `production`）。打包后可在 Organizer 里看签名 entitlements，确认 `icloud-container-environment` 是 `Production`。
 4. 隐私政策 URL、支持 URL 已用无痕窗口打开确认。
 5. 目的地选 **Any iOS Device (arm64)**，Scheme 用 `bodycheck`，Product → Archive → Distribute App → App Store Connect。
 

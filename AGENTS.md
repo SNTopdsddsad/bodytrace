@@ -34,7 +34,7 @@
 建议下一件（上架门槛，按顺序）：
 
 1. **真机验收**：体重读写健康、后台导入、拒权仍能记、无网能用（文档 A1–A6、A9）；小组件已能添加，顺手确认 A7 数据、A8 点按记体重、A10 单位一致  
-2. CloudKit Production schema 已部署（2026-08-18）。Archive 走 Release，已用 `bodycheck.Release.entitlements`  
+2. CloudKit Production schema 已部署（2026-08-18）。Debug / Release 都连 Production（`bodycheck.entitlements` 与 `bodycheck.Release.entitlements`）  
 3. 对外页已托管：隐私政策 `https://app.aigcwe.com/privacy/privacy-policy.html`，支持页 `https://app.aigcwe.com/privacy/support.html`。按 `docs/app-store/app-store-connect.md` 填商店后台与营养标签；截图需真机实拍
 
 ## 当前进度（2026-08）
@@ -153,19 +153,18 @@ ModelConfiguration(
 ## CloudKit
 
 - 容器：`iCloud.yinke.bodycheck`
-- iOS entitlements：Debug 用 `bodycheck/bodycheck.entitlements`（CloudKit `Development`）；Release / Archive / TestFlight 用 `bodycheck/bodycheck.Release.entitlements`（CloudKit `Production`，`aps-environment` = `production`）。Widget 没有 CloudKit，不用改。
+- iOS entitlements：Debug 用 `bodycheck/bodycheck.entitlements`，Release / Archive / TestFlight 用 `bodycheck/bodycheck.Release.entitlements`。两份都是 CloudKit `Production`、`aps-environment` = `production`。Widget 没有 CloudKit，不用改。从旧的 Development 调试包切过来时，真机要删 App 重装，本地 `BodyTrackCloud` 不能就地换环境。
 - iOS Background Modes：`remote-notification` 必须是数组，写在仓库根目录 `Info.plist`。不要放进 `bodycheck/`（文件系统同步组会再拷一份，编译报 Multiple commands produce Info.plist）。不要用 `INFOPLIST_KEY_UIBackgroundModes = "remote-notification"`（会生成字符串，CloudKit 会报 client bug）
 - 无 iCloud 账号时本地照常读写；UI 必须反映 `CKAccountStatus` 和 `NSPersistentCloudKitContainer` 的 import/export 事件
-- **CloudKit ≠ iCloud 云盘**：记录不会出现在「文件 / iCloud Drive」。开发阶段到 [CloudKit 控制台](https://icloud.developer.apple.com/) 选 `iCloud.yinke.bodycheck` → **Development** → **Private Database** 查看 `CD_WeightEntry` 等
+- **CloudKit ≠ iCloud 云盘**：记录不会出现在「文件 / iCloud Drive」。日常数据在 [CloudKit 控制台](https://icloud.developer.apple.com/) 选 `iCloud.yinke.bodycheck` → **Production** → **Private Database** 查看 `CD_WeightEntry` 等
 - 设置里「已开启」只表示账号可用；「等待首次同步 / 正在上传 / 同步出错」才反映真正的 CloudKit 事件
 - 不要在 App 启动主线程调用 `initializeCloudKitSchema()`：会卡住 CloudKit exporter，真机白屏，并打出 `PFCloudKitStoreMonitor ... didn't tear down after 5 seconds`
 - 旧的非 CloudKit store 可能无法就地升级：设置会显示「仅本地」。开发阶段可删 App 重装；不要静默清空用户数据
 
 ### 发布前必须：Development schema → Production
 
-Xcode Debug / 真机开发走 **Development**（`bodycheck.entitlements`）。TestFlight、App Store、Archive 走 **Release**，用 `bodycheck.Release.entitlements` 连 **Production**。  
-不要把 Debug 那份改成 Production，日常真机会污染线上库。  
-**Production 不会自动带上 Development 里的表。** 忘了部署，上架用户会同步失败，控制台 Production 里只有空的 `Users`。
+App 的 Debug / Release 都连 **Production**。改 `@Model` 时，CloudKit 仍只能在控制台 **Development** 里改 schema，再 Deploy 到 Production。Debug 包不会再给 Development 自动建表。  
+**Production 不会自动带上 Development 里的表。** 忘了部署，真机和上架用户都会同步失败，控制台 Production 里只有空的 `Users`。
 
 当前 Development 已有、必须一并部署的类型：
 
@@ -239,7 +238,7 @@ xcodebuild -project bodycheck.xcodeproj -scheme bodycheck \
 - 不要提交 `.DS_Store`、`xcuserdata`、个人签名之外的本地状态。
 - 用户未要求不要顺手重构、不要扩 scope、不要改名工程。
 - 改了产品口径或模型，同步改 `docs/BodyTrack_开发文档.md` 文首版本与变更表；改了 `@Model` 后还要在控制台重新 Deploy 到 Production（见上文「发布前必须」）。
-- 准备 Archive / TestFlight / 上架前，先完成 Development → Production schema 部署，否则线上同步是空的。
+- 准备 Archive / TestFlight / 上架前，以及改了 `@Model` 之后，先完成 Development → Production schema 部署，否则真机和线上同步都是空的。
 - 提交说明用 conventional commits；类型保留 `feat:` / `docs:`，**标题和正文一律中文**。
 
 ## 文档关系
