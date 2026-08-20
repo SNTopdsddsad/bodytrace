@@ -1,12 +1,13 @@
 # 人体体征追踪 App 开发文档
 
-**版本**：v1.35  
-**日期**：2026-08-19  
+**版本**：v1.36  
+**日期**：2026-08-20  
 **项目代号**：BodyTrack  
 **工程名（当前）**：bodycheck（Xcode 工程可后续重命名）
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| v1.36 | 2026-08-20 | 对齐过时文案：设置 / 资料页不再写「概览可填」或「对照目标」；开发文档现行口径去掉 Mac、手记运动、旧 store 名 `BodyTrack`、概览肥肉大图 |
 | v1.35 | 2026-08-19 | Debug / Release 都连 CloudKit Production。改模型后仍须在控制台把 Development schema Deploy 到 Production |
 | v1.34 | 2026-08-19 | 概览体重摘要条隐藏「目标」和到达时间，只留「最近」。个人资料里仍可填目标体重 |
 | v1.33 | 2026-08-19 | 概览去掉「今天：多吃了 / 没有吃多」。热量主卡直接展示摄入、健康消耗、当前差值和数据完整状态，并提供消耗详情入口。「最近」与「目标」合成体重摘要条，放在热量主卡下方 |
@@ -53,27 +54,29 @@
 
 一款 iPhone 人体体征记录工具，核心能力包括：
 
-- 从 Apple 健康读取体重数据
-- 手动记录体重、简单食物热量、运动
+- 从 Apple 健康读取体重、锻炼与能量
+- 手动记录体重、简单食物热量（饮食不写健康）
 - iPhone 桌面小组件支持快速记录体重
 - 数据通过 iCloud 在多台 iPhone 之间同步
 
 ### 1.2 目标用户
 
-需要持续关注体重变化、简单记录饮食与运动，并希望在桌面快速操作的用户。
+需要持续关注体重变化、简单记录饮食，并从 Apple 健康带入运动与消耗，希望在桌面快速记体重的用户。
 
 ### 1.3 MVP 范围（第一版必须完成）
 
-| 功能 | iPhone | Mac | 优先级 |
-|------|--------|-----|--------|
-| 体重记录（增删改查） | ✅ | ✅ | P0 |
-| 快速记录体重（小组件入口） | ✅ | - | P0 |
-| 从 HealthKit 读取最新体重 | ✅ | - | P0 |
-| 手动体重写回 HealthKit | ✅ | - | P0 |
-| 简单食物热量记录 | ✅ | ✅ | P0 |
-| 运动记录 | ✅ | ✅ | P1 |
-| 今日热量汇总展示 | ✅ | ✅ | P1 |
-| 数据 iCloud 同步 | ✅ | ✅ | P0 |
+仅 iPhone。Mac / visionOS 已取消，不要按双端做。
+
+| 功能 | 状态 | 优先级 |
+|------|------|--------|
+| 体重记录（增删改查） | ✅ | P0 |
+| 快速记录体重（小组件入口） | ✅ | P0 |
+| 从 HealthKit 读取最新体重 | ✅ | P0 |
+| 手动体重写回 HealthKit | ✅ | P0 |
+| 简单食物热量记录 | ✅ | P0 |
+| 锻炼只读导入（Apple 健康 workout） | ✅ | P1 |
+| 今日热量汇总展示 | ✅ | P1 |
+| 数据 iCloud 同步（多台 iPhone） | ✅ | P0 |
 
 ### 1.4 产品口径（已定默认，可改）
 
@@ -82,7 +85,7 @@
 | 体重单位存储 | 始终 **kg**；界面可切换显示为 lb |
 | 体重条数 | **允许多条/日**（列表全保留；「最新体重」取 `date` 最新一条，同一天用 `createdAt` 决胜） |
 | 今日热量公式 | **今日摄入** = 当日 `FoodEntry.calories` 之和；**净热量** = 摄入 − 活动能量 − 静息能量 |
-| 肥肉示意 | **100 克肥肉 = 800 千卡**热量差。文案用「约等于 / 少了 / 多了」，不是当天体脂变化。概览最多 3 大块；日详情最多 5 块；中尺寸小组件一块图 + 克数 |
+| 肥肉示意 | **100 克肥肉 = 800 千卡**热量差。文案用「约等于 / 少了 / 多了」，不是当天体脂变化。概览热量主卡不用肥肉大图；日详情最多 5 块；中尺寸小组件一块图 + 克数 |
 | 热量范围 | 概览「今天热量」只看当天。没记饮食不把摄入当 0。小组件只显示今日 |
 | 达标时间 | 算法仍按窗口首末日体重线性粗算（`WeightPace`）。概览暂不展示到达时间。若以后再展示，文案用「大约 / 粗算」，间隔不足 7 天或几乎没变则不报天数 |
 | 锻炼无消耗 | 列表行 `caloriesBurned == nil` 只展示时长，不另做合计 |
@@ -105,7 +108,7 @@
 | 语言 | Swift 6 | 注意严格并发（`Sendable` 等） |
 | UI | SwiftUI | iPhone |
 | 数据持久化 | SwiftData | 本地业务数据 |
-| 跨设备同步 | CloudKit（SwiftData） | iPhone ↔ Mac |
+| 跨设备同步 | CloudKit（SwiftData） | 多台 iPhone |
 | 健康数据 | HealthKit | **仅 iOS Target** |
 | 小组件 | WidgetKit + App Intents | **仅 iOS** |
 | 本机共享 | App Groups | App ↔ Widget 摘要 |
@@ -114,10 +117,10 @@
 ### 2.2 架构原则
 
 1. **iOS 上，HealthKit 与 SwiftData 双写对账**：体重以 sample UUID 关联，避免重复导入。
-2. **SwiftData 为全平台业务数据源**（详细记录、笔记、列表、Mac 端）。
+2. **SwiftData 为业务数据源**（详细记录、笔记、列表）。
 3. **App Group 只存 Widget 所需摘要**（最新体重、今日摄入等），不承担完整同步。
 4. **CloudKit 负责跨设备业务数据同步**；Widget Extension **不**直接跑完整 CloudKit 同步。
-5. **Mac 不依赖 HealthKit**，只使用同步后的 SwiftData；Mac 上的改删 **不直接** 写 HealthKit（由 iOS 侧按策略处理或仅保留业务库）。
+5. **仅 iPhone**。不要加回 Mac / visionOS 目标或 `#if os(macOS)`。
 
 ### 2.3 数据流向
 
@@ -146,12 +149,11 @@
 | Health 侧新增/变更体重 | 用 sample UUID **upsert**：已存在则更新 `weight`/`date`，不存在则插入（`source = healthkit`） |
 | iOS 编辑体重 | 更新 SwiftData；若有 `healthKitUUID` 则删除旧 HK 样本并写入新样本（或按实现选择 update），再更新 UUID |
 | iOS 删除体重 | 删 SwiftData；若有 `healthKitUUID` 且 `source == manual`（或本 App 写入的样本）则尝试删 HK 样本 |
-| Mac 新增/编辑/删除体重 | **仅**改 SwiftData + CloudKit；**不**写 HealthKit |
 | 食物新增/编辑/删除 | **仅**改 SwiftData + CloudKit；**不**写 HealthKit |
 | 无 iCloud / 离线 | 本地 SwiftData 照常读写；恢复网络后由系统同步；UI 不阻塞 |
 | HealthKit 未授权 | 全部业务功能仍可用；隐藏/禁用「从健康同步」相关提示，引导去设置 |
 
-**原则**：业务列表以 SwiftData 为准；HealthKit 是 iOS 上的健康生态出口与体重外部来源，不能阻塞 Mac 与未授权用户。
+**原则**：业务列表以 SwiftData 为准；HealthKit 是健康生态出口与体重外部来源，不能阻塞未授权用户。
 
 ---
 
@@ -175,7 +177,7 @@ final class WeightEntry {
     var date: Date
     var weight: Double                 // 单位：kg
     var source: String                 // WeightSource.rawValue
-    /// 关联的 HealthKit 样本 UUID；用于去重与删除/更新对账。Mac 端通常为 nil。
+    /// 关联的 HealthKit 样本 UUID；用于去重与删除/更新对账。未写回健康时为 nil。
     var healthKitUUID: UUID?
     var note: String?
     var createdAt: Date
@@ -415,12 +417,12 @@ bodycheck/                              # 仓库根（工程名可改为 BodyTra
 
 ```swift
 let modelConfiguration = ModelConfiguration(
-    "BodyTrack",
+    "BodyTrackCloud",
     cloudKitDatabase: .private("iCloud.yinke.bodycheck")
 )
 ```
 
-实现见 `PersistenceController.load()`：先开 CloudKit，失败则同一 store 名回退 `cloudKitDatabase: .none`。设置页与 Mac 侧栏展示 `CKContainer.accountStatus()`。
+实现见 `PersistenceController.load()`：先开 CloudKit，失败则同一 store 名回退 `cloudKitDatabase: .none`。不要再用旧 store 名 `"BodyTrack"` 开 CloudKit。设置页展示 `CKAccountStatus` 与 CloudKit 导入/导出事件。
 
 **注意**：
 
@@ -492,7 +494,8 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
    - 快速添加（名称 + 热量）；iPhone 可拍照或从相册选图
 
 3. **体重**
-   - 列表 + 简单趋势图（趋势可放打磨阶段）
+   - 列表 + 时间 / 来源 / 备注筛选；顶部为最新、与上一条、范围内变化
+   - 趋势图在概览，不在体重列表
    - 新增 / 编辑 / 删除
 
 4. **设置**
@@ -502,11 +505,9 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
    - 清除我的全部数据（体重 / 饮食 / 运动 / 个人资料 / 小组件摘要）；健康 App 源数据不动；清除后不再自动从健康导入，直到用户再点同步
    - 数据与隐私说明入口
 
-### 6.2 Mac 主要页面
+### 6.2 平台范围
 
-- 与 iPhone 功能基本对齐
-- 更强调列表管理与批量编辑
-- **不**显示 HealthKit 权限入口
+仅 iPhone。Mac / visionOS 页面与目标已删除，不要加回去。
 
 ### 6.3 小组件尺寸
 
@@ -517,12 +518,14 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 ## 7. 开发阶段建议
 
+> 历史规划。当前工程只编 iOS；Mac 已取消。
+
 ### 第一阶段（基础骨架）
 
-1. 创建 / 调整为 Multiplatform 项目
+1. 创建 / 调整为 iPhone 项目
 2. 配置 SwiftData + CloudKit（无 unique 约束）
-3. 实现 `WeightEntry` 增删改查（iOS + Mac）
-4. 验证双端同步
+3. 实现 `WeightEntry` 增删改查
+4. 验证 iCloud 在多台 iPhone 之间同步
 5. 注册 Deep Link 与快速记录页骨架
 
 ### 第二阶段（HealthKit + 小组件）
@@ -534,7 +537,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 ### 第三阶段（饮食与运动）
 
 1. `FoodEntry`（仅本地/iCloud，不写健康）
-2. `ExerciseEntry`（P1）
+2. `ExerciseEntry`（从健康导入，本应用只读）
 3. 今日摄入汇总与概览展示
 
 ### 第四阶段（打磨）
@@ -565,10 +568,10 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 - Apple Watch 快速记录
 - 体重趋势图表增强
 - 自定义食物库
-- 目标体重与提醒
-- Live Activity（记录运动时）
+- 概览展示目标对照 / 到达时间；本地称重 / 记饮食提醒
+- Live Activity
 - 更丰富的营养素记录
-- 读取活动能量 / 步数（届时再申请对应 HealthKit 类型）
+- 读取步数（活动能量已读；届时再申请步数类型）
 ---
 
 ## 10. 配置清单与命名
@@ -577,7 +580,7 @@ WidgetCenter.shared.reloadTimelines(ofKind: "WeightWidget")
 
 - [x] iCloud → CloudKit（主 App，容器 `iCloud.yinke.bodycheck`）
 - [x] App Groups（主 App + Widget，**相同** Group ID `group.yinke.bodycheck`）
-- [x] HealthKit（**仅** iOS 主 App Target；当前只读 workout）
+- [x] HealthKit（**仅** iOS 主 App Target；读体重 / 锻炼 / 活动能量 / 静息能量，写体重）
 
 ### 命名（发布前替换 `yourcompany`）
 
@@ -605,8 +608,8 @@ Widget kind:            WeightWidget
 
 | 编号 | 场景 | 期望 |
 |------|------|------|
-| A1 | iPhone 手动增删改体重 | 列表正确；有网络时同步到 Mac |
-| A2 | Mac 增删改体重 | 仅业务库变更；同步到 iPhone；不要求写入 Health |
+| A1 | iPhone 手动增删改体重 | 列表正确；有网络且已登录 iCloud 时同步到其他 iPhone |
+| A2 | 另一台 iPhone 增删改体重 | 仅业务库 + CloudKit；不要求本机写入 Health |
 | A3 | iOS 授权后写体重 | 「健康」App 可见对应体重样本 |
 | A4 | 在「健康」中新增体重 | App 内出现对应记录且不因重复导入产生多条（同 UUID） |
 | A5 | 拒绝 HealthKit 权限 | 仍可手动记体重/食物；有引导文案 |

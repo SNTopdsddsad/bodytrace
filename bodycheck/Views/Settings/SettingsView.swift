@@ -66,7 +66,7 @@ struct SettingsView: View {
         } header: {
             Text("我")
         } footer: {
-            Text("也可在概览页填写。资料只用于本应用展示，不单独上传给开发者。打开 iCloud 时会随私人库同步。")
+            Text("资料只用于本应用展示，不单独上传给开发者。打开 iCloud 时会随私人库同步。概览暂不展示资料或目标对照。")
         }
     }
 

@@ -59,7 +59,7 @@ struct ProfileEditorView: View {
             } header: {
                 Text("目标体重")
             } footer: {
-                Text("按当前体重单位填写，保存为公斤。概览会对照最新体重显示差距。")
+                Text("按当前体重单位填写，保存为公斤。概览暂不展示目标对照或到达时间。")
             }
 
             if let validationMessage {
