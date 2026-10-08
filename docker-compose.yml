@@ -1,0 +1,23 @@
+# 本地开发的 Postgres。
+# 启动：docker compose up -d    停止：docker compose down
+#
+# 数据通过 bind mount 直接落在 D:\docker\bodytrace-pg，
+# 删掉容器数据也不丢；也不依赖 Docker Desktop 的数据盘位置。
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bodytrace-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bodytrace
+    ports:
+      - "5433:5432"
+    volumes:
+      - D:/docker/bodytrace-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bodytrace"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
