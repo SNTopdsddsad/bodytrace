@@ -8,6 +8,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,10 @@ export default function RegisterPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="items-center text-center">
+        <div className="mx-auto mb-1 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
+          <Flame className="size-7" aria-hidden />
+        </div>
         <CardTitle className="text-xl">创建账号</CardTitle>
         <CardDescription>一个邮箱就够了，注册后立即可用</CardDescription>
       </CardHeader>

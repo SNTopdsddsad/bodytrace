@@ -7,5 +7,7 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
+    // 与 src/db/index.ts 保持一致：DATABASE_SSL=require 时开启
+    ssl: process.env.DATABASE_SSL === "require" ? { rejectUnauthorized: false } : undefined,
   },
 });

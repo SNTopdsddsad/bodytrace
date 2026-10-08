@@ -66,6 +66,31 @@ console.log("2. 未登录应被拒绝");
   cookie = saved;
 }
 
+console.log("2.5 跨站伪造（CSRF）应被拒绝");
+{
+  // 模拟恶意网站：带着别人的 cookie、带着别人的 Origin 发 POST
+  const { status } = await api("/api/v1/foods", {
+    method: "POST",
+    headers: { Origin: "https://evil.example.com" },
+    body: JSON.stringify({ name: "x", calories: 1 }),
+  });
+  check("伪造 Origin 返回 401", status === 401);
+}
+
+console.log("2.6 未来日期应被拒绝");
+{
+  const { status } = await api("/api/v1/meals", {
+    method: "POST",
+    body: JSON.stringify({
+      date: "2999-01-01",
+      mealType: "breakfast",
+      foodId: "00000000-0000-0000-0000-000000000000",
+      grams: 100,
+    }),
+  });
+  check("未来日期返回 400", status === 400);
+}
+
 console.log("3. 食物库（新用户应预置 24 种）");
 let rice;
 {

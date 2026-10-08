@@ -11,11 +11,14 @@ import { food, mealEntry } from "@/db/schema";
 import { MEAL_ORDER, MEAL_LABELS, ZERO_MACRO, addMacro, round1, scaleMacro } from "@/lib/nutrition";
 import type { MacroLike, MealType } from "@/lib/nutrition";
 import { getGoals } from "./goals";
-import { isValidDateStr } from "@/lib/date";
+import { isValidDateStr, todayStr } from "@/lib/date";
 
 /** API 入参校验：zod 会先验证数据形状，不合法直接报错，脏数据进不了数据库。 */
 export const mealCreateSchema = z.object({
-  date: z.string().refine(isValidDateStr, "日期格式应为 YYYY-MM-DD"),
+  date: z
+    .string()
+    .refine(isValidDateStr, "日期格式应为 YYYY-MM-DD")
+    .refine((d) => d <= todayStr(), "不能记录未来日期"),
   mealType: z.enum(MEAL_ORDER),
   foodId: z.string().uuid(),
   grams: z.number().min(1).max(5000),

@@ -2,7 +2,7 @@
  * GET  /api/v1/meals?date=YYYY-MM-DD  某天的全部饮食记录
  * POST /api/v1/meals                  添加记录 {date, mealType, foodId, grams}
  */
-import { getSession, unauthorized, invalidBody } from "@/lib/api-auth";
+import { getSession, requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
 import { isValidDateStr } from "@/lib/date";
 import { addEntry, getDayEntries, mealCreateSchema } from "@/services/meals";
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
+  const session = await requireSession(request);
   if (!session) return unauthorized();
 
   const parsed = mealCreateSchema.safeParse(await request.json().catch(() => null));

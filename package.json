@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:import-reference": "node scripts/import-food-reference.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

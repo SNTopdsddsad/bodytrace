@@ -4,13 +4,13 @@
  *
  * 注意：动态段 [id] 在 Next 16 里是异步的，需要 await params 拿值。
  */
-import { getSession, unauthorized, invalidBody } from "@/lib/api-auth";
+import { requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
 import { deleteFood, foodPatchSchema, updateFood } from "@/services/foods";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: Ctx) {
-  const session = await getSession();
+  const session = await requireSession(request);
   if (!session) return unauthorized();
 
   const { id } = await params;
@@ -22,8 +22,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
   return Response.json({ food });
 }
 
-export async function DELETE(_request: Request, { params }: Ctx) {
-  const session = await getSession();
+export async function DELETE(request: Request, { params }: Ctx) {
+  const session = await requireSession(request);
   if (!session) return unauthorized();
 
   const { id } = await params;

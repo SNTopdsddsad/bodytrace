@@ -31,8 +31,10 @@ export function SiteNav({ userName }: { userName: string }) {
   return (
     <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-3xl items-center gap-4 px-4">
-        <Link href="/" className="flex items-center gap-1.5 font-semibold">
-          <Flame className="size-5 text-primary" aria-hidden />
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
+            <Flame className="size-4" aria-hidden />
+          </span>
           BodyTrace
         </Link>
 
@@ -57,12 +59,11 @@ export function SiteNav({ userName }: { userName: string }) {
           })}
         </nav>
 
-        <div className="hidden items-center gap-2 sm:flex">
-          <span className="text-sm text-muted-foreground">{userName}</span>
-          <Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录">
-            <LogOut className="size-4" aria-hidden />
-          </Button>
-        </div>
+        <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
+        {/* 登出按钮任何屏幕都可见（手机上也藏在角落里不行） */}
+        <Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录">
+          <LogOut className="size-4" aria-hidden />
+        </Button>
       </div>
     </header>
   );

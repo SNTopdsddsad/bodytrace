@@ -140,6 +140,30 @@ export const dailyGoal = pgTable("daily_goal", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * 食物参考库：官方《中国食物成分表（标准版第6版）》的 1677 种食物，
+ * 全体用户共享、只读。用户从这里“抄”数据到自己的 food 表。
+ * 数据来源：github.com/Sanotsu/china-food-composition-data（个人学习研究用途）。
+ */
+export const foodReference = pgTable(
+  "food_reference",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    foodCode: text("food_code").notNull().unique(),
+    name: text("name").notNull(),
+    englishName: text("english_name"),
+    category: text("category"),
+    /** 以下营养值均为每 100g 可食部 */
+    calories: real("calories"),
+    protein: real("protein"),
+    carbs: real("carbs"),
+    fat: real("fat"),
+    dietaryFiber: real("dietary_fiber"),
+    edible: real("edible"),
+  },
+  (t) => [index("food_reference_name_idx").on(t.name)],
+);
+
 export type Food = typeof food.$inferSelect;
 export type MealEntry = typeof mealEntry.$inferSelect;
 export type DailyGoal = typeof dailyGoal.$inferSelect;

@@ -19,9 +19,9 @@ export default async function TrendsPage() {
     recorded.length === 0 ? 0 : Math.round(recorded.reduce((s, d) => s + pick(d), 0) / recorded.length);
 
   const stats = [
-    { label: "日均热量", value: avg((d) => d.calories), unit: "千卡" },
-    { label: "日均蛋白质", value: avg((d) => d.protein), unit: "克" },
-    { label: "有记录天数", value: recorded.length, unit: `/${trends.length} 天` },
+    { label: "日均热量", value: avg((d) => d.calories), unit: "千卡", dot: "bg-emerald-500" },
+    { label: "日均蛋白质", value: avg((d) => d.protein), unit: "克", dot: "bg-sky-500" },
+    { label: "有记录天数", value: recorded.length, unit: `/${trends.length} 天`, dot: "bg-violet-500" },
   ];
 
   return (
@@ -35,7 +35,10 @@ export default async function TrendsPage() {
         {stats.map((s) => (
           <Card key={s.label}>
             <CardContent className="py-4">
-              <div className="text-xs text-muted-foreground">{s.label}</div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className={`size-2 rounded-full ${s.dot}`} aria-hidden />
+                {s.label}
+              </div>
               <div className="mt-1 text-xl font-bold tabular-nums sm:text-2xl">
                 {s.value}
                 <span className="ml-1 text-xs font-normal text-muted-foreground">{s.unit}</span>

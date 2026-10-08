@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, ilike } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { food, mealEntry } from "@/db/schema";
+import { food, foodReference, mealEntry } from "@/db/schema";
 
 export const foodInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -17,11 +17,15 @@ export const foodPatchSchema = foodInputSchema.partial().extend({
   isFavorite: z.boolean().optional(),
 });
 
-export async function listFoods(userId: string, q?: string) {
-  const where = q
-    ? and(eq(food.userId, userId), ilike(food.name, `%${q}%`))
-    : eq(food.userId, userId);
-  return db.select().from(food).where(where).orderBy(desc(food.isFavorite), asc(food.name));
+export async function listFoods(userId: string, q?: string, favorite?: boolean) {
+  const conditions = [eq(food.userId, userId)];
+  if (q) conditions.push(ilike(food.name, `%${q}%`));
+  if (favorite) conditions.push(eq(food.isFavorite, true));
+  return db
+    .select()
+    .from(food)
+    .where(and(...conditions))
+    .orderBy(desc(food.isFavorite), asc(food.name));
 }
 
 export async function listFavorites(userId: string) {
@@ -91,4 +95,17 @@ export async function deleteFood(userId: string, id: string) {
     .where(and(eq(food.id, id), eq(food.userId, userId)))
     .returning({ id: food.id });
   return row != null;
+}
+
+/**
+ * 搜索官方食物参考库（《中国食物成分表》1677 种）。
+ * 只读公共数据，返回前 limit 条，按名称排序。
+ */
+export async function searchFoodReference(q: string, limit = 20) {
+  return db
+    .select()
+    .from(foodReference)
+    .where(ilike(foodReference.name, `%${q}%`))
+    .orderBy(asc(foodReference.name))
+    .limit(limit);
 }

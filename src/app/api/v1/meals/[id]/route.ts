@@ -2,13 +2,13 @@
  * PATCH  /api/v1/meals/:id  修改克数 {grams}（营养值自动按比例重算）
  * DELETE /api/v1/meals/:id  删除一条记录
  */
-import { getSession, unauthorized, invalidBody } from "@/lib/api-auth";
+import { requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
 import { deleteEntry, mealPatchSchema, updateEntryGrams } from "@/services/meals";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: Ctx) {
-  const session = await getSession();
+  const session = await requireSession(request);
   if (!session) return unauthorized();
 
   const { id } = await params;
@@ -20,8 +20,8 @@ export async function PATCH(request: Request, { params }: Ctx) {
   return Response.json({ entry });
 }
 
-export async function DELETE(_request: Request, { params }: Ctx) {
-  const session = await getSession();
+export async function DELETE(request: Request, { params }: Ctx) {
+  const session = await requireSession(request);
   if (!session) return unauthorized();
 
   const { id } = await params;

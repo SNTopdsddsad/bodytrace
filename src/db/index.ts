@@ -10,6 +10,9 @@ import * as schema from "./schema";
 const client = postgres(process.env.DATABASE_URL!, {
   // 连接池上限：自用小站点 10 个连接绰绰有余
   max: 10,
+  // 云数据库（如腾讯云）外网连接通常要求 SSL；
+  // 在 .env 里设置 DATABASE_SSL=require 即开启（自签证书也放行）
+  ssl: process.env.DATABASE_SSL === "require" ? { rejectUnauthorized: false } : undefined,
 });
 
 export const db = drizzle(client, { schema });

@@ -7,7 +7,8 @@
 ## 功能
 
 - **今日总览**：热量环 + 蛋白/碳水/脂肪进度条，一眼看到"今天还能吃多少"
-- **饮食日记**：按日期翻阅，早/午/晚/加餐四区；添加食物支持 **最近吃过 / 收藏 / 搜索** 三个入口；克数可改可删，营养值自动重算
+- **饮食日记**：按日期翻阅，早/午/晚/加餐四区；添加食物支持 **最近吃过 / 收藏 / 搜索 / 官方参考库** 四个入口；克数可改可删，营养值自动重算
+- **食物参考库**：内置《中国食物成分表（标准版第6版）》1677 种食物（数据来自 [Sanotsu/china-food-composition-data](https://github.com/Sanotsu/china-food-composition-data)，个人学习研究用途），添加食物时可搜索官方数值一键抄录进自己的库
 - **食物库**：营养按每 100g 录入（照抄包装袋营养成分表即可）；可设"一份 = 多少克"快捷录入；注册时自动预置 24 种常见食物
 - **每日目标** + **30 天趋势图**（热量柱状 + 蛋白质折线 + 目标参考线）
 - **历史不篡改**：饮食记录存营养快照，改/删食物库不影响旧记录
@@ -49,6 +50,9 @@ BETTER_AUTH_URL=http://localhost:3000
 APP_TIMEZONE=Asia/Shanghai
 ```
 
+> 注意：`BETTER_AUTH_URL` 必须和你实际访问的地址（协议+域名+端口）一致，
+> 换端口跑（如 3001）时要同步修改它，否则登录会因为 Origin 校验失败。
+
 ### 3. 建表 + 启动
 
 ```bash
@@ -67,6 +71,7 @@ npm run dev         # 打开 http://localhost:3000
 | `npm run build` / `npm run start` | 生产构建 / 启动生产服务器 |
 | `npm run db:push` | 表结构有改动后，把改动推到数据库 |
 | `npm run db:generate` | 生成 SQL 迁移文件（存档建表语句，备查） |
+| `npm run db:import-reference` | 导入《中国食物成分表》1677 种食物到参考库（数据在 `data/`，可重复执行） |
 | `node scripts/smoke-test.mjs` | 端到端冒烟测试（需先 `npm run start`） |
 | `node scripts/debug-pages.mjs` | 检查五个页面是否正常渲染 |
 
@@ -105,6 +110,7 @@ src/
 | PATCH | `/api/v1/foods/:id` | 修改（含 isFavorite 收藏开关） |
 | DELETE | `/api/v1/foods/:id` | 删除 |
 | GET | `/api/v1/foods/recents` | 最近吃过的食物 |
+| GET | `/api/v1/foods/reference?q=` | 搜索官方参考库（公共只读数据） |
 | GET | `/api/v1/meals?date=` | 某天记录 |
 | POST | `/api/v1/meals` | 记一笔 `{date, mealType, foodId, grams}` |
 | PATCH | `/api/v1/meals/:id` | 改克数（营养按比例重算） |

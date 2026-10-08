@@ -2,7 +2,7 @@
  * GET /api/v1/goals  查询每日目标（未设置时返回默认值）
  * PUT /api/v1/goals  保存目标 {calories, protein, carbs, fat}
  */
-import { getSession, unauthorized, invalidBody } from "@/lib/api-auth";
+import { getSession, requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
 import { getGoals, goalsSchema, upsertGoals } from "@/services/goals";
 
 export async function GET() {
@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const session = await getSession();
+  const session = await requireSession(request);
   if (!session) return unauthorized();
 
   const parsed = goalsSchema.safeParse(await request.json().catch(() => null));

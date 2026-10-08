@@ -9,6 +9,30 @@ export async function getSession(): Promise<Session | null> {
   return session;
 }
 
+/**
+ * 带 CSRF 校验的守卫，给会改数据的方法（POST/PATCH/DELETE）用：
+ * 浏览器发的跨站请求必带 Origin 头，和应用地址不匹配就直接拒绝；
+ * 没有 Origin 的请求（未来 app 的 token 调用、curl 脚本）放行，
+ * 它们不携带 cookie，本来就不存在跨站伪造问题。
+ */
+export async function requireSession(request: Request): Promise<Session | null> {
+  const session = await getSession();
+  if (!session) return null;
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      const allowedHost = new URL(
+        process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+      ).host;
+      if (new URL(origin).host !== allowedHost) return null;
+    } catch {
+      return null; // Origin 不是合法 URL，按可疑处理
+    }
+  }
+  return session;
+}
+
 export function unauthorized(): Response {
   return Response.json({ error: "未登录" }, { status: 401 });
 }

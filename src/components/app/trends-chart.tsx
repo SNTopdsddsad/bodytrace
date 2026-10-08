@@ -51,7 +51,7 @@ export function TrendsChart({ data, calorieGoal }: { data: Point[]; calorieGoal:
             strokeDasharray="6 4"
             label={{ value: `目标 ${calorieGoal}`, position: "insideTopRight", fontSize: 11 }}
           />
-          <Bar yAxisId="cal" dataKey="热量" fill="#a1a1aa" radius={[3, 3, 0, 0]} />
+          <Bar yAxisId="cal" dataKey="热量" fill="#10b981" radius={[3, 3, 0, 0]} />
           <Line
             yAxisId="pro"
             type="monotone"

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api-client";
 import type { MealType } from "@/lib/nutrition";
 import { FoodPicker } from "./food-picker";
+import { MEAL_STYLES } from "./meal-styles";
 
 export function MealSection({
   date,
@@ -33,8 +34,11 @@ export function MealSection({
   const [busy, setBusy] = useState(false);
 
   const kcalTotal = Math.round(entries.reduce((s, e) => s + e.calories, 0));
+  const style = MEAL_STYLES[mealType];
+  const MealIcon = style.icon;
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, name: string, grams: number) {
+    if (!window.confirm(`确定删除「${name} ${grams}g」吗？`)) return;
     setBusy(true);
     try {
       await api(`/api/v1/meals/${id}`, { method: "DELETE" });
@@ -66,16 +70,21 @@ export function MealSection({
   }
 
   return (
-    <section className="rounded-xl border">
-      {/* 区块标题栏 */}
+    <section className={`rounded-xl border border-l-4 ${style.bar}`}>
+      {/* 区块标题栏：彩色图标 + 餐名 + 小计 */}
       <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-baseline gap-2">
-          <h2 className="font-semibold">{label}</h2>
-          {entries.length > 0 && (
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {kcalTotal} 千卡
-            </span>
-          )}
+        <div className="flex items-center gap-2.5">
+          <span className={`flex size-8 items-center justify-center rounded-full ${style.chip}`}>
+            <MealIcon className="size-4" aria-hidden />
+          </span>
+          <div className="flex items-baseline gap-2">
+            <h2 className="font-semibold">{label}</h2>
+            {entries.length > 0 && (
+              <span className={`text-sm tabular-nums font-medium ${style.value}`}>
+                {kcalTotal} 千卡
+              </span>
+            )}
+          </div>
         </div>
         <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
           <Plus className="size-4" aria-hidden />
@@ -145,7 +154,7 @@ export function MealSection({
                 size="icon"
                 className="size-8 text-muted-foreground hover:text-destructive"
                 disabled={busy}
-                onClick={() => handleDelete(e.id)}
+                onClick={() => handleDelete(e.id, e.name, e.grams)}
                 title="删除"
               >
                 <Trash2 className="size-4" aria-hidden />

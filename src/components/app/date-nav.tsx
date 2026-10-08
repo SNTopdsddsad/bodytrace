@@ -33,7 +33,7 @@ export function DateNav({ date }: { date: string }) {
         type="date"
         className="w-40"
         value={date}
-        max="2100-12-31"
+        max={todayStr()}
         onChange={(e) => e.target.value && go(e.target.value)}
       />
       {date !== todayStr() && (

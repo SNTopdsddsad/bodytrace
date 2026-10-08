@@ -10,6 +10,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,11 @@ export default function LoginPage() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="items-center text-center">
+        {/* 品牌标识：渐变色方块 + 火焰 */}
+        <div className="mx-auto mb-1 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
+          <Flame className="size-7" aria-hidden />
+        </div>
         <CardTitle className="text-xl">登录 BodyTrace</CardTitle>
         <CardDescription>记录你的饮食、训练和身体变化</CardDescription>
       </CardHeader>
