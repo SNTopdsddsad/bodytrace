@@ -1,16 +1,22 @@
 /**
  * 目标设置页：附带一些估算小知识，方便拍数值。
+ * 填过个人资料时，直接给出基础代谢估算。
  */
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoalsForm } from "@/components/app/goals-form";
 import { getSession } from "@/lib/api-auth";
 import { getGoals } from "@/services/goals";
+import { getProfile } from "@/services/profile";
+import { estimateBmr } from "@/lib/profile";
 import { PageHeader } from "@/components/app/page-header";
 import { Lightbulb, Target } from "lucide-react";
 
 export default async function GoalsPage() {
   const session = await getSession();
-  const goals = await getGoals(session!.user.id);
+  const userId = session!.user.id;
+  const [goals, profile] = await Promise.all([getGoals(userId), getProfile(userId)]);
+  const bmr = profile ? estimateBmr(profile) : null;
 
   return (
     <div className="space-y-8">
@@ -31,6 +37,20 @@ export default async function GoalsPage() {
           <CardTitle className="flex items-center gap-2"><Lightbulb className="size-4 text-primary" aria-hidden />怎么估算？</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
+          {bmr != null ? (
+            <p className="rounded-xl border bg-card p-3.5 leading-6">
+              根据你的{" "}
+              <Link href="/profile" className="text-primary underline underline-offset-2">身体数据</Link>
+              ，基础代谢约 <span className="font-semibold text-foreground">{bmr.toLocaleString("zh-CN")} 千卡/天</span>。
+              乘以活动系数（久坐 1.2 – 高强度 1.725）得到每日总消耗，再按下面的方法增减。
+            </p>
+          ) : (
+            <p className="rounded-xl border border-dashed p-3.5 leading-6">
+              先到{" "}
+              <Link href="/profile" className="text-primary underline underline-offset-2">个人资料</Link>
+              填写身高、体重、年龄和性别，这里会直接算出你的基础代谢。
+            </p>
+          )}
           <p>
             热量：先估基础消耗（TDEE），减脂每天减 300–500 千卡，增肌加 200–300 千卡。
             网上搜“TDEE 计算器”填身高体重活动量即可。

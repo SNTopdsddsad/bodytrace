@@ -140,6 +140,24 @@ export const dailyGoal = pgTable("daily_goal", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
+
+/**
+ * 每用户一行身体数据（个人资料）。字段全部可空：
+ * 允许先填一部分，缺项时相关估算（如基础代谢）就不展示。
+ */
+export const userProfile = pgTable("user_profile", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  gender: genderEnum("gender"),
+  age: integer("age"),
+  heightCm: real("height_cm"),
+  weightKg: real("weight_kg"),
+  targetWeightKg: real("target_weight_kg"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /**
  * 食物参考库：官方《中国食物成分表（标准版第6版）》的 1677 种食物，
  * 全体用户共享、只读。用户从这里“抄”数据到自己的 food 表。
@@ -167,3 +185,4 @@ export const foodReference = pgTable(
 export type Food = typeof food.$inferSelect;
 export type MealEntry = typeof mealEntry.$inferSelect;
 export type DailyGoal = typeof dailyGoal.$inferSelect;
+export type UserProfile = typeof userProfile.$inferSelect;
