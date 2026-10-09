@@ -9,11 +9,12 @@ import { MEAL_STYLES } from "@/components/app/meal-styles";
 import { getSession } from "@/lib/api-auth";
 import { formatDateCn, todayStr } from "@/lib/date";
 import { getDaySummary } from "@/services/meals";
+import { DAY_TYPE_LABELS } from "@/lib/plan";
 
 export default async function TodayPage() {
   const session = await getSession();
   const today = todayStr();
-  const { totals, goals, byMeal } = await getDaySummary(session!.user.id, today);
+  const { totals, goals, byMeal, goalDayType } = await getDaySummary(session!.user.id, today);
   const entries = byMeal.flatMap((meal) => meal.entries.map((entry) => ({ ...entry, mealLabel: meal.label })));
   const recordedMeals = byMeal.filter((meal) => meal.entries.length > 0).length;
   const progress = goals.calories > 0 ? Math.round((totals.calories / goals.calories) * 100) : 0;
@@ -26,12 +27,12 @@ export default async function TodayPage() {
       <div className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
         <section className="relative overflow-hidden rounded-2xl bg-(--brand-deep) p-6 text-white sm:p-7" aria-labelledby="energy-title">
           <div className="pointer-events-none absolute -right-14 -top-24 size-72 rounded-full border border-white/10" aria-hidden />
-          <div className="relative flex items-center justify-between"><h2 id="energy-title" className="text-sm font-medium text-white/85">每日能量</h2><span className="rounded-full bg-white/10 px-3 py-1 text-[11px] text-(--brand-pale)">已完成 {progress}%</span></div>
+          <div className="relative flex items-center justify-between"><h2 id="energy-title" className="text-sm font-medium text-white/85">每日能量</h2><div className="flex items-center gap-2">{goalDayType && <Link href="/plan" className="rounded-full bg-(--brand-light) px-3 py-1 text-[11px] font-medium text-(--brand-deep)">{DAY_TYPE_LABELS[goalDayType]}</Link>}<span className="rounded-full bg-white/10 px-3 py-1 text-[11px] text-(--brand-pale)">已完成 {progress}%</span></div></div>
           <div className="relative mt-5 flex flex-col-reverse items-center justify-between gap-6 min-[520px]:flex-row">
             <div className="w-full min-[520px]:w-auto">
               <p className="text-xs text-white/60">今日已摄入</p>
               <p className="mt-2 text-[2.6rem] leading-none font-semibold tracking-tight tabular-nums">{Math.round(totals.calories).toLocaleString("zh-CN")}<span className="ml-2 text-sm font-normal text-white/60">千卡</span></p>
-              <div className="mt-6 flex items-center gap-2 text-xs text-white/70"><Target className="size-4 text-(--brand-light)" aria-hidden />每日目标 <span className="font-medium text-white">{goals.calories.toLocaleString("zh-CN")}</span> 千卡</div>
+              <div className="mt-6 flex items-center gap-2 text-xs text-white/70"><Target className="size-4 text-(--brand-light)" aria-hidden />{goalDayType ? "今日目标" : "每日目标"} <span className="font-medium text-white">{goals.calories.toLocaleString("zh-CN")}</span> 千卡</div>
             </div>
             <NutritionRing consumed={totals.calories} goal={goals.calories} inverse />
           </div>

@@ -4,12 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendsChart } from "@/components/app/trends-chart";
 import { PageHeader } from "@/components/app/page-header";
 import { getSession } from "@/lib/api-auth";
-import { getGoals } from "@/services/goals";
 import { getTrends } from "@/services/trends";
 
 export default async function TrendsPage() {
   const session = await getSession();
-  const [trends, goals] = await Promise.all([getTrends(session!.user.id, 30), getGoals(session!.user.id)]);
+  const trends = await getTrends(session!.user.id, 30);
   const recorded = trends.filter((day) => day.calories > 0);
   const avg = (pick: (day: (typeof trends)[number]) => number) => recorded.length === 0 ? 0 : Math.round(recorded.reduce((sum, day) => sum + pick(day), 0) / recorded.length);
   const stats = [
@@ -27,7 +26,7 @@ export default async function TrendsPage() {
       <Card>
         <CardHeader><CardTitle>热量与蛋白质</CardTitle><p className="mt-1 text-xs text-muted-foreground">每日摄入与热量目标的对比</p></CardHeader>
         <CardContent>
-          {recorded.length === 0 ? <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-4 py-16 text-center"><ChartNoAxesCombined className="mb-4 size-9 text-primary/50" strokeWidth={1.4} aria-hidden /><h2 className="text-base font-medium">每一次记录，都会留下轨迹。</h2><p className="mt-2 text-sm text-muted-foreground">记录第一餐，开始积累你的营养趋势。</p><Link href="/diary" className="mt-6 flex items-center gap-2 text-sm font-medium text-primary">去记录饮食<ArrowRight className="size-4" aria-hidden /></Link></div> : <TrendsChart data={trends} calorieGoal={goals.calories} />}
+          {recorded.length === 0 ? <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/30 px-4 py-16 text-center"><ChartNoAxesCombined className="mb-4 size-9 text-primary/50" strokeWidth={1.4} aria-hidden /><h2 className="text-base font-medium">每一次记录，都会留下轨迹。</h2><p className="mt-2 text-sm text-muted-foreground">记录第一餐，开始积累你的营养趋势。</p><Link href="/diary" className="mt-6 flex items-center gap-2 text-sm font-medium text-primary">去记录饮食<ArrowRight className="size-4" aria-hidden /></Link></div> : <TrendsChart data={trends} />}
         </CardContent>
       </Card>
     </div>

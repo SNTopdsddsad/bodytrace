@@ -1,20 +1,31 @@
 /**
  * 目标设置页：附带一些估算小知识，方便拍数值。
+ * 有碳循环计划生效时给出提示，说明这里的目标是推导基准与兜底。
  */
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoalsForm } from "@/components/app/goals-form";
 import { getSession } from "@/lib/api-auth";
 import { getGoals } from "@/services/goals";
+import { getPlan } from "@/services/plan";
 import { PageHeader } from "@/components/app/page-header";
-import { Lightbulb, Target } from "lucide-react";
+import { CalendarRange, Lightbulb, Target } from "lucide-react";
 
 export default async function GoalsPage() {
   const session = await getSession();
-  const goals = await getGoals(session!.user.id);
+  const userId = session!.user.id;
+  const [goals, plan] = await Promise.all([getGoals(userId), getPlan(userId)]);
 
   return (
     <div className="space-y-8">
       <PageHeader eyebrow="找到自己的节奏" title="目标设置" description="设定每日营养目标，让每一次记录都有参照。" />
+      {plan?.isActive && (
+        <p className="flex flex-wrap items-center gap-2 rounded-xl border bg-secondary/50 p-4 text-sm leading-6">
+          <CalendarRange className="size-4 shrink-0 text-primary" aria-hidden />
+          <span>碳循环计划生效中（{plan.startDate} 起）：一周里每天按日型各有目标，首页和日记显示的是<b className="font-medium">当天</b>的目标。这里的目标用于推导计划默认值，也是计划外日期的兜底。</span>
+          <Link href="/plan" className="text-primary underline underline-offset-2">去调整计划</Link>
+        </p>
+      )}
       <div className="grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
       <Card>
         <CardHeader>

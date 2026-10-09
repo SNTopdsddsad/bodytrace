@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
+import { BookOpen, CalendarRange, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -16,8 +16,11 @@ const LINKS = [
   { href: "/goals", label: "目标设置", short: "目标", icon: Target },
 ] as const;
 
-/** 个人资料只进侧边栏，不占移动端底部导航的五个位置。 */
-const PROFILE_LINK = { href: "/profile", label: "个人资料", icon: UserRound } as const;
+/** 侧边栏的次要入口：不占移动端底部导航的五个位置。 */
+const SIDEBAR_LINKS = [
+  { href: "/plan", label: "饮食计划", icon: CalendarRange },
+  { href: "/profile", label: "个人资料", icon: UserRound },
+] as const;
 
 export function SiteNav({ userName }: { userName: string }) {
   const pathname = usePathname();
@@ -50,12 +53,14 @@ export function SiteNav({ userName }: { userName: string }) {
             </Link>
           ))}
           <div className="my-3 border-t" />
-          <Link href={PROFILE_LINK.href} aria-current={isActive(PROFILE_LINK.href) ? "page" : undefined}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-colors ${isActive(PROFILE_LINK.href) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-            <PROFILE_LINK.icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
-            {PROFILE_LINK.label}
-            {isActive(PROFILE_LINK.href) && <ChevronRight className="ml-auto size-4 opacity-60" aria-hidden />}
-          </Link>
+          {SIDEBAR_LINKS.map(({ href, label, icon: Icon }) => (
+            <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-colors ${isActive(href) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
+              {label}
+              {isActive(href) && <ChevronRight className="ml-auto size-4 opacity-60" aria-hidden />}
+            </Link>
+          ))}
         </nav>
         <div className="mt-auto px-5 pb-5 pt-10">
           <div className="mb-6 rounded-2xl bg-secondary p-4">
@@ -75,6 +80,9 @@ export function SiteNav({ userName }: { userName: string }) {
       <header className="flex h-20 items-center justify-between border-b bg-card px-5 lg:hidden">
         <Link href="/" aria-label="BodyTrace 首页"><Brand /></Link>
         <div className="flex items-center gap-2">
+          <Link href="/plan" aria-label="饮食计划" aria-current={isActive("/plan") ? "page" : undefined} className="flex size-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <CalendarRange className="size-5" strokeWidth={1.8} aria-hidden />
+          </Link>
           <Link href="/profile" className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-muted" aria-label="查看个人资料">
             <span className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-primary">{userName.slice(0, 1).toUpperCase()}</span>
             <span className="max-w-24 truncate text-xs text-muted-foreground">{userName}</span>

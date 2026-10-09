@@ -2,7 +2,8 @@
 
 /**
  * 30 天趋势图：柱子 = 每日热量（左轴），折线 = 每日蛋白质（右轴），
- * 红色虚线 = 热量目标。Recharts 只能在客户端跑，所以标了 "use client"。
+ * 虚线折线 = 每天生效的热量目标（碳循环计划下按日型逐天变化）。
+ * Recharts 只能在客户端跑，所以标了 "use client"。
  */
 import {
   Bar,
@@ -10,21 +11,21 @@ import {
   ComposedChart,
   Legend,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 
-type Point = { date: string; calories: number; protein: number; carbs: number; fat: number };
+type Point = { date: string; calories: number; protein: number; carbs: number; fat: number; goalCalories: number };
 
-export function TrendsChart({ data, calorieGoal }: { data: Point[]; calorieGoal: number }) {
+export function TrendsChart({ data }: { data: Point[] }) {
   const chartData = data.map((d) => ({
     // x 轴只显示 月/日
     label: d.date.slice(5).replace("-", "/"),
     热量: Math.round(d.calories),
     蛋白质: Math.round(d.protein),
+    热量目标: Math.round(d.goalCalories),
   }));
 
   return (
@@ -41,19 +42,10 @@ export function TrendsChart({ data, calorieGoal }: { data: Point[]; calorieGoal:
             cursor={{ fill: "var(--muted)", opacity: 0.6 }}
             contentStyle={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 12, color: "var(--foreground)" }}
             formatter={(value, name) =>
-              name === "热量" ? [`${value} 千卡`, name] : [`${value} g`, name]
+              name === "蛋白质" ? [`${value} g`, name] : [`${value} 千卡`, name]
             }
           />
           <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 12, paddingTop: 16 }} />
-          {/* 目标参考线 */}
-          <ReferenceLine
-            yAxisId="cal"
-            y={calorieGoal}
-            ifOverflow="extendDomain"
-            stroke="var(--chart-3)"
-            strokeDasharray="6 4"
-            label={{ value: `目标 ${calorieGoal}`, position: "insideTopRight", fontSize: 11, fill: "var(--muted-foreground)" }}
-          />
           <Bar yAxisId="cal" dataKey="热量" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
           <Line
             yAxisId="pro"
@@ -61,6 +53,17 @@ export function TrendsChart({ data, calorieGoal }: { data: Point[]; calorieGoal:
             dataKey="蛋白质"
             stroke="var(--chart-2)"
             strokeWidth={2}
+            dot={false}
+            isAnimationActive={false}
+          />
+          {/* 每天生效的目标：碳循环计划下是阶梯状折线，平时是水平线 */}
+          <Line
+            yAxisId="cal"
+            type="stepAfter"
+            dataKey="热量目标"
+            stroke="var(--chart-3)"
+            strokeWidth={1.5}
+            strokeDasharray="6 4"
             dot={false}
             isAnimationActive={false}
           />

@@ -10,8 +10,9 @@ import { db } from "@/db";
 import { food, mealEntry } from "@/db/schema";
 import { MEAL_ORDER, MEAL_LABELS, ZERO_MACRO, addMacro, round1, scaleMacro } from "@/lib/nutrition";
 import type { MacroLike, MealType } from "@/lib/nutrition";
-import { getGoals } from "./goals";
+import { getGoalsForDate } from "./goals";
 import { isValidDateStr, todayStr } from "@/lib/date";
+import type { DayType } from "@/lib/plan";
 
 /** API 入参校验：zod 会先验证数据形状，不合法直接报错，脏数据进不了数据库。 */
 export const mealCreateSchema = z.object({
@@ -108,13 +109,17 @@ export type DaySummary = {
   /** 全天合计 */
   totals: MacroLike;
   goals: { calories: number; protein: number; carbs: number; fat: number };
+  /** 生效目标的来源：plan = 碳循环当天日型，base = 每日目标兜底 */
+  goalSource: "plan" | "base";
+  /** 计划生效时的日型（高/中/低碳），否则 null */
+  goalDayType: DayType | null;
 };
 
-/** 页面首页用的“某天汇总”：记录 + 合计 + 目标一次拿全。 */
+/** 页面首页用的“某天汇总”：记录 + 合计 + 目标一次拿全（目标按日期走计划）。 */
 export async function getDaySummary(userId: string, date: string): Promise<DaySummary> {
-  const [entries, goals] = await Promise.all([
+  const [entries, goalsForDate] = await Promise.all([
     getDayEntries(userId, date),
-    getGoals(userId),
+    getGoalsForDate(userId, date),
   ]);
 
   const totals = entries.reduce((acc, e) => addMacro(acc, e), ZERO_MACRO);
@@ -125,7 +130,14 @@ export async function getDaySummary(userId: string, date: string): Promise<DaySu
     entries: entries.filter((e) => e.mealType === mealType),
   }));
 
-  return { date, byMeal, totals, goals };
+  return {
+    date,
+    byMeal,
+    totals,
+    goals: goalsForDate.goals,
+    goalSource: goalsForDate.source,
+    goalDayType: goalsForDate.dayType,
+  };
 }
 
 /** 按天聚合营养合计（趋势图用），只返回有记录的日期。 */

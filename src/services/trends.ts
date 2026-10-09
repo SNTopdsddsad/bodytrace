@@ -1,19 +1,36 @@
 /**
  * 趋势服务：最近 N 天每天的营养合计，供图表展示。
+ * 有碳循环计划时附带每天生效的热量目标，图上画成按天目标线。
  */
 import { shiftDate, todayStr } from "@/lib/date";
+import { resolveDayGoals } from "@/lib/plan";
 import { getDailyTotals } from "./meals";
+import { getGoals } from "./goals";
+import { getPlan } from "./plan";
 
-export async function getTrends(userId: string, days = 30) {
+export type TrendPoint = {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  /** 当天生效的热量目标（计划日按日型，否则基准目标） */
+  goalCalories: number;
+};
+
+export async function getTrends(userId: string, days = 30): Promise<TrendPoint[]> {
   const today = todayStr();
   const from = shiftDate(today, -(days - 1));
 
-  const totals = await getDailyTotals(userId, from, today);
+  const [totals, base, plan] = await Promise.all([
+    getDailyTotals(userId, from, today),
+    getGoals(userId),
+    getPlan(userId),
+  ]);
   const byDate = new Map(totals.map((t) => [t.date, t]));
 
   // 没有记录的日期补 0，图表曲线才不会断档跳日期
-  const result: { date: string; calories: number; protein: number; carbs: number; fat: number }[] =
-    [];
+  const result: TrendPoint[] = [];
   for (let i = 0; i < days; i++) {
     const d = shiftDate(from, i);
     const t = byDate.get(d);
@@ -23,6 +40,7 @@ export async function getTrends(userId: string, days = 30) {
       protein: t?.protein ?? 0,
       carbs: t?.carbs ?? 0,
       fat: t?.fat ?? 0,
+      goalCalories: resolveDayGoals(plan, base, d).goals.calories,
     });
   }
   return result;

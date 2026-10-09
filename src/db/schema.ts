@@ -16,6 +16,7 @@ import {
   timestamp,
   date,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -156,6 +157,50 @@ export const userProfile = pgTable("user_profile", {
   targetWeightKg: real("target_weight_kg"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ---------------- 饮食计划 ---------------- */
+
+export const dayTypeEnum = pgEnum("day_type", ["high", "medium", "low"]);
+
+/**
+ * 饮食计划（当前只有碳循环）：每用户至多一条。
+ * startDate 之前的日子不受计划影响，仍走 daily_goal 兜底。
+ */
+export const dietPlan = pgTable(
+  "diet_plan",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("diet_plan_user_unique").on(t.userId)],
+);
+
+/**
+ * 计划里一周七天的安排：weekday 0=周一 … 6=周日。
+ * 目标按天存（同一日型的天数值相同），按天取用时无需再按日型换算。
+ */
+export const dietPlanDay = pgTable(
+  "diet_plan_day",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => dietPlan.id, { onDelete: "cascade" }),
+    weekday: integer("weekday").notNull(),
+    dayType: dayTypeEnum("day_type").notNull(),
+    calories: integer("calories").notNull(),
+    protein: integer("protein").notNull(),
+    carbs: integer("carbs").notNull(),
+    fat: integer("fat").notNull(),
+  },
+  (t) => [unique("diet_plan_day_plan_weekday_unique").on(t.planId, t.weekday)],
+);
 
 /**
  * 食物参考库：官方《中国食物成分表（标准版第6版）》的 1677 种食物，

@@ -7,13 +7,14 @@ import { PageHeader } from "@/components/app/page-header";
 import { getSession } from "@/lib/api-auth";
 import { formatDateCn, isValidDateStr, todayStr } from "@/lib/date";
 import { getDaySummary } from "@/services/meals";
+import { DAY_TYPE_LABELS } from "@/lib/plan";
 import Link from "next/link";
 
 export default async function DiaryPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const session = await getSession();
   const params = await searchParams;
   const date = typeof params.date === "string" && isValidDateStr(params.date) ? params.date : todayStr();
-  const { totals, goals, byMeal } = await getDaySummary(session!.user.id, date);
+  const { totals, goals, byMeal, goalDayType } = await getDaySummary(session!.user.id, date);
 
   return (
     <div className="space-y-8">
@@ -22,7 +23,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
         <Card className="[--card-spacing:--spacing(4)] sm:[--card-spacing:--spacing(6)] xl:sticky xl:top-8">
           <CardContent>
             <div className="flex flex-wrap items-center justify-between gap-3 xl:block">
-              <div><h2 className="flex items-center gap-2 text-sm font-medium"><Flame className="size-4 text-primary" aria-hidden />当日营养小结</h2><p className="mt-2 text-xs text-muted-foreground">每日目标 {goals.calories.toLocaleString("zh-CN")} 千卡</p></div>
+              <div><h2 className="flex items-center gap-2 text-sm font-medium"><Flame className="size-4 text-primary" aria-hidden />当日营养小结</h2><p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{goalDayType && <Link href="/plan" className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-primary">{DAY_TYPE_LABELS[goalDayType]}</Link>}{goalDayType ? "今日目标" : "每日目标"} {goals.calories.toLocaleString("zh-CN")} 千卡</p></div>
               <div className="xl:mt-5"><p className="text-[11px] text-muted-foreground">已摄入</p><p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums xl:text-4xl">{Math.round(totals.calories).toLocaleString("zh-CN")}<span className="ml-1.5 text-xs font-normal text-muted-foreground">千卡</span></p></div>
             </div>
             <div className="my-4 border-t xl:my-6" />
