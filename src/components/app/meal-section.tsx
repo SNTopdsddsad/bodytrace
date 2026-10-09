@@ -70,20 +70,16 @@ export function MealSection({
   }
 
   return (
-    <section className={`rounded-xl border border-l-4 ${style.bar}`}>
+    <section id={`meal-${mealType}`} className="scroll-mt-6 overflow-hidden rounded-2xl border bg-card shadow-[0_2px_12px_-8px_#233e2e26]">
       {/* 区块标题栏：彩色图标 + 餐名 + 小计 */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-4 sm:px-5">
         <div className="flex items-center gap-2.5">
-          <span className={`flex size-8 items-center justify-center rounded-full ${style.chip}`}>
-            <MealIcon className="size-4" aria-hidden />
+          <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${style.chip}`}>
+            <MealIcon className="size-5" strokeWidth={1.7} aria-hidden />
           </span>
-          <div className="flex items-baseline gap-2">
-            <h2 className="font-semibold">{label}</h2>
-            {entries.length > 0 && (
-              <span className={`text-sm tabular-nums font-medium ${style.value}`}>
-                {kcalTotal} 千卡
-              </span>
-            )}
+          <div>
+            <h2 className="text-sm font-semibold">{label}</h2>
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">{entries.length > 0 ? `${entries.length} 项食物 · ${kcalTotal} 千卡` : "等待记录"}</p>
           </div>
         </div>
         <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
@@ -94,16 +90,16 @@ export function MealSection({
 
       {/* 记录列表 */}
       {entries.length === 0 ? (
-        <p className="px-4 py-5 text-sm text-muted-foreground">还没有记录</p>
+        <button type="button" onClick={() => setPickerOpen(true)} className="flex min-h-22 w-full items-center justify-center gap-2 px-4 py-5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-primary"><Plus className="size-3.5" aria-hidden />添加食物，记录这一餐</button>
       ) : (
         <ul className="divide-y">
           {entries.map((e) => (
-            <li key={e.id} className="flex items-center gap-3 px-4 py-2.5">
+            <li key={e.id} className="flex flex-wrap items-center gap-2 px-4 py-4 sm:gap-3 sm:px-5">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{e.name}</div>
                 {editingId === e.id ? (
                   /* 行内改克数：保存/取消 */
-                  <div className="mt-1 flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Input
                       type="number"
                       min={1}
@@ -133,15 +129,15 @@ export function MealSection({
                 ) : (
                   <button
                     type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    className="mt-1 text-left text-xs leading-5 text-muted-foreground hover:text-foreground hover:underline"
                     title="点击修改克数"
                     onClick={() => {
                       setEditingId(e.id);
                       setEditGrams(e.grams);
                     }}
                   >
-                    {e.grams}g · 蛋白 {Math.round(e.protein)}g · 碳水 {Math.round(e.carbs)}g ·
-                    脂肪 {Math.round(e.fat)}g
+                    <span className="block">{e.grams} g · 点击调整份量</span>
+                    <span className="block text-[11px]">蛋白 {Math.round(e.protein)}g · 碳水 {Math.round(e.carbs)}g · 脂肪 {Math.round(e.fat)}g</span>
                   </button>
                 )}
               </div>
@@ -152,10 +148,11 @@ export function MealSection({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 text-muted-foreground hover:text-destructive"
+                className="size-10 text-muted-foreground hover:text-destructive"
                 disabled={busy}
                 onClick={() => handleDelete(e.id, e.name, e.grams)}
                 title="删除"
+                aria-label={`删除${e.name}`}
               >
                 <Trash2 className="size-4" aria-hidden />
               </Button>

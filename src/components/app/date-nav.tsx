@@ -24,14 +24,15 @@ export function DateNav({ date }: { date: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Button variant="outline" size="icon" onClick={() => shift(-1)} title="前一天">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border bg-card p-1.5">
+      <Button variant="ghost" size="icon" onClick={() => shift(-1)} title="前一天" aria-label="前一天">
         <ChevronLeft className="size-4" aria-hidden />
       </Button>
 
       <Input
         type="date"
-        className="w-40"
+        className="h-10 w-36 border-0 bg-transparent shadow-none sm:w-40"
+        aria-label="记录日期"
         value={date}
         max={todayStr()}
         onChange={(e) => e.target.value && go(e.target.value)}
@@ -42,11 +43,12 @@ export function DateNav({ date }: { date: string }) {
         </Button>
       )}
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
         onClick={() => shift(1)}
         disabled={date >= todayStr()}
         title="后一天"
+        aria-label="后一天"
       >
         <ChevronRight className="size-4" aria-hidden />
       </Button>

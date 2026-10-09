@@ -88,12 +88,21 @@ export function FoodPicker({ date, mealType, mealLabel, open, onOpenChange }: Pr
   const [refSearching, setRefSearching] = useState(false);
   const [importing, setImporting] = useState(false);
 
+  // 弹窗每次重新打开时清掉上一次的选择和搜索词。
+  // 按 React 官方模式在渲染期对比 prop 调整状态，避免在 effect 里同步 setState 触发级联渲染。
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setPicked(null);
+      setQ("");
+      setRefQ("");
+    }
+  }
+
   /** 弹窗每次打开时拉取“最近吃过”和“收藏” */
   useEffect(() => {
     if (!open) return;
-    setPicked(null);
-    setQ("");
-    setRefQ("");
     api<{ foods: Food[] }>("/api/v1/foods/recents").then((d) => setRecents(d.foods)).catch(() => {});
     api<{ foods: Food[] }>("/api/v1/foods?favorite=true")
       .then((d) => setFavorites(d.foods))
@@ -103,10 +112,7 @@ export function FoodPicker({ date, mealType, mealLabel, open, onOpenChange }: Pr
   /** 搜索输入防抖：停 300ms 才发请求，避免每敲一个字查一次库 */
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
-    if (q.trim() === "") {
-      setResults([]);
-      return;
-    }
+    if (q.trim() === "") return;
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       setSearching(true);
@@ -166,10 +172,7 @@ export function FoodPicker({ date, mealType, mealLabel, open, onOpenChange }: Pr
   /** 参考库搜索，同样 300ms 防抖 */
   const refTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
-    if (refQ.trim() === "") {
-      setRefResults([]);
-      return;
-    }
+    if (refQ.trim() === "") return;
     clearTimeout(refTimer.current);
     refTimer.current = setTimeout(async () => {
       setRefSearching(true);
@@ -203,6 +206,10 @@ export function FoodPicker({ date, mealType, mealLabel, open, onOpenChange }: Pr
       setSaving(false);
     }
   }
+
+  // 搜索词清空时列表立即视为空：渲染期派生，代替在 effect 里清状态
+  const visibleResults = q.trim() === "" ? [] : results;
+  const visibleRefResults = refQ.trim() === "" ? [] : refResults;
 
   // 第二步的实时预览：每100g值 × 克数/100
   const preview = picked
@@ -284,7 +291,7 @@ export function FoodPicker({ date, mealType, mealLabel, open, onOpenChange }: Pr
                   新增
                 </p>
               )}
-              {results.map((f) => (
+              {visibleResults.map((f) => (
                 <FoodRow key={f.id} food={f} onPick={pick} />
               ))}
             </TabsContent>
@@ -302,7 +309,7 @@ export function FoodPicker({ date, mealType, mealLabel, open, onOpenChange }: Pr
               {!refSearching && refQ.trim() !== "" && refResults.length === 0 && (
                 <p className="py-6 text-center text-sm text-muted-foreground">参考库里也没有</p>
               )}
-              {refResults.map((r) => (
+              {visibleRefResults.map((r) => (
                 <button
                   key={r.id}
                   type="button"

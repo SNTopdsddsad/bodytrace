@@ -10,7 +10,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Flame } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,22 +40,20 @@ export default function LoginPage() {
   }
 
   return (
-    <Card>
-      <CardHeader className="items-center text-center">
-        {/* 品牌标识：渐变色方块 + 火焰 */}
-        <div className="mx-auto mb-1 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
-          <Flame className="size-7" aria-hidden />
-        </div>
-        <CardTitle className="text-xl">登录 BodyTrace</CardTitle>
-        <CardDescription>记录你的饮食、训练和身体变化</CardDescription>
+    <Card className="gap-8 border-0 bg-transparent shadow-none">
+      <CardHeader className="gap-3 px-0">
+        <p className="text-xs font-medium tracking-[0.16em] text-primary">欢迎回到 BODYTRACE</p>
+        <CardTitle><h1 className="text-3xl font-semibold tracking-tight">继续你的健康日常。</h1></CardTitle>
+        <CardDescription className="leading-6">登录账号，记录今天的饮食与营养。</CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="px-0">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">邮箱</Label>
             <Input
               id="email"
               type="email"
+              autoComplete="email"
               required
               placeholder="you@example.com"
               value={email}
@@ -63,10 +61,16 @@ export default function LoginPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="password">密码</Label>
+              <Link href="/forgot-password" className="text-xs text-primary underline-offset-4 hover:underline">
+                忘记密码？
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"
+              autoComplete="current-password"
               required
               minLength={8}
               placeholder="至少 8 位"
@@ -74,10 +78,10 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "登录中…" : "登录"}
+          <Button type="submit" size="lg" className="mt-2 w-full" disabled={loading}>
+            {loading ? <><LoaderCircle className="size-4 animate-spin" aria-hidden />登录中…</> : <>登录 BodyTrace<ArrowRight className="size-4" aria-hidden /></>}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="pt-3 text-center text-sm text-muted-foreground">
             还没有账号？{" "}
             <Link href="/register" className="text-primary underline-offset-4 hover:underline">
               注册一个

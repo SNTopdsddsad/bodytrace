@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-body);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,104 +48,95 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/*
- * 主题：翡翠绿（健康、活力）。
- * 页面上所有组件（按钮、导航高亮、进度条…）用的都是这里的变量，
- * 想换主色调只改这一块的 oklch 色值即可，不用挨个组件改。
- */
 :root {
-  /* 系统字体栈：中英文都有合适字体，且构建时不需要联网下载 Google Fonts */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue",
-    Arial, sans-serif;
-  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
-    "Liberation Mono", monospace;
-
-  /* 背景：极浅的绿调白，卡片纯白浮在上面 */
-  --background: oklch(0.985 0.006 155);
-  --foreground: oklch(0.24 0.03 160);
-
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.03 160);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.03 160);
-
-  /* 主色：鲜艳翡翠绿 */
-  --primary: oklch(0.63 0.16 155);
-  --primary-foreground: oklch(0.985 0.01 155);
-
-  --secondary: oklch(0.95 0.025 155);
-  --secondary-foreground: oklch(0.36 0.06 158);
-  --muted: oklch(0.955 0.012 155);
-  --muted-foreground: oklch(0.5 0.025 158);
-  --accent: oklch(0.94 0.035 155);
-  --accent-foreground: oklch(0.32 0.05 158);
-
-  --destructive: oklch(0.6 0.22 25);
-  --border: oklch(0.905 0.015 158);
-  --input: oklch(0.905 0.015 158);
-  --ring: oklch(0.63 0.16 155);
-
-  /* 图表五色：绿 / 蓝 / 琥珀 / 玫瑰 / 紫罗兰 */
-  --chart-1: oklch(0.63 0.16 155);
-  --chart-2: oklch(0.62 0.14 235);
-  --chart-3: oklch(0.76 0.15 80);
-  --chart-4: oklch(0.65 0.2 10);
-  --chart-5: oklch(0.6 0.18 300);
-
-  --radius: 0.625rem;
-  --sidebar: oklch(0.975 0.01 155);
-  --sidebar-foreground: oklch(0.24 0.03 160);
-  --sidebar-primary: oklch(0.63 0.16 155);
-  --sidebar-primary-foreground: oklch(0.985 0.01 155);
-  --sidebar-accent: oklch(0.94 0.035 155);
-  --sidebar-accent-foreground: oklch(0.32 0.05 158);
-  --sidebar-border: oklch(0.905 0.015 158);
-  --sidebar-ring: oklch(0.63 0.16 155);
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --background: #f6f7f2;
+  --foreground: #25382d;
+  --card: #ffffff;
+  --card-foreground: #25382d;
+  --popover: #ffffff;
+  --popover-foreground: #25382d;
+  --primary: #315b43;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf0e5;
+  --secondary-foreground: #315b43;
+  --muted: #f0f2ec;
+  --muted-foreground: #697466;
+  --accent: #eaf0e5;
+  --accent-foreground: #315b43;
+  --destructive: #b84e42;
+  --border: #e6e9df;
+  --input: #dce2d7;
+  --ring: #69865b;
+  --chart-1: #69865b;
+  --chart-2: #6696aa;
+  --chart-3: #cea45e;
+  --chart-4: #bf8273;
+  --chart-5: #9483ac;
+  /* 品牌反白面板（auth 侧栏、今日能量卡）的固定配色，不随明暗主题切换 */
+  --brand-deep: #315b43;
+  --brand-light: #c2dc9b;
+  --brand-pale: #d2e6bf;
+  --brand-cream: #eaf0e5;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #25382d;
+  --sidebar-primary: #315b43;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf0e5;
+  --sidebar-accent-foreground: #315b43;
+  --sidebar-border: #e6e9df;
+  --sidebar-ring: #69865b;
 }
 
 .dark {
-  --background: oklch(0.17 0.015 160);
-  --foreground: oklch(0.96 0.01 155);
-  --card: oklch(0.21 0.02 160);
-  --card-foreground: oklch(0.96 0.01 155);
-  --popover: oklch(0.21 0.02 160);
-  --popover-foreground: oklch(0.96 0.01 155);
-  --primary: oklch(0.74 0.16 155);
-  --primary-foreground: oklch(0.18 0.03 160);
-  --secondary: oklch(0.28 0.03 158);
-  --secondary-foreground: oklch(0.96 0.01 155);
-  --muted: oklch(0.26 0.02 158);
-  --muted-foreground: oklch(0.7 0.02 155);
-  --accent: oklch(0.3 0.04 155);
-  --accent-foreground: oklch(0.96 0.01 155);
-  --destructive: oklch(0.68 0.2 25);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.74 0.16 155);
-  --chart-1: oklch(0.74 0.16 155);
-  --chart-2: oklch(0.7 0.13 235);
-  --chart-3: oklch(0.8 0.14 80);
-  --chart-4: oklch(0.7 0.18 10);
-  --chart-5: oklch(0.68 0.17 300);
-  --sidebar: oklch(0.21 0.02 160);
-  --sidebar-foreground: oklch(0.96 0.01 155);
-  --sidebar-primary: oklch(0.74 0.16 155);
-  --sidebar-primary-foreground: oklch(0.18 0.03 160);
-  --sidebar-accent: oklch(0.3 0.04 155);
-  --sidebar-accent-foreground: oklch(0.96 0.01 155);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.74 0.16 155);
+  --background: #18211c;
+  --foreground: #eef2e9;
+  --card: #202c24;
+  --card-foreground: #eef2e9;
+  --popover: #202c24;
+  --popover-foreground: #eef2e9;
+  --primary: #b0cc9a;
+  --primary-foreground: #1c3022;
+  --secondary: #2a3a2d;
+  --secondary-foreground: #c8ddba;
+  --muted: #29342c;
+  --muted-foreground: #a3b09f;
+  --accent: #304434;
+  --accent-foreground: #eef2e9;
+  --destructive: #ef998c;
+  --border: #344037;
+  --input: #405145;
+  --ring: #b0cc9a;
+  --chart-1: #a4c58a;
+  --chart-2: #83b4c8;
+  --chart-3: #daba80;
+  --chart-4: #d69c8b;
+  --chart-5: #b4a2ce;
+  --sidebar: #202c24;
+  --sidebar-foreground: #eef2e9;
+  --sidebar-primary: #b0cc9a;
+  --sidebar-primary-foreground: #1c3022;
+  --sidebar-accent: #304434;
+  --sidebar-accent-foreground: #eef2e9;
+  --sidebar-border: #344037;
+  --sidebar-ring: #b0cc9a;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
+  * { @apply border-border outline-ring/50; }
+  html { @apply font-sans; }
+  body { @apply bg-background text-foreground; }
+  ::selection { background: #d8e6cd; color: #25382d; }
+  button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

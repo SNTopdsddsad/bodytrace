@@ -28,37 +28,41 @@ export function TrendsChart({ data, calorieGoal }: { data: Point[]; calorieGoal:
   }));
 
   return (
-    <div className="h-80 w-full">
+    <div className="h-64 w-full min-w-0 sm:h-80">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={chartData} margin={{ top: 8, right: 4, bottom: 0, left: -16 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+          <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} interval="preserveStartEnd" axisLine={false} tickLine={false} tickMargin={12} />
           {/* 左轴：热量 */}
-          <YAxis yAxisId="cal" tick={{ fontSize: 11 }} />
+          <YAxis yAxisId="cal" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
           {/* 右轴：蛋白质 */}
-          <YAxis yAxisId="pro" orientation="right" tick={{ fontSize: 11 }} />
+          <YAxis yAxisId="pro" orientation="right" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
           <Tooltip
+            cursor={{ fill: "var(--muted)", opacity: 0.6 }}
+            contentStyle={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 12, color: "var(--foreground)" }}
             formatter={(value, name) =>
               name === "热量" ? [`${value} 千卡`, name] : [`${value} g`, name]
             }
           />
-          <Legend />
+          <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 12, paddingTop: 16 }} />
           {/* 目标参考线 */}
           <ReferenceLine
             yAxisId="cal"
             y={calorieGoal}
-            stroke="#ef4444"
+            ifOverflow="extendDomain"
+            stroke="var(--chart-3)"
             strokeDasharray="6 4"
-            label={{ value: `目标 ${calorieGoal}`, position: "insideTopRight", fontSize: 11 }}
+            label={{ value: `目标 ${calorieGoal}`, position: "insideTopRight", fontSize: 11, fill: "var(--muted-foreground)" }}
           />
-          <Bar yAxisId="cal" dataKey="热量" fill="#10b981" radius={[3, 3, 0, 0]} />
+          <Bar yAxisId="cal" dataKey="热量" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
           <Line
             yAxisId="pro"
             type="monotone"
             dataKey="蛋白质"
-            stroke="#0ea5e9"
+            stroke="var(--chart-2)"
             strokeWidth={2}
             dot={false}
+            isAnimationActive={false}
           />
         </ComposedChart>
       </ResponsiveContainer>

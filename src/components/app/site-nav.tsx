@@ -1,70 +1,76 @@
 "use client";
 
-/**
- * 顶部导航栏。客户端组件是为了用 usePathname()
- * 给当前所在页的链接加高亮样式。
- */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Flame, LogOut } from "lucide-react";
+import { BookOpen, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, Utensils } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { Brand } from "./brand";
 
 const LINKS = [
-  { href: "/", label: "今日" },
-  { href: "/diary", label: "日记" },
-  { href: "/foods", label: "食物库" },
-  { href: "/trends", label: "趋势" },
-  { href: "/goals", label: "目标" },
+  { href: "/", label: "今日概览", short: "今日", icon: LayoutDashboard },
+  { href: "/diary", label: "饮食日记", short: "日记", icon: BookOpen },
+  { href: "/foods", label: "我的食物库", short: "食物库", icon: Utensils },
+  { href: "/trends", label: "营养趋势", short: "趋势", icon: ChartNoAxesCombined },
+  { href: "/goals", label: "目标设置", short: "目标", icon: Target },
 ] as const;
 
 export function SiteNav({ userName }: { userName: string }) {
   const pathname = usePathname();
   const router = useRouter();
+  const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   async function handleLogout() {
-    await authClient.signOut();
+    const { error } = await authClient.signOut();
+    if (error) {
+      toast.error("退出登录失败，请重试。");
+      return;
+    }
     router.push("/login");
     router.refresh();
   }
 
   return (
-    <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-3xl items-center gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm">
-            <Flame className="size-4" aria-hidden />
-          </span>
-          BodyTrace
-        </Link>
-
-        <nav className="flex flex-1 gap-1 overflow-x-auto">
-          {LINKS.map((link) => {
-            const active =
-              link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={
-                  "rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors " +
-                  (active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground")
-                }
-              >
-                {link.label}
-              </Link>
-            );
-          })}
+    <>
+      <a href="#main-content" className="sr-only fixed left-4 top-4 z-50 rounded-lg bg-card p-3 focus:not-sr-only">跳到主要内容</a>
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col overflow-y-auto border-r bg-card lg:flex">
+        <Link href="/" className="px-7 pb-10 pt-9" aria-label="BodyTrace 首页"><Brand /></Link>
+        <p className="px-8 pb-3 text-[11px] tracking-[0.18em] text-muted-foreground">我的健康记录</p>
+        <nav aria-label="主导航" className="space-y-1.5 px-4">
+          {LINKS.map(({ href, label, icon: Icon }) => (
+            <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-colors ${isActive(href) ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              <Icon className="size-[18px]" strokeWidth={1.8} aria-hidden />
+              {label}
+              {isActive(href) && <ChevronRight className="ml-auto size-4 opacity-60" aria-hidden />}
+            </Link>
+          ))}
         </nav>
-
-        <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
-        {/* 登出按钮任何屏幕都可见（手机上也藏在角落里不行） */}
-        <Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录">
-          <LogOut className="size-4" aria-hidden />
-        </Button>
-      </div>
-    </header>
+        <div className="mt-auto px-5 pb-5 pt-10">
+          <div className="mb-6 rounded-2xl bg-secondary p-4">
+            <Leaf className="mb-3 size-5 text-primary" aria-hidden />
+            <p className="text-sm font-medium">好习惯，从一餐开始。</p>
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">一点一滴的记录，都是更了解自己的开始。</p>
+          </div>
+          <div className="flex items-center gap-3 border-t pt-5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-primary">{userName.slice(0, 1).toUpperCase()}</span>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{userName}</p><p className="mt-0.5 text-[11px] text-muted-foreground">个人空间</p></div>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录" aria-label="退出登录"><LogOut className="size-4" aria-hidden /></Button>
+          </div>
+        </div>
+      </aside>
+      <header className="flex h-20 items-center justify-between border-b bg-card px-5 lg:hidden">
+        <Link href="/" aria-label="BodyTrace 首页"><Brand /></Link>
+        <div className="flex items-center gap-2"><span className="max-w-24 truncate text-xs text-muted-foreground">{userName}</span><Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录" aria-label="退出登录"><LogOut className="size-4" aria-hidden /></Button></div>
+      </header>
+      <nav aria-label="移动端导航" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
+        {LINKS.map(({ href, short, icon: Icon }) => (
+          <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined} className={`flex min-h-18 flex-col items-center justify-center gap-1.5 text-[11px] font-medium transition-colors ${isActive(href) ? "text-primary" : "text-muted-foreground"}`}>
+            <span className={`rounded-xl px-4 py-1 ${isActive(href) ? "bg-secondary" : ""}`}><Icon className="size-5" strokeWidth={1.8} aria-hidden /></span>{short}
+          </Link>
+        ))}
+      </nav>
+    </>
   );
 }

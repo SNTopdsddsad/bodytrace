@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Pencil, Plus, Search, Star, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Star, Trash2, Utensils } from "lucide-react";
 import type { Food } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,7 @@ const EMPTY_FORM = {
 export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
   // null = 关闭弹窗；否则是正在编辑的食物（undefined key 表示新增）
   const [editing, setEditing] = useState<Food | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,7 +43,7 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
   const [busy, setBusy] = useState(false);
 
   // 前端本地过滤即可（个人食物库量级很小）
-  const filtered = initialFoods.filter((f) => f.name.includes(q.trim()));
+  const filtered = initialFoods.filter((f) => f.name.includes(q.trim()) && (!onlyFavorites || f.isFavorite));
 
   function openCreate() {
     setEditing(null);
@@ -121,45 +122,55 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 sm:p-5">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Search
-            className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <Input
-            className="pl-8"
-            placeholder="搜索食物…"
+            className="bg-muted/40 pl-10"
+            placeholder="搜索食物名称…"
+            aria-label="搜索食物"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
         <Button onClick={openCreate}>
           <Plus className="size-4" aria-hidden />
-          新增
+          新增食物
         </Button>
       </div>
-
-      <ul className="divide-y rounded-xl border">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 rounded-xl bg-muted p-1">
+          <Button variant={onlyFavorites ? "ghost" : "outline"} size="sm" aria-pressed={!onlyFavorites} onClick={() => setOnlyFavorites(false)}>全部食物 <span className="text-xs text-muted-foreground">{initialFoods.length}</span></Button>
+          <Button variant={onlyFavorites ? "outline" : "ghost"} size="sm" aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites(true)}><Star className="size-3.5" aria-hidden />我的收藏</Button>
+        </div>
+        <span className="text-xs text-muted-foreground">营养数值均为每 100 克</span>
+      </div>
+      <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
         {filtered.length === 0 && (
-          <li className="px-4 py-6 text-center text-sm text-muted-foreground">
-            没有匹配的食物
+          <li className="flex flex-col items-center px-4 py-14 text-center text-sm text-muted-foreground">
+            <Utensils className="mb-4 size-7 text-primary/50" aria-hidden />
+            {onlyFavorites && !q ? "还没有收藏，点击食物旁的星标试试。" : "没有匹配的食物，试试其他名称。"}
           </li>
         )}
         {filtered.map((f) => (
-          <li key={f.id} className="flex items-center gap-2 px-3 py-2.5">
+          <li key={f.id} className="flex items-center gap-1 px-2 py-4 transition-colors hover:bg-muted/25 sm:gap-3 sm:px-5">
             <button
               type="button"
-              className="shrink-0"
+              className="flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-muted"
               onClick={() => toggleFavorite(f)}
               title={f.isFavorite ? "取消收藏" : "收藏"}
+              aria-label={`${f.isFavorite ? "取消收藏" : "收藏"}${f.name}`}
+              aria-pressed={f.isFavorite}
             >
               <Star
                 className={
                   "size-5 " +
                   (f.isFavorite
                     ? "fill-amber-400 text-amber-400"
-                    : "text-muted-foreground hover:text-foreground")
+                    : "text-muted-foreground/40 hover:text-foreground")
                 }
                 aria-hidden
               />
@@ -171,21 +182,25 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
                   <span className="ml-1 text-xs text-muted-foreground">({f.brand})</span>
                 )}
               </div>
-              <div className="text-xs tabular-nums text-muted-foreground">
-                {f.calories} 千卡 · 蛋白 {f.protein} · 碳水 {f.carbs} · 脂肪 {f.fat}
-                {f.servingGrams != null && ` · 一份 ${f.servingGrams}g`}
-                <span className="text-muted-foreground/60"> /100g</span>
+              <div className="mt-1 text-xs leading-5 tabular-nums text-muted-foreground">
+                <span className="xl:hidden">{f.calories} 千卡 · 蛋白 {f.protein}g · 碳水 {f.carbs}g · 脂肪 {f.fat}g{f.servingGrams != null && ` · 一份 ${f.servingGrams} g`}</span>
+                <span className="hidden xl:inline">{f.servingGrams != null ? `一份 ${f.servingGrams} g` : "按克数记录"}</span>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(f)} title="编辑">
+            <div className="hidden w-20 shrink-0 text-right xl:block"><p className="text-base font-semibold tabular-nums">{f.calories}</p><p className="mt-1 text-[11px] text-muted-foreground">千卡</p></div>
+            <div className="ml-4 hidden shrink-0 grid-cols-3 gap-6 border-l pl-6 text-center xl:grid">
+              {[{ label: "蛋白质", value: f.protein }, { label: "碳水", value: f.carbs }, { label: "脂肪", value: f.fat }].map((macro) => <div key={macro.label} className="w-14"><p className="text-sm font-medium tabular-nums">{macro.value}<span className="ml-0.5 text-[10px] text-muted-foreground">g</span></p><p className="mt-1 text-[11px] text-muted-foreground">{macro.label}</p></div>)}
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => openEdit(f)} title="编辑" aria-label={`编辑${f.name}`}>
               <Pencil className="size-4" aria-hidden />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive"
               onClick={() => handleDelete(f)}
               title="删除"
+              aria-label={`删除${f.name}`}
             >
               <Trash2 className="size-4" aria-hidden />
             </Button>
@@ -195,7 +210,7 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
 
       {/* 新增/编辑弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "编辑食物" : "新增食物"}</DialogTitle>
             <DialogDescription>营养值按每 100 克填写，包装食品看背面营养成分表</DialogDescription>

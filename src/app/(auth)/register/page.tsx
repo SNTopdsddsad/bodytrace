@@ -8,7 +8,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Flame } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,20 +38,19 @@ export default function RegisterPage() {
   }
 
   return (
-    <Card>
-      <CardHeader className="items-center text-center">
-        <div className="mx-auto mb-1 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
-          <Flame className="size-7" aria-hidden />
-        </div>
-        <CardTitle className="text-xl">创建账号</CardTitle>
-        <CardDescription>一个邮箱就够了，注册后立即可用</CardDescription>
+    <Card className="gap-8 border-0 bg-transparent shadow-none">
+      <CardHeader className="gap-3 px-0">
+        <p className="text-xs font-medium tracking-[0.16em] text-primary">从今天开始，了解自己</p>
+        <CardTitle><h1 className="text-3xl font-semibold tracking-tight">创建你的健康空间。</h1></CardTitle>
+        <CardDescription className="leading-6">一个邮箱就够了，常用食物库已为你准备好。</CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="px-0">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name">昵称</Label>
             <Input
               id="name"
+              autoComplete="nickname"
               required
               placeholder="怎么称呼你"
               value={name}
@@ -63,6 +62,7 @@ export default function RegisterPage() {
             <Input
               id="email"
               type="email"
+              autoComplete="email"
               required
               placeholder="you@example.com"
               value={email}
@@ -74,6 +74,7 @@ export default function RegisterPage() {
             <Input
               id="password"
               type="password"
+              autoComplete="new-password"
               required
               minLength={8}
               placeholder="至少 8 位"
@@ -81,10 +82,10 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "创建中…" : "注册"}
+          <Button type="submit" size="lg" className="mt-2 w-full" disabled={loading}>
+            {loading ? <><LoaderCircle className="size-4 animate-spin" aria-hidden />创建中…</> : <>创建账号<ArrowRight className="size-4" aria-hidden /></>}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="pt-3 text-center text-sm text-muted-foreground">
             已有账号？{" "}
             <Link href="/login" className="text-primary underline-offset-4 hover:underline">
               去登录

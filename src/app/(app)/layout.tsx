@@ -15,9 +15,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
 
   return (
-    <div className="flex min-h-svh flex-1 flex-col">
+    <div className="min-h-svh flex-1">
       <SiteNav userName={session.user.name} />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
+      <main id="main-content" className="min-w-0 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-7 sm:px-7 lg:ml-60 lg:px-10 lg:py-10 xl:px-14">
+        <div className="mx-auto w-full max-w-6xl">{children}</div>
+      </main>
     </div>
   );
 }
