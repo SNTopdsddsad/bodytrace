@@ -1,5 +1,5 @@
 {
-  "id": "831156ce-c486-491d-b0b6-4b0a30f994a4",
+  "id": "74a05749-25be-4204-81fb-d729e074a42a",
   "prevId": "eb0cd4f6-6f76-44c9-af43-b46ea37dd7c0",
   "version": "7",
   "dialect": "postgresql",
@@ -720,12 +720,6 @@
           "name": "gender",
           "type": "gender",
           "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "age": {
-          "name": "age",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

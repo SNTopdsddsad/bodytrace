@@ -1,6 +1,6 @@
 /**
  * GET /api/v1/profile  查询个人资料（未填写时返回全 null 字段）
- * PUT /api/v1/profile  保存资料 {gender, age, heightCm, weightKg, targetWeightKg}
+ * PUT /api/v1/profile  保存资料 {gender, heightCm, weightKg, targetWeightKg}
  */
 import { getSession, requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
 import { getProfile, profileSchema, upsertProfile } from "@/services/profile";
@@ -11,7 +11,7 @@ export async function GET() {
 
   const profile = await getProfile(session.user.id);
   return Response.json({
-    profile: profile ?? { gender: null, age: null, heightCm: null, weightKg: null, targetWeightKg: null },
+    profile: profile ?? { gender: null, heightCm: null, weightKg: null, targetWeightKg: null },
   });
 }
 

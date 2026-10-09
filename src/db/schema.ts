@@ -144,14 +144,13 @@ export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 
 /**
  * 每用户一行身体数据（个人资料）。字段全部可空：
- * 允许先填一部分，缺项时相关估算（如基础代谢）就不展示。
+ * 允许先填一部分，缺项时相关估算（如 BMI）就不展示。
  */
 export const userProfile = pgTable("user_profile", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   gender: genderEnum("gender"),
-  age: integer("age"),
   heightCm: real("height_cm"),
   weightKg: real("weight_kg"),
   targetWeightKg: real("target_weight_kg"),

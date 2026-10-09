@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * 个人资料表单：性别、年龄、身高、体重、目标体重。
+ * 个人资料表单：性别、身高、体重、目标体重。
  * 所有字段都可以留空（= 未填写），留空保存时提交 null。
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { LoaderCircle, Save, Ruler, Scale, UserRound, VenusAndMars } from "lucide-react";
+import { LoaderCircle, Save, Ruler, Scale, VenusAndMars } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,14 +15,13 @@ import { api } from "@/lib/api-client";
 import { GENDER_LABELS, type BodyProfile, type Gender } from "@/lib/profile";
 
 /** 数值输入统一转字符串管理：空字符串代表未填写，提交时转回 null。 */
-type NumberKey = "age" | "heightCm" | "weightKg" | "targetWeightKg";
+type NumberKey = "heightCm" | "weightKg" | "targetWeightKg";
 type FormState = { gender: Gender | null } & Record<NumberKey, string>;
 
 const NUMBER_FIELDS: { key: NumberKey; label: string; unit: string; icon: typeof Ruler; min: number; max: number; step: number; placeholder: string }[] = [
   { key: "heightCm", label: "身高", unit: "cm", icon: Ruler, min: 50, max: 280, step: 1, placeholder: "如 170" },
   { key: "weightKg", label: "体重", unit: "kg", icon: Scale, min: 20, max: 500, step: 0.5, placeholder: "如 65.5" },
   { key: "targetWeightKg", label: "目标体重", unit: "kg", icon: Scale, min: 20, max: 500, step: 0.5, placeholder: "如 60" },
-  { key: "age", label: "年龄", unit: "岁", icon: UserRound, min: 5, max: 120, step: 1, placeholder: "如 28" },
 ];
 
 const GENDERS = Object.keys(GENDER_LABELS) as Gender[];
@@ -31,7 +30,6 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => ({
     gender: initialProfile?.gender ?? null,
-    age: initialProfile?.age?.toString() ?? "",
     heightCm: initialProfile?.heightCm?.toString() ?? "",
     weightKg: initialProfile?.weightKg?.toString() ?? "",
     targetWeightKg: initialProfile?.targetWeightKg?.toString() ?? "",
@@ -47,7 +45,6 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
         method: "PUT",
         body: JSON.stringify({
           gender: form.gender,
-          age: toNumberOrNull(form.age),
           heightCm: toNumberOrNull(form.heightCm),
           weightKg: toNumberOrNull(form.weightKg),
           targetWeightKg: toNumberOrNull(form.targetWeightKg),
@@ -66,8 +63,9 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
     <form onSubmit={handleSave} className="space-y-6">
       <div className="space-y-4">
         <div className="space-y-2.5">
-          <Label className="flex items-center gap-2 text-xs sm:text-sm" htmlFor="gender-group"><VenusAndMars className="size-3.5 sm:size-4 text-primary" aria-hidden />性别</Label>
-          <div id="gender-group" role="group" aria-label="性别" className="flex gap-1 rounded-xl bg-muted p-1">
+          <Label id="gender-label" className="flex items-center gap-2 text-xs sm:text-sm"><VenusAndMars className="size-3.5 sm:size-4 text-primary" aria-hidden />性别</Label>
+          {/* 分组容器不是表单控件，Label 用 htmlFor 关联不上，改用 aria-labelledby */}
+          <div role="group" aria-labelledby="gender-label" className="flex gap-1 rounded-xl bg-muted p-1">
             {GENDERS.map((g) => (
               <button
                 key={g}
@@ -80,7 +78,7 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">再次点击可取消选择。性别参与基础代谢估算，不愿透露将按男女平均值计算。</p>
+          <p className="text-[11px] text-muted-foreground">再次点击可取消选择。</p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-4">

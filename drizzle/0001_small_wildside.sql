@@ -17,7 +17,6 @@ CREATE TABLE "food_reference" (
 CREATE TABLE "user_profile" (
 	"user_id" text PRIMARY KEY NOT NULL,
 	"gender" "gender",
-	"age" integer,
 	"height_cm" real,
 	"weight_kg" real,
 	"target_weight_kg" real,
