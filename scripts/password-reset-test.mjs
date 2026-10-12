@@ -1,17 +1,9 @@
-// 需要本地 npm run dev；只修改本脚本创建的临时账号，结束后清理。
+// 自行启动独立本地应用，只修改本脚本创建的合成账号，结束后清理。
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import dotenv from "dotenv";
-import postgres from "postgres";
+import { startLocalTestApp } from "./lib/local-test-app.mjs";
 
-dotenv.config({ quiet: true });
-const base = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
-const databaseURL = new URL(process.env.DATABASE_URL);
-const localHosts = ["localhost", "127.0.0.1", "[::1]"];
-assert(localHosts.includes(new URL(base).hostname), "测试仅允许本地应用");
-assert(localHosts.includes(databaseURL.hostname), "测试仅允许本地数据库");
-
-const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+const { base, pool, stop } = await startLocalTestApp();
 const email = `password_reset_${Date.now()}@bodytrace.dev`;
 const oldPassword = "ResetTestBefore2026!";
 const newPassword = "ResetTestAfter2026!";
@@ -31,6 +23,7 @@ async function api(path, body, headers = {}) {
     headers: { "Content-Type": "application/json", Origin: base, Cookie: cookie, ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     redirect: "manual",
+    signal: AbortSignal.timeout(30_000),
   });
   const text = await response.text();
   let json = null;
@@ -43,18 +36,18 @@ async function requestReset() {
 }
 
 async function latestToken() {
-  const [record] = await sql`
-    select identifier, expires_at from verification
-    where value = ${userId} and identifier like 'reset-password:%'
+  const [[record]] = await pool.execute(`
+    select identifier, expires_at from bodytrace_verification
+    where value = ? and identifier like 'reset-password:%'
     order by created_at desc limit 1
-  `;
+  `, [userId]);
   assert(record, "临时账号应有重置令牌");
   return { token: record.identifier.slice("reset-password:".length), expiresAt: record.expires_at };
 }
 
 try {
   const page = await api("/forgot-password");
-  assert(page.text.includes("当前为本地调试模式"), "请先运行 npm run dev，生产模式不开放本地找回渠道");
+  assert(page.text.includes("当前为本地调试模式"), "独立测试应用应启用本地找回渠道");
 
   const signup = await api("/api/auth/sign-up/email", { name: "密码重置测试", email, password: oldPassword });
   assert.equal(signup.response.status, 200);
@@ -75,8 +68,9 @@ try {
 
   // 单独准备过期令牌，保留首次申请的有效链接以验证改密后的整体作废。
   const expiredToken = randomUUID();
-  await sql`insert into verification (id, identifier, value, expires_at)
-    values (${randomUUID()}, ${`reset-password:${expiredToken}`}, ${userId}, now() - interval '1 minute')`;
+  await pool.execute(`insert into bodytrace_verification (id, identifier, value, expires_at)
+    values (?, ?, ?, DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 MINUTE))`,
+    [randomUUID(), `reset-password:${expiredToken}`, userId]);
   const callback = await api(`/api/auth/reset-password/${expiredToken}?callbackURL=${encodeURIComponent(base + "/reset-password")}`);
   const location = new URL(callback.response.headers.get("location"), base);
   check("过期链接跳到失效页面", callback.response.status === 302 && location.searchParams.get("error") === "INVALID_TOKEN");
@@ -127,9 +121,14 @@ try {
   check("更换伪造的转发 IP 头不能绕过限流", spoofedStatuses.every((status) => status === 429));
   console.log(`\n${passed} 项密码重置检查通过。`);
 } finally {
-  if (userId) {
-    await sql`delete from verification where value = ${userId} and identifier like 'reset-password:%'`;
-    await sql`delete from "user" where id = ${userId} and email = ${email}`;
+  try { await stop(); } finally {
+    try {
+      // 响应超时也能按本次唯一邮箱找回并清理合成账号。
+      const [users] = await pool.execute("SELECT id FROM bodytrace_user WHERE email = ?", [email]);
+      for (const user of users) {
+        await pool.execute("delete from bodytrace_verification where value = ? and identifier like 'reset-password:%'", [user.id]);
+      }
+      await pool.execute("delete from bodytrace_user where email = ?", [email]);
+    } finally { await pool.end(); }
   }
-  await sql.end();
 }

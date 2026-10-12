@@ -22,7 +22,7 @@
 |---|---|
 | 框架 | Next.js 16（App Router）+ React 19 + TypeScript |
 | UI | Tailwind CSS v4 + shadcn/ui（base-nova 风格）+ Recharts |
-| 数据库 | PostgreSQL + Drizzle ORM |
+| 数据库 | MySQL 8.0 / 8.4 + Drizzle ORM + mysql2 |
 | 认证 | better-auth（邮箱密码；Web 走 cookie，已启用 bearer 插件支持未来 App） |
 | 校验 | zod |
 
@@ -30,13 +30,13 @@
 
 ### 1. 准备数据库
 
-项目根目录已带 `docker-compose.yml`（Postgres 16，端口 5433，数据通过 bind mount 落在 `D:\docker\bodytrace-pg`，删容器不丢数据）：
+开发运行时使用 Node.js 24 LTS。项目根目录已带 `docker-compose.yml`（MySQL 8.4 LTS，端口 3307，数据落在 `D:\docker\bodytrace-mysql`）：
 
 ```bash
-docker compose up -d     # 启动；停止用 docker compose down
+docker compose up -d mysql     # 启动；停止用 docker compose stop mysql
 ```
 
-或者直接用你的云 Postgres——把 `.env` 里的 `DATABASE_URL` 换成云库连接串即可。
+使用云 MySQL 时，直接把 `.env` 里的 `DATABASE_URL` 换成云库连接串，无需启动 Docker。应用表统一使用 `bodytrace_` 前缀，与云库里其他应用的同名表分开；这个前缀不替代开发、预发和生产的数据库隔离。
 
 ### 2. 配置环境变量
 
@@ -47,11 +47,13 @@ cp .env.example .env   # Windows: copy .env.example .env
 编辑 `.env`：
 
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/bodytrace
+DATABASE_URL=mysql://bodytrace:bodytrace@localhost:3307/bodytrace
 BETTER_AUTH_SECRET=<随机长字符串， openssl rand -base64 32 生成>
 BETTER_AUTH_URL=http://localhost:3000
 APP_TIMEZONE=Asia/Shanghai
 ```
+
+云库格式为 `mysql://账号:URL编码后的密码@地址:3306/数据库名`。账号和密码只保存在本地 `.env` 或部署平台的密钥配置中。服务商启用 TLS 后设置 `DATABASE_SSL=require`；需要私有 CA 时设置 `DATABASE_SSL_CA_FILE`。连接会验证服务器证书，不默认放行自签名证书。每个应用连接的驱动及数据库会话时区统一为 UTC，饮食日期仍保存为 `YYYY-MM-DD`。
 
 > 注意：`BETTER_AUTH_URL` 必须和你实际访问的地址（协议+域名+端口）一致，
 > 换端口跑（如 3001）时要同步修改它，否则登录会因为 Origin 校验失败。
@@ -62,7 +64,7 @@ APP_TIMEZONE=Asia/Shanghai
 
 ```bash
 npm install
-npm run db:push     # 把 src/db/schema.ts 的表结构推进数据库
+npm run db:migrate  # 在目标 MySQL 上应用已审查的迁移
 npm run dev         # 打开 http://localhost:3000
 ```
 
@@ -75,11 +77,28 @@ npm run dev         # 打开 http://localhost:3000
 | `npm run dev` | 开发模式（改代码自动热更新） |
 | `npm run build` / `npm run start` | 生产构建 / 启动生产服务器 |
 | `npm run db:push` | 表结构有改动后，把改动推到数据库 |
-| `npm run db:generate` | 生成 SQL 迁移文件（存档建表语句，备查） |
+| `npm run db:generate` | 生成 MySQL SQL 迁移到 `drizzle/mysql/`，执行前审查 |
+| `npm run db:migrate` | 应用 `drizzle/mysql/` 中尚未执行的迁移，生产使用此命令 |
 | `npm run db:import-reference` | 导入《中国食物成分表》1677 种食物到参考库（数据在 `data/`，可重复执行） |
 | `node scripts/smoke-test.mjs` | 端到端冒烟测试（需先 `npm run start`） |
 | `node scripts/debug-pages.mjs` | 检查五个页面是否正常渲染 |
-| `npm run test:password-reset` | 验证有效期、令牌作废、会话失效和伪造 IP 不能绕过限流；需本地 `npm run dev`，重复运行需间隔一分钟 |
+| `npm run test:password-reset` | 自行启动独立测试应用，验证有效期、令牌作废、会话失效和伪造 IP 不能绕过限流 |
+| `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及七个页面 |
+| `npm run test:test-isolation` | 验证测试不会采用云库配置，拒绝非本地测试连接 |
+
+MySQL 迁移位于 `drizzle/mysql/`，初始迁移显式采用 InnoDB、utf8mb4 与区分大小写的标识符比较。`drizzle/` 根目录里的旧 PostgreSQL SQL 和 meta 仅作存档，不能应用到 MySQL。后续新表也要审查字符集和排序规则。`db:push` 只用于可重建的开发库；切换驱动不会自动导入 PostgreSQL 的旧账号或记录，旧数据库及其数据目录保留。
+
+MySQL 和密码找回测试不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行的应用。先启动本地 MySQL，再直接执行测试：
+
+```powershell
+docker compose up -d mysql
+npm run test:mysql
+npm run test:password-reset
+```
+
+默认测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`；需要其他本地测试库时设置 `TEST_DATABASE_URL`，只允许 `localhost` 或 `127.0.0.1`，并固定使用回环地址连接。测试会应用 MySQL 迁移，并在参考库为空时导入公开食物数据。不要把需要保留的业务资料放进这个测试库。
+
+每次测试在 `.next/test-projects/` 创建独立应用副本，不复制 `.env`，以相同测试连接启动自己的服务器和 SQL 清理连接。服务器绑定自动端口并记录实际监听 PID，可与用户的 3000 开发服务器同时运行；退出时停止自己的进程、清理合成账号并移除临时副本。每次密码找回测试使用新进程，因此无需等待上一轮限流窗口结束。维护脚本使用 Node.js 24 的内置 TypeScript 支持。
 
 ### 本地测试忘记密码
 
@@ -135,7 +154,7 @@ src/
 
 ## 部署到自己的服务器
 
-最简单的路线（假设已有云 Postgres）：
+最简单的路线（已有云 MySQL）：
 
 ```bash
 # 服务器上
@@ -149,7 +168,7 @@ npm run build
 #   BETTER_AUTH_URL=https://你的域名
 #   APP_TIMEZONE=Asia/Shanghai
 
-npm run db:push        # 首次部署建表
+npm run db:migrate     # 应用已审查的 MySQL 迁移
 
 # 用 pm2 守护进程（或写个 systemd unit / Dockerfile 都行）
 npm i -g pm2

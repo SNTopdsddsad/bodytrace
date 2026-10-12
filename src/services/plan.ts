@@ -53,14 +53,13 @@ export async function getPlan(userId: string): Promise<CarbCyclePlan | null> {
 /** 整体保存（全量替换七天）：计划行 upsert，七天先删后插，放在一个事务里。 */
 export async function savePlan(userId: string, input: PlanInput) {
   await db.transaction(async (tx) => {
-    const [plan] = await tx
+    await tx
       .insert(dietPlan)
       .values({ userId, startDate: input.startDate, isActive: input.isActive, updatedAt: new Date() })
-      .onConflictDoUpdate({
-        target: dietPlan.userId,
+      .onDuplicateKeyUpdate({
         set: { startDate: input.startDate, isActive: input.isActive, updatedAt: new Date() },
-      })
-      .returning({ id: dietPlan.id });
+      });
+    const [plan] = await tx.select({ id: dietPlan.id }).from(dietPlan).where(eq(dietPlan.userId, userId));
 
     await tx.delete(dietPlanDay).where(eq(dietPlanDay.planId, plan.id));
     await tx.insert(dietPlanDay).values(

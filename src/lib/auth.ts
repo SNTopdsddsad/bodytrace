@@ -26,9 +26,9 @@ const trustedIpHeader = process.env.NODE_ENV === "production"
   : undefined;
 
 export const auth = betterAuth({
-  // 告诉 better-auth 用我们的 Postgres 存用户/会话数据（表结构见 src/db/schema.ts）
+  // 告诉 better-auth 用 MySQL 存用户/会话数据（表结构见 src/db/schema.ts）
   database: drizzleAdapter(db, {
-    provider: "pg",
+    provider: "mysql",
     schema: {
       user: userTable,
       session: sessionTable,

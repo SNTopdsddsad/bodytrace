@@ -29,8 +29,7 @@ export async function upsertProfile(userId: string, input: Profile) {
   await db
     .insert(userProfile)
     .values({ userId, ...input, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: userProfile.userId,
+    .onDuplicateKeyUpdate({
       set: { ...input, updatedAt: new Date() },
     });
   return input;

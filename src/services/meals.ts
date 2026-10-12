@@ -39,23 +39,26 @@ export async function addEntry(userId: string, input: z.infer<typeof mealCreateS
   if (!f) return null;
 
   const macro = scaleMacro(f, input.grams);
-  const [row] = await db
-    .insert(mealEntry)
-    .values({
-      userId,
-      date: input.date,
-      mealType: input.mealType,
-      foodId: f.id,
-      name: f.name,
-      grams: input.grams,
-      // 存写入时刻的快照：以后食物库改了/删了，历史记录不变
-      calories: macro.calories,
-      protein: macro.protein,
-      carbs: macro.carbs,
-      fat: macro.fat,
-    })
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    const [{ id }] = await tx
+      .insert(mealEntry)
+      .values({
+        userId,
+        date: input.date,
+        mealType: input.mealType,
+        foodId: f.id,
+        name: f.name,
+        grams: input.grams,
+        // 存写入时刻的快照：以后食物库改了/删了，历史记录不变
+        calories: macro.calories,
+        protein: macro.protein,
+        carbs: macro.carbs,
+        fat: macro.fat,
+      })
+      .$returningId();
+    const [row] = await tx.select().from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+    return row;
+  });
 }
 
 /** 修改某条记录的克数：营养值按新旧克数比例缩放（对已删食物的记录同样有效）。 */
@@ -64,33 +67,35 @@ export async function updateEntryGrams(
   id: string,
   grams: number,
 ) {
-  const [entry] = await db
-    .select()
-    .from(mealEntry)
-    .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
-  if (!entry) return null;
+  return db.transaction(async (tx) => {
+    const [entry] = await tx
+      .select()
+      .from(mealEntry)
+      .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)))
+      .for("update");
+    if (!entry) return null;
 
-  const k = grams / entry.grams;
-  const [row] = await db
-    .update(mealEntry)
-    .set({
-      grams,
-      calories: round1(entry.calories * k),
-      protein: round1(entry.protein * k),
-      carbs: round1(entry.carbs * k),
-      fat: round1(entry.fat * k),
-    })
-    .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)))
-    .returning();
-  return row ?? null;
+    const k = grams / entry.grams;
+    await tx
+      .update(mealEntry)
+      .set({
+        grams,
+        calories: round1(entry.calories * k),
+        protein: round1(entry.protein * k),
+        carbs: round1(entry.carbs * k),
+        fat: round1(entry.fat * k),
+      })
+      .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+    const [row] = await tx.select().from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+    return row ?? null;
+  });
 }
 
 export async function deleteEntry(userId: string, id: string) {
-  const [row] = await db
+  const [result] = await db
     .delete(mealEntry)
-    .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)))
-    .returning({ id: mealEntry.id });
-  return row != null;
+    .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+  return result.affectedRows > 0;
 }
 
 /** 某一天的全部记录，按创建顺序排列。 */
@@ -160,7 +165,7 @@ export async function getDailyTotals(userId: string, fromDate: string, toDate: s
     )
     .groupBy(mealEntry.date);
 
-  // sum() 出来可能是字符串（Postgres 数值类型的习惯），统一转成数字
+  // 聚合结果统一转成数字，保持现有 API 的数值契约。
   return rows.map((r) => ({
     date: r.date,
     calories: round1(Number(r.calories)),

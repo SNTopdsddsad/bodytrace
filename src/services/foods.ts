@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike } from "drizzle-orm";
+import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { food, foodReference, mealEntry } from "@/db/schema";
@@ -14,12 +14,16 @@ export const foodInputSchema = z.object({
 });
 
 export const foodPatchSchema = foodInputSchema.partial().extend({
+  // PATCH 没有提交的字段保持原值，不能沿用新建表单的零值默认项。
+  protein: foodInputSchema.shape.protein.removeDefault().optional(),
+  carbs: foodInputSchema.shape.carbs.removeDefault().optional(),
+  fat: foodInputSchema.shape.fat.removeDefault().optional(),
   isFavorite: z.boolean().optional(),
 });
 
 export async function listFoods(userId: string, q?: string, favorite?: boolean) {
   const conditions = [eq(food.userId, userId)];
-  if (q) conditions.push(ilike(food.name, `%${q}%`));
+  if (q) conditions.push(like(sql`lower(${food.name})`, `%${q.toLowerCase()}%`));
   if (favorite) conditions.push(eq(food.isFavorite, true));
   return db
     .select()
@@ -60,20 +64,23 @@ export async function listRecentFoods(userId: string, limit = 12) {
 }
 
 export async function createFood(userId: string, input: z.infer<typeof foodInputSchema>) {
-  const [row] = await db
-    .insert(food)
-    .values({
-      userId,
-      name: input.name,
-      brand: input.brand ?? null,
-      calories: input.calories,
-      protein: input.protein,
-      carbs: input.carbs,
-      fat: input.fat,
-      servingGrams: input.servingGrams ?? null,
-    })
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    const [{ id }] = await tx
+      .insert(food)
+      .values({
+        userId,
+        name: input.name,
+        brand: input.brand ?? null,
+        calories: input.calories,
+        protein: input.protein,
+        carbs: input.carbs,
+        fat: input.fat,
+        servingGrams: input.servingGrams ?? null,
+      })
+      .$returningId();
+    const [row] = await tx.select().from(food).where(and(eq(food.id, id), eq(food.userId, userId)));
+    return row;
+  });
 }
 
 export async function updateFood(
@@ -81,20 +88,21 @@ export async function updateFood(
   id: string,
   patch: z.infer<typeof foodPatchSchema>,
 ) {
-  const [row] = await db
-    .update(food)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(food.id, id), eq(food.userId, userId)))
-    .returning();
-  return row ?? null;
+  return db.transaction(async (tx) => {
+    await tx
+      .update(food)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(and(eq(food.id, id), eq(food.userId, userId)));
+    const [row] = await tx.select().from(food).where(and(eq(food.id, id), eq(food.userId, userId)));
+    return row ?? null;
+  });
 }
 
 export async function deleteFood(userId: string, id: string) {
-  const [row] = await db
+  const [result] = await db
     .delete(food)
-    .where(and(eq(food.id, id), eq(food.userId, userId)))
-    .returning({ id: food.id });
-  return row != null;
+    .where(and(eq(food.id, id), eq(food.userId, userId)));
+  return result.affectedRows > 0;
 }
 
 /**
@@ -105,7 +113,7 @@ export async function searchFoodReference(q: string, limit = 20) {
   return db
     .select()
     .from(foodReference)
-    .where(ilike(foodReference.name, `%${q}%`))
+    .where(like(sql`lower(${foodReference.name})`, `%${q.toLowerCase()}%`))
     .orderBy(asc(foodReference.name))
     .limit(limit);
 }

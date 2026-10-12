@@ -1,17 +1,17 @@
 /**
- * 导入《中国食物成分表》参考数据到 food_reference 表。
+ * 导入《中国食物成分表》参考数据到 bodytrace_food_reference 表。
  *
  * 数据来源：github.com/Sanotsu/china-food-composition-data
  * 默认使用「增强矫正版」（*fixed_en*.json，已修正原书能量列互换问题、含英文名）。
  *
  * 用法：
- *   npm run db:push                            # 先确保 food_reference 表存在
+ *   npm run db:push                            # 先确保 bodytrace_food_reference 表存在
  *   node scripts/import-food-reference.mjs     # 导入（可重复执行，每次全量重建）
  */
 import "dotenv/config";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import postgres from "postgres";
+import { createMySqlPool } from "../src/db/connection.ts";
 
 const DATA_DIR = "data/china-food-composition-data";
 const BATCH_SIZE = 100;
@@ -48,11 +48,6 @@ function toStringOrNull(v) {
   const s = String(v).trim();
   return s === "" || s === "—" ? null : s;
 }
-
-const sql = postgres(process.env.DATABASE_URL, {
-  ssl: process.env.DATABASE_SSL === "require" ? { rejectUnauthorized: false } : undefined,
-  max: 5,
-});
 
 // 文件名过滤词（默认空 = 目录下全部 JSON；该目录只放 fixed_en 增强矫正版数据）
 const files = findJsonFiles(DATA_DIR, process.argv[2] ?? "");
@@ -104,23 +99,28 @@ if (rows.length === 0) process.exit(1);
 console.log("样例:", JSON.stringify(rows[0]));
 
 const t0 = Date.now();
-await sql`TRUNCATE food_reference`;
-for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-  // postgres.js 拿对象键名当列名，所以要转成数据库的 snake_case
-  const batch = rows.slice(i, i + BATCH_SIZE).map((r) => ({
-    food_code: r.foodCode,
-    name: r.name,
-    english_name: r.englishName,
-    category: r.category,
-    calories: r.calories,
-    protein: r.protein,
-    carbs: r.carbs,
-    fat: r.fat,
-    dietary_fiber: r.dietaryFiber,
-    edible: r.edible,
-  }));
-  await sql`INSERT INTO food_reference ${sql(batch)}`;
+const pool = createMySqlPool(1);
+const connection = await pool.getConnection();
+try {
+  await connection.beginTransaction();
+  // DELETE 可以回滚；MySQL 的 TRUNCATE 会隐式提交，导入失败时会丢失旧参考库。
+  await connection.query("DELETE FROM bodytrace_food_reference");
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE).map((r) => [
+      r.foodCode, r.name, r.englishName, r.category,
+      r.calories, r.protein, r.carbs, r.fat, r.dietaryFiber, r.edible,
+    ]);
+    await connection.query(`INSERT INTO bodytrace_food_reference
+      (food_code, name, english_name, category, calories, protein, carbs, fat, dietary_fiber, edible)
+      VALUES ?`, [batch]);
+  }
+  await connection.commit();
+  const [[{ count }]] = await connection.query("SELECT count(*) AS count FROM bodytrace_food_reference");
+  console.log(`✓ 导入完成：${count} 条，耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+} catch (error) {
+  await connection.rollback();
+  throw error;
+} finally {
+  connection.release();
+  await pool.end();
 }
-const [{ count }] = await sql`SELECT count(*)::int AS count FROM food_reference`;
-console.log(`✓ 导入完成：${count} 条，耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-await sql.end();

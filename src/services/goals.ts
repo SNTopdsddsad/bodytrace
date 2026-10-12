@@ -49,8 +49,7 @@ export async function upsertGoals(userId: string, input: z.infer<typeof goalsSch
   await db
     .insert(dailyGoal)
     .values({ userId, ...input, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: dailyGoal.userId,
+    .onDuplicateKeyUpdate({
       set: { ...input, updatedAt: new Date() },
     });
   return input;
