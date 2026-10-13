@@ -9,34 +9,52 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { RequestTimeoutError, withRequestTimeout } from "@/lib/request-timeout";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     // 阻止表单默认的整页提交，改用 fetch 异步请求
     e.preventDefault();
     setLoading(true);
-    const { error } = await authClient.signIn.email({ email, password });
-    setLoading(false);
-
-    if (error) {
-      toast.error(error.message ?? "登录失败，请检查邮箱和密码");
-      return;
+    setLoginError("");
+    try {
+      const { error } = await withRequestTimeout(signal => authClient.signIn.email({
+        email: email.trim(),
+        password,
+        fetchOptions: { signal },
+      }));
+      if (error) {
+        setLoginError(error.status === 401
+          ? "邮箱或密码不正确，请检查后重试。"
+          : error.status === 429
+            ? "登录尝试过于频繁，请稍后再试。"
+            : error.status >= 500
+              ? "登录服务暂时不可用，请稍后重试。"
+              : error.message ?? "登录失败，请检查邮箱和密码。");
+        return;
+      }
+      // refresh() 让服务端组件重新渲染，带上新的登录状态
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      setLoginError(error instanceof RequestTimeoutError
+        ? "登录请求超过 15 秒，请重试。"
+        : "网络连接中断或登录发生异常，请重试。");
+    } finally {
+      setLoading(false);
     }
-    // refresh() 让服务端组件重新渲染，带上新的登录状态
-    router.push("/");
-    router.refresh();
   }
 
   return (
@@ -47,7 +65,7 @@ export default function LoginPage() {
         <CardDescription className="leading-6">登录账号，记录今天的饮食与营养。</CardDescription>
       </CardHeader>
       <CardContent className="px-0">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">邮箱</Label>
             <Input
@@ -78,6 +96,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          {loginError && <p role="alert" className="text-sm text-destructive">{loginError}</p>}
           <Button type="submit" size="lg" className="mt-2 w-full" disabled={loading}>
             {loading ? <><LoaderCircle className="size-4 animate-spin" aria-hidden />登录中…</> : <>登录 BodyTrace<ArrowRight className="size-4" aria-hidden /></>}
           </Button>

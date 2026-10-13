@@ -30,6 +30,9 @@ export function getMySqlConfig() {
     // DATE 保持 YYYY-MM-DD，不能因为驱动转成 Date 而改变记录日期。
     dateStrings: ["DATE"],
     connectionLimit: 10,
+    connectTimeout: 10_000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10_000,
     ssl: sslMode === "require" ? {
       rejectUnauthorized: true,
       ...(process.env.DATABASE_SSL_CA_FILE
@@ -40,7 +43,14 @@ export function getMySqlConfig() {
 }
 
 export function createMySqlPool(connectionLimit = 10) {
-  const pool = mysql.createPool({ ...getMySqlConfig(), connectionLimit });
+  const pool = mysql.createPool({
+    ...getMySqlConfig(),
+    connectionLimit,
+    // mysql2 只有在 maxIdle < connectionLimit 时才启动空闲回收任务。
+    // 尽早关闭闲置连接，避免再次登录时复用已被云库或网络断开的连接。
+    maxIdle: Math.max(0, Math.min(5, connectionLimit - 1)),
+    idleTimeout: 30_000,
+  });
   pool.on("connection", (connection) => {
     // timezone: Z 控制驱动转换；会话时区还要统一，保证数据库默认时间也是 UTC。
     connection.query("SET time_zone = '+00:00'", (error) => {

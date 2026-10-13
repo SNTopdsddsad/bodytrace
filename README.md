@@ -85,6 +85,7 @@ npm run dev         # 打开 http://localhost:3000
 | `npm run test:password-reset` | 自行启动独立测试应用，验证有效期、令牌作废、会话失效和伪造 IP 不能绕过限流 |
 | `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及七个页面 |
 | `npm run test:test-isolation` | 验证测试不会采用云库配置，拒绝非本地测试连接 |
+| `npm run test:request-timeout` | 无需数据库，验证登录响应体卡住时 15 秒取消请求，以及正常返回和计时器清理 |
 
 MySQL 迁移位于 `drizzle/mysql/`，初始迁移显式采用 InnoDB、utf8mb4 与区分大小写的标识符比较。`drizzle/` 根目录里的旧 PostgreSQL SQL 和 meta 仅作存档，不能应用到 MySQL。后续新表也要审查字符集和排序规则。`db:push` 只用于可重建的开发库；切换驱动不会自动导入 PostgreSQL 的旧账号或记录，旧数据库及其数据目录保留。
 
