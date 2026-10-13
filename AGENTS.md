@@ -19,7 +19,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [README.md](README.md)：当前已实现功能、本地环境、命令和接口入口。
 - [开发指南](docs/BodyTrace_Nextjs_MySQL_Development_Guide.md)：架构、数据语义、权限、迁移和后续路线。
 - [产品与界面设计指南](docs/BodyTrace_Product_UI_Design_Guide.md)：产品方向、视觉、交互状态和页面验收。
-- 两份指南包含后续规划。训练记录、体重历史、报告、时间线、OCR、助手和 SwiftUI 客户端不能视作已经实现，也不要为无关任务提前添加空接口、占位入口或新目录体系。
+- 两份指南包含后续规划。当前已实现体重、体脂率、血压持续记录；训练记录、报告、时间线、OCR、助手和 SwiftUI 客户端仍是规划，也不要为无关任务提前添加空接口、占位入口或新目录体系。
 - 开始修改前简要说明用户行为、变更范围和验证方式；遇到会影响范围或数据契约的冲突，说明差异并按当前任务对齐。
 
 ## 当前技术与目录
@@ -122,6 +122,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `npm run test:mysql` | 需要本地 MySQL，验证写入、日期、中文与 emoji、快照、账号隔离和页面 |
 | `npm run test:password-reset` | 需要本地 MySQL，验证重置令牌、会话失效与认证限流 |
 | `npm run test:mysql-pool` | 需要本地 MySQL，验证空闲回收后重建 UTC 连接，约需 32 秒 |
+| `npm run test:measurements` | 无需数据库，验证身体指标校验、精度、变化计算与趋势缺失值 |
+| `npm run test:measurement-integration` | 需要本地 MySQL，验证身体指标读写、幂等、版本冲突和账号隔离 |
 
 - 当前测试使用 Node.js 内置测试工具和脚本，尚未安装 Vitest 或 Playwright；没有通用 `npm test`。按现有能力验证，不照规划文档运行不存在的命令。
 - MySQL 与密码找回测试通过 `scripts/lib/local-test-app.mjs` 创建独立应用；不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行应用。

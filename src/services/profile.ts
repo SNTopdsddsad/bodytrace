@@ -7,30 +7,56 @@ import { z } from "zod";
 import { db } from "@/db";
 import { userProfile } from "@/db/schema";
 import type { BodyProfile } from "@/lib/profile";
+import type { Measurement } from "@/lib/measurements";
+import { getLatestMeasurement } from "./measurements";
 
-/** 各字段都可省略（null = 未填写/清空），填了就必须在合理范围内。 */
+/** 基础字段可为空；weightKg 兼容旧客户端，新页面从测量记录读取。 */
 export const profileSchema = z.object({
   gender: z.enum(["male", "female", "other"]).nullable(),
   heightCm: z.number().min(50).max(280).nullable(),
-  weightKg: z.number().min(20).max(500).nullable(),
+  weightKg: z.number().min(20).max(500).nullable().optional(),
   targetWeightKg: z.number().min(20).max(500).nullable(),
 });
 
 export type Profile = BodyProfile;
+export class ProfileWeightConflict extends Error {}
 
-export async function getProfile(userId: string): Promise<Profile | null> {
-  const [row] = await db.select().from(userProfile).where(eq(userProfile.userId, userId));
-  if (!row) return null;
-  const { gender, heightCm, weightKg, targetWeightKg } = row;
-  return { gender, heightCm, weightKg, targetWeightKg };
+/** 资料连同最新测量体重一次读出，页面可直接区分体重来源，不必再查一次。 */
+export type ProfileContext = { profile: Profile; latestWeight: Measurement | null };
+
+export async function getProfileContext(userId: string): Promise<ProfileContext | null> {
+  const [[row], latest] = await Promise.all([
+    db.select().from(userProfile).where(eq(userProfile.userId, userId)),
+    getLatestMeasurement(userId, "weight"),
+  ]);
+  if (!row && !latest) return null;
+  const profile: Profile = {
+    gender: row?.gender ?? null,
+    heightCm: row?.heightCm ?? null,
+    weightKg: latest?.value != null ? Number(latest.value) : row?.weightKg ?? null,
+    targetWeightKg: row?.targetWeightKg ?? null,
+  };
+  return { profile, latestWeight: latest };
 }
 
-export async function upsertProfile(userId: string, input: Profile) {
+export async function getProfile(userId: string): Promise<Profile | null> {
+  return (await getProfileContext(userId))?.profile ?? null;
+}
+
+export async function upsertProfile(userId: string, input: z.infer<typeof profileSchema>) {
+  const latest = await getLatestMeasurement(userId, "weight");
+  if (latest && input.weightKg !== undefined && input.weightKg !== Number(latest.value)) {
+    throw new ProfileWeightConflict("当前体重来自测量记录，请到身体变化页面修改。");
+  }
+  const values = {
+    gender: input.gender, heightCm: input.heightCm, targetWeightKg: input.targetWeightKg,
+    ...(!latest && input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
+  };
   await db
     .insert(userProfile)
-    .values({ userId, ...input, updatedAt: new Date() })
+    .values({ userId, ...values, updatedAt: new Date() })
     .onDuplicateKeyUpdate({
-      set: { ...input, updatedAt: new Date() },
+      set: { ...values, updatedAt: new Date() },
     });
-  return input;
+  return getProfile(userId);
 }

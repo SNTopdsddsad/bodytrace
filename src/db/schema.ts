@@ -14,11 +14,13 @@ import {
   boolean,
   int,
   double,
+  decimal,
   varchar,
   datetime,
   date,
   index,
   unique,
+  check,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -159,6 +161,35 @@ export const userProfile = mysqlTable("bodytrace_user_profile", {
   targetWeightKg: double("target_weight_kg"),
   updatedAt: datetime("updated_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
 });
+
+/** 身体指标：每条是一项真实测量，血压的两项数值成对保存并标记晨间/夜间。 */
+export const measurement = mysqlTable("bodytrace_measurement", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => user.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 32, enum: ["weight", "bodyFat", "bloodPressure"] }).notNull(),
+  date: date("date", { mode: "string" }).notNull(),
+  time: varchar("time", { length: 5 }),
+  timeZone: varchar("time_zone", { length: 64 }).notNull(),
+  value: decimal("value", { precision: 5, scale: 2 }),
+  systolic: int("systolic"),
+  diastolic: int("diastolic"),
+  /** 血压测量时段；旧数据未标记时为 NULL，新血压记录必填。 */
+  period: varchar("period", { length: 16, enum: ["morning", "evening"] }),
+  note: varchar("note", { length: 500 }),
+  requestId: varchar("request_id", { length: 36 }).notNull(),
+  version: int("version").notNull().default(1),
+  createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime("updated_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  deletedAt: datetime("deleted_at", { mode: "date", fsp: 3 }),
+}, t => [
+  index("measurement_user_kind_date_idx").on(t.userId, t.kind, t.date),
+  unique("measurement_user_request_unique").on(t.userId, t.requestId),
+  check("measurement_values_valid", sql`
+    (${t.kind} = 'weight' AND ${t.value} IS NOT NULL AND ${t.value} > 0 AND ${t.value} <= 500 AND ${t.systolic} IS NULL AND ${t.diastolic} IS NULL AND ${t.period} IS NULL)
+    OR (${t.kind} = 'bodyFat' AND ${t.value} IS NOT NULL AND ${t.value} > 0 AND ${t.value} <= 100 AND ${t.systolic} IS NULL AND ${t.diastolic} IS NULL AND ${t.period} IS NULL)
+    OR (${t.kind} = 'bloodPressure' AND ${t.value} IS NULL AND ${t.systolic} IS NOT NULL AND ${t.diastolic} IS NOT NULL AND ${t.systolic} > ${t.diastolic} AND ${t.systolic} <= 400 AND ${t.diastolic} > 0 AND (${t.period} IS NULL OR ${t.period} IN ('morning', 'evening')))
+  `),
+]);
 
 /* ---------------- 饮食计划 ---------------- */
 

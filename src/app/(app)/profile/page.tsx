@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
 import { ProfileForm } from "@/components/app/profile-form";
 import { getSession } from "@/lib/api-auth";
-import { getProfile } from "@/services/profile";
+import { getProfileContext } from "@/services/profile";
 import { bmiLabel, calcBmi } from "@/lib/profile";
 import { round1 } from "@/lib/nutrition";
 
@@ -27,7 +27,9 @@ function MetricRow({ icon: Icon, label, value, hint }: { icon: typeof Gauge; lab
 export default async function ProfilePage() {
   const session = await getSession();
   const user = session!.user;
-  const profile = await getProfile(user.id);
+  const context = await getProfileContext(user.id);
+  const profile = context?.profile ?? null;
+  const latestWeight = context?.latestWeight ?? null;
 
   const bmi = profile ? calcBmi(profile) : null;
 
@@ -41,12 +43,12 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="了解自己的起点" title="个人资料" description="填写身体数据，查看 BMI 与目标体重差距，让饮食记录更有参照。" />
+      <PageHeader eyebrow="了解自己的起点" title="个人资料" description="填写基础资料和目标，当前体重来自最新测量记录。" action={<Link href="/measurements" className="flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm font-medium text-primary"><Scale className="size-4" aria-hidden />身体变化<ArrowRight className="size-4" aria-hidden /></Link>} />
       <div className="grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><UserRound className="size-4 text-primary" aria-hidden />我的身体数据</CardTitle>
-            <p className="mt-2 text-xs text-muted-foreground">所有字段都可留空，先填一部分也没问题；体重有变化时随时回来更新。</p>
+            <p className="mt-2 text-xs text-muted-foreground">基础字段可留空；体重、体脂率和血压在身体变化中持续记录。</p>
           </CardHeader>
           <CardContent>
             <ProfileForm initialProfile={profile} />
@@ -59,6 +61,7 @@ export default async function ProfilePage() {
               <CardTitle className="flex items-center gap-2"><Gauge className="size-4 text-primary" aria-hidden />身体指标</CardTitle>
             </CardHeader>
             <CardContent>
+              {profile?.weightKg != null && <MetricRow icon={Scale} label={latestWeight ? "最新测量体重" : "旧资料参考体重"} value={`${profile.weightKg} kg`} hint={latestWeight ? `${latestWeight.date}${latestWeight.time ? ` ${latestWeight.time}` : " · 未填测量时间"}` : "尚无测量历史，保留原资料值"} />}
               {hasBodyData ? (
                 <>
                   {bmi != null && <MetricRow icon={Scale} label="BMI" value={`${bmi}（${bmiLabel(bmi)}）`} hint="按中国成人标准分级" />}

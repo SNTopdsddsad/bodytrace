@@ -2,7 +2,7 @@
 
 版本 1.1 · MySQL + Drizzle 方案 · 更新日期 2026 年 10 月 12 日 · 适用对象 丹青及协作开发工具
 
-**当前仓库基线**：已从 PostgreSQL 切换到 MySQL，继续使用现有 Drizzle ORM、mysql2 和 npm。保留现有食物库、饮食快照、碳循环计划、资料及认证功能；本文中的体重历史、报告、时间线等仍是后续产品目标，不代表已经实现。应用表使用 `bodytrace_` 前缀，与云库已有表共存；旧 PostgreSQL 迁移留作存档，MySQL 迁移单独位于 `drizzle/mysql/`。切换连接不会自动搬运旧 PostgreSQL 数据。
+**当前仓库基线**：已从 PostgreSQL 切换到 MySQL，继续使用现有 Drizzle ORM、mysql2 和 npm。保留现有食物库、饮食快照、碳循环计划、资料及认证功能；身体变化已支持体重、体脂率和血压的持续记录、趋势与历史维护，报告和统一时间线仍是后续产品目标。应用表使用 `bodytrace_` 前缀，与云库已有表共存；旧 PostgreSQL 迁移留作存档，MySQL 迁移单独位于 `drizzle/mysql/`。切换连接不会自动搬运旧 PostgreSQL 数据。
 
 BodyTrace 先以 Next.js 网页端验证个人身体档案的使用价值，同时建设未来 iOS 可以调用的 HTTP API。核心流程稳定后，使用 Swift 与 SwiftUI 开发苹果客户端，继续使用已有账户、业务服务和数据。饮食与健身是日常入口，长期目标是让个人身体资料能够持续积累、方便找回，并支撑有来源的个人助手。
 

@@ -1,0 +1,8 @@
+ALTER TABLE `bodytrace_measurement` DROP CONSTRAINT `measurement_values_valid`;--> statement-breakpoint
+ALTER TABLE `bodytrace_measurement` ADD `period` varchar(16);--> statement-breakpoint
+UPDATE `bodytrace_measurement` SET `period` = IF(`time` < '12:00', 'morning', 'evening') WHERE `kind` = 'bloodPressure' AND `time` IS NOT NULL;--> statement-breakpoint
+ALTER TABLE `bodytrace_measurement` ADD CONSTRAINT `measurement_values_valid` CHECK (
+    (`bodytrace_measurement`.`kind` = 'weight' AND `bodytrace_measurement`.`value` IS NOT NULL AND `bodytrace_measurement`.`value` > 0 AND `bodytrace_measurement`.`value` <= 500 AND `bodytrace_measurement`.`systolic` IS NULL AND `bodytrace_measurement`.`diastolic` IS NULL AND `bodytrace_measurement`.`period` IS NULL)
+    OR (`bodytrace_measurement`.`kind` = 'bodyFat' AND `bodytrace_measurement`.`value` IS NOT NULL AND `bodytrace_measurement`.`value` > 0 AND `bodytrace_measurement`.`value` <= 100 AND `bodytrace_measurement`.`systolic` IS NULL AND `bodytrace_measurement`.`diastolic` IS NULL AND `bodytrace_measurement`.`period` IS NULL)
+    OR (`bodytrace_measurement`.`kind` = 'bloodPressure' AND `bodytrace_measurement`.`value` IS NULL AND `bodytrace_measurement`.`systolic` IS NOT NULL AND `bodytrace_measurement`.`diastolic` IS NOT NULL AND `bodytrace_measurement`.`systolic` > `bodytrace_measurement`.`diastolic` AND `bodytrace_measurement`.`systolic` <= 400 AND `bodytrace_measurement`.`diastolic` > 0 AND (`bodytrace_measurement`.`period` IS NULL OR `bodytrace_measurement`.`period` IN ('morning', 'evening')))
+  );

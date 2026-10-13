@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, CalendarRange, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
+import { Activity, BookOpen, CalendarRange, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -19,6 +19,7 @@ const LINKS = [
 /** 侧边栏的次要入口：不占移动端底部导航的五个位置。 */
 const SIDEBAR_LINKS = [
   { href: "/plan", label: "饮食计划", icon: CalendarRange },
+  { href: "/measurements", label: "身体变化", icon: Activity },
   { href: "/profile", label: "个人资料", icon: UserRound },
 ] as const;
 

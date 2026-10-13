@@ -3,7 +3,7 @@
  * PUT /api/v1/profile  保存资料 {gender, heightCm, weightKg, targetWeightKg}
  */
 import { getSession, requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
-import { getProfile, profileSchema, upsertProfile } from "@/services/profile";
+import { getProfile, profileSchema, upsertProfile, ProfileWeightConflict } from "@/services/profile";
 
 export async function GET() {
   const session = await getSession();
@@ -22,5 +22,10 @@ export async function PUT(request: Request) {
   const parsed = profileSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return invalidBody(parsed.error);
 
-  return Response.json({ profile: await upsertProfile(session.user.id, parsed.data) });
+  try {
+    return Response.json({ profile: await upsertProfile(session.user.id, parsed.data) });
+  } catch (error) {
+    if (error instanceof ProfileWeightConflict) return Response.json({ error: error.message }, { status: 409 });
+    throw error;
+  }
 }

@@ -11,6 +11,8 @@
     "test:password-reset": "node scripts/password-reset-test.mjs",
     "test:mysql": "node scripts/mysql-integration-test.mjs",
     "test:mysql-pool": "node --test scripts/mysql-pool.test.mjs",
+    "test:measurements": "node --test scripts/measurements.test.mjs",
+    "test:measurement-integration": "node scripts/measurement-integration-test.mjs",
     "test:test-isolation": "node --test scripts/local-test-app.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

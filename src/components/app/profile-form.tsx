@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * 个人资料表单：性别、身高、体重、目标体重。
+ * 个人资料表单：性别、身高、目标体重；测量体重由身体变化记录维护。
  * 所有字段都可以留空（= 未填写），留空保存时提交 null。
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { LoaderCircle, Save, Ruler, Scale, VenusAndMars } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,12 +16,11 @@ import { api } from "@/lib/api-client";
 import { GENDER_LABELS, type BodyProfile, type Gender } from "@/lib/profile";
 
 /** 数值输入统一转字符串管理：空字符串代表未填写，提交时转回 null。 */
-type NumberKey = "heightCm" | "weightKg" | "targetWeightKg";
+type NumberKey = "heightCm" | "targetWeightKg";
 type FormState = { gender: Gender | null } & Record<NumberKey, string>;
 
 const NUMBER_FIELDS: { key: NumberKey; label: string; unit: string; icon: typeof Ruler; min: number; max: number; step: number; placeholder: string }[] = [
   { key: "heightCm", label: "身高", unit: "cm", icon: Ruler, min: 50, max: 280, step: 1, placeholder: "如 170" },
-  { key: "weightKg", label: "体重", unit: "kg", icon: Scale, min: 20, max: 500, step: 0.5, placeholder: "如 65.5" },
   { key: "targetWeightKg", label: "目标体重", unit: "kg", icon: Scale, min: 20, max: 500, step: 0.5, placeholder: "如 60" },
 ];
 
@@ -31,7 +31,6 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
   const [form, setForm] = useState<FormState>(() => ({
     gender: initialProfile?.gender ?? null,
     heightCm: initialProfile?.heightCm?.toString() ?? "",
-    weightKg: initialProfile?.weightKg?.toString() ?? "",
     targetWeightKg: initialProfile?.targetWeightKg?.toString() ?? "",
   }));
   const [busy, setBusy] = useState(false);
@@ -46,7 +45,6 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
         body: JSON.stringify({
           gender: form.gender,
           heightCm: toNumberOrNull(form.heightCm),
-          weightKg: toNumberOrNull(form.weightKg),
           targetWeightKg: toNumberOrNull(form.targetWeightKg),
         }),
       });
@@ -106,6 +104,11 @@ export function ProfileForm({ initialProfile }: { initialProfile: BodyProfile | 
             );
           })}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/25 p-4">
+        <div><p className="flex items-center gap-2 text-sm font-medium"><Scale className="size-4 text-primary" aria-hidden />体重</p><p className="mt-1 text-xs text-muted-foreground">到身体变化中记录和修改，最新测量会同步到这里。</p></div>
+        <Link href="/measurements" className="text-sm font-medium text-primary hover:underline">{initialProfile?.weightKg != null ? `${initialProfile.weightKg} kg · 查看记录` : "记录身体指标"}</Link>
       </div>
 
       <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={busy}>
