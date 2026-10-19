@@ -72,7 +72,7 @@ export default async function TodayPage() {
             {entries.length > 4 && <Link href="/diary" className="mt-3 block text-xs text-primary">查看全部 {entries.length} 项记录 →</Link>}
           </CardContent>
         </Card>
-        <div className="flex flex-col justify-between rounded-2xl border border-[#dfe6d5] bg-[#edf1e5] p-6 dark:border-border dark:bg-secondary">
+        <div className="flex flex-col justify-between rounded-2xl border border-border bg-secondary p-6">
           <div><span className="text-[11px] font-medium tracking-[0.14em] text-primary">让记录更轻松</span><h2 className="mt-3 text-xl leading-relaxed font-semibold">把常吃的食物，<br />留在自己的食物库。</h2><p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">收藏常用食物，下次记录时快速找到。每一餐，都可以少一点繁琐。</p></div>
           <Link href="/foods" className="mt-5 flex items-center gap-2 text-sm font-medium text-primary">整理我的食物库<ArrowRight className="size-4" aria-hidden /></Link>
         </div>

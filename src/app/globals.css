@@ -52,84 +52,84 @@
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --background: #f6f7f2;
-  --foreground: #25382d;
+  --background: #ffffff;
+  --foreground: #111111;
   --card: #ffffff;
-  --card-foreground: #25382d;
+  --card-foreground: #111111;
   --popover: #ffffff;
-  --popover-foreground: #25382d;
-  --primary: #315b43;
+  --popover-foreground: #111111;
+  --primary: #111111;
   --primary-foreground: #ffffff;
-  --secondary: #eaf0e5;
-  --secondary-foreground: #315b43;
-  --muted: #f0f2ec;
-  --muted-foreground: #697466;
-  --accent: #eaf0e5;
-  --accent-foreground: #315b43;
-  --destructive: #b84e42;
-  --border: #e6e9df;
-  --input: #dce2d7;
-  --ring: #69865b;
-  --chart-1: #69865b;
-  --chart-2: #6696aa;
-  --chart-3: #cea45e;
-  --chart-4: #bf8273;
-  --chart-5: #9483ac;
-  /* 品牌反白面板（auth 侧栏、今日能量卡）的固定配色，不随明暗主题切换 */
-  --brand-deep: #315b43;
-  --brand-light: #c2dc9b;
-  --brand-pale: #d2e6bf;
-  --brand-cream: #eaf0e5;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #111111;
+  --muted: #f5f5f5;
+  --muted-foreground: #6f6f6f;
+  --accent: #f5f5f5;
+  --accent-foreground: #111111;
+  --destructive: #dc2626;
+  --border: #e8e8e8;
+  --input: #d4d4d4;
+  --ring: #111111;
+  --chart-1: #171717;
+  --chart-2: #404040;
+  --chart-3: #737373;
+  --chart-4: #a3a3a3;
+  --chart-5: #d4d4d4;
+  /* 品牌对比面板（auth 侧栏、今日能量卡）的固定配色，不随明暗主题切换 */
+  --brand-deep: #111111;
+  --brand-light: #e5e5e5;
+  --brand-pale: #a3a3a3;
+  --brand-cream: #ffffff;
   --radius: 0.75rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #25382d;
-  --sidebar-primary: #315b43;
+  --sidebar-foreground: #111111;
+  --sidebar-primary: #111111;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eaf0e5;
-  --sidebar-accent-foreground: #315b43;
-  --sidebar-border: #e6e9df;
-  --sidebar-ring: #69865b;
+  --sidebar-accent: #f5f5f5;
+  --sidebar-accent-foreground: #111111;
+  --sidebar-border: #e8e8e8;
+  --sidebar-ring: #111111;
 }
 
 .dark {
-  --background: #18211c;
-  --foreground: #eef2e9;
-  --card: #202c24;
-  --card-foreground: #eef2e9;
-  --popover: #202c24;
-  --popover-foreground: #eef2e9;
-  --primary: #b0cc9a;
-  --primary-foreground: #1c3022;
-  --secondary: #2a3a2d;
-  --secondary-foreground: #c8ddba;
-  --muted: #29342c;
-  --muted-foreground: #a3b09f;
-  --accent: #304434;
-  --accent-foreground: #eef2e9;
-  --destructive: #ef998c;
-  --border: #344037;
-  --input: #405145;
-  --ring: #b0cc9a;
-  --chart-1: #a4c58a;
-  --chart-2: #83b4c8;
-  --chart-3: #daba80;
-  --chart-4: #d69c8b;
-  --chart-5: #b4a2ce;
-  --sidebar: #202c24;
-  --sidebar-foreground: #eef2e9;
-  --sidebar-primary: #b0cc9a;
-  --sidebar-primary-foreground: #1c3022;
-  --sidebar-accent: #304434;
-  --sidebar-accent-foreground: #eef2e9;
-  --sidebar-border: #344037;
-  --sidebar-ring: #b0cc9a;
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #141414;
+  --card-foreground: #fafafa;
+  --popover: #141414;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #0a0a0a;
+  --secondary: #262626;
+  --secondary-foreground: #e5e5e5;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #1f1f1f;
+  --accent-foreground: #fafafa;
+  --destructive: #f87171;
+  --border: #262626;
+  --input: #404040;
+  --ring: #d4d4d4;
+  --chart-1: #fafafa;
+  --chart-2: #d4d4d4;
+  --chart-3: #a3a3a3;
+  --chart-4: #737373;
+  --chart-5: #525252;
+  --sidebar: #141414;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #1f1f1f;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #262626;
+  --sidebar-ring: #d4d4d4;
 }
 
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { @apply font-sans; }
   body { @apply bg-background text-foreground; }
-  ::selection { background: #d8e6cd; color: #25382d; }
+  ::selection { background: #111111; color: #ffffff; }
   button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
 }
 

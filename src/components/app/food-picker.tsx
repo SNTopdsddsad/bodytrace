@@ -54,7 +54,7 @@ function FoodRow({ food, onPick }: { food: Food; onPick: (f: Food) => void }) {
       <div>
         <div className="flex items-center gap-1.5 font-medium">
           {food.isFavorite && (
-            <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
+            <Star className="size-3.5 fill-foreground text-foreground" aria-hidden />
           )}
           {food.name}
         </div>

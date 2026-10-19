@@ -70,7 +70,7 @@ export function MealSection({
   }
 
   return (
-    <section id={`meal-${mealType}`} className="scroll-mt-6 overflow-hidden rounded-2xl border bg-card shadow-[0_2px_12px_-8px_#233e2e26]">
+    <section id={`meal-${mealType}`} className="scroll-mt-6 overflow-hidden rounded-2xl border bg-card shadow-[0_2px_12px_-8px_#00000026]">
       {/* 区块标题栏：彩色图标 + 餐名 + 小计 */}
       <div className="flex items-center justify-between gap-3 border-b px-4 py-4 sm:px-5">
         <div className="flex items-center gap-2.5">

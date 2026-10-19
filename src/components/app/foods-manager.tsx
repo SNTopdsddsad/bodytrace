@@ -186,7 +186,7 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
                         className={
                           "size-5 " +
                           (f.isFavorite
-                            ? "fill-amber-400 text-amber-400"
+                            ? "fill-foreground text-foreground"
                             : "text-muted-foreground")
                         }
                         aria-hidden
