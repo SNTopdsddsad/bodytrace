@@ -101,6 +101,24 @@ try {
   }
   check("删除记录成功", (await api(a, `/api/v1/meals/${entry.id}`, "DELETE")).status === 200);
   check("重复删除返回不存在", (await api(a, `/api/v1/meals/${entry.id}`, "DELETE")).status === 404);
+
+  // 一键清空：重新记一笔餐和一条测量，验证清空范围、账号隔离与硬删除。
+  assert.equal((await api(a, "/api/v1/measurements", "POST", { requestId: randomUUID(), measurement: { kind: "weight", date: today, value: "80.1" } })).status, 201);
+  const presetFoodId = (await api(a, "/api/v1/foods")).json.foods[0].id;
+  assert.equal((await api(a, "/api/v1/meals", "POST", { date: today, mealType: "lunch", foodId: presetFoodId, grams: 150 })).status, 201);
+  assert.equal((await api(b, "/api/v1/measurements", "POST", { requestId: randomUUID(), measurement: { kind: "bodyFat", date: today, value: "18.5" } })).status, 201);
+  check("未登录不能一键清空", (await api(null, "/api/v1/records", "DELETE")).status === 401);
+  const cleared = (await api(a, "/api/v1/records", "DELETE")).json;
+  check("一键清空返回两类删除数量", cleared.ok === true && cleared.cleared.mealEntries === 1 && cleared.cleared.measurements === 1);
+  check("清空后当日饮食与全部指标为空", (await api(a, `/api/v1/meals?date=${today}`)).json.entries.length === 0 && (await api(a, "/api/v1/measurements?range=all")).json.entries.length === 0);
+  check("清空保留目标与个人资料", (await api(a, "/api/v1/goals")).json.goals.calories === 2200 && (await api(a, "/api/v1/profile")).json.profile.heightCm === 175.5);
+  check("清空只影响本人记录", (await api(b, "/api/v1/measurements?range=all")).json.entries.length === 1);
+  const [[mealLeft]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_meal_entry WHERE user_id = ?", [a.id]);
+  const [[measureLeft]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_measurement WHERE user_id = ?", [a.id]);
+  check("清空为硬删除，软删除测量行一并移除", mealLeft.count === 0 && measureLeft.count === 0);
+  const repeat = (await api(a, "/api/v1/records", "DELETE")).json;
+  check("重复清空成功且数量为零", repeat.ok === true && repeat.cleared.mealEntries === 0 && repeat.cleared.measurements === 0);
+  check("清空后个人资料页正常渲染", (await api(a, "/profile")).status === 200);
   console.log(`\n${passed} 项 MySQL 集成检查通过。`);
 } finally {
   // 先停止应用，避免超时请求在清理后迟到写入；按预先记录的合成邮箱清理。

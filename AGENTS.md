@@ -19,6 +19,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [README.md](README.md)：当前已实现功能、本地环境、命令和接口入口。
 - [开发指南](docs/BodyTrace_Nextjs_MySQL_Development_Guide.md)：架构、数据语义、权限、迁移和后续路线。
 - [产品与界面设计指南](docs/BodyTrace_Product_UI_Design_Guide.md)：产品方向、视觉、交互状态和页面验收。
+- [API 参考](docs/BodyTrace_API_Reference.md)：已实现业务接口按模块分类的契约、参数校验与响应示例。
 - 两份指南包含后续规划。当前已实现体重、体脂率、血压持续记录；训练记录、报告、时间线、OCR、助手和 SwiftUI 客户端仍是规划，也不要为无关任务提前添加空接口、占位入口或新目录体系。
 - 开始修改前简要说明用户行为、变更范围和验证方式；遇到会影响范围或数据契约的冲突，说明差异并按当前任务对齐。
 
@@ -85,7 +86,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## 界面与交互
 
-- 界面改动先读设计指南相关章节，沿用 `src/app/globals.css` 的语义令牌、暖白背景和深绿操作色，优先复用现有业务组件及 Base UI 组件 API。
+- 界面改动先读设计指南相关章节，沿用 `src/app/globals.css` 的语义令牌、白色背景和黑色对比色，优先复用现有业务组件及 Base UI 组件 API。
 - 手机优先，核对桌面、手机导航和安全区域；交互元素使用正确语义，输入有标签和单位，图标按钮有可访问名称，键盘焦点可见。
 - 完整处理正常、空状态、输入错误、保存中和失败状态；保存期间防止重复提交，失败后保留可重试的输入。不能只展示 toast 或静态假成功代替真实保存结果。
 - 请求结果未知时先核对服务端状态，不自动重复创建。新增入口、导航和数据展示必须对应实际能力；设计指南的目标导航按具体任务推进。

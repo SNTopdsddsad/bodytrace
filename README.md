@@ -14,6 +14,7 @@
 - **饮食计划·碳循环**：一周七天安排高/中/低碳日（提供三种模板），每种日型独立目标（默认按每日目标推导：高碳日碳水 ×1.5 脂肪减半、低碳日碳水减半脂肪 ×1.3）；生效后首页、日记按日期显示当天目标与日型徽标，趋势图目标线按天变化；支持停用（保留配置）与删除
 - **个人资料**：身高/性别/目标体重，可分次填写；体重来自最新测量，数据齐全时自动计算 BMI（中国成人标准分级）和目标体重差距
 - **身体变化**：持续记录体重、体脂率和血压，支持补录、同日多次测量、备注、修改和删除；血压分晨间/夜间记录，趋势同屏对比。按近 7 / 30 / 90 天或全部回看趋势和历史。最新体重同步到个人资料；原资料体重仅保留作参考，不自动生成历史。
+- **数据管理**：个人资料页一键清空全部饮食记录与身体指标（二次确认后同一事务硬删除）；个人食物库、目标、计划与资料保持不变。
 - **忘记密码**：登录页进入找回流程，使用一次性链接设置新密码；当前暂不发送邮件，本地开发时链接输出到终端。
 - **历史不篡改**：饮食记录存营养快照，改/删食物库不影响旧记录
 
@@ -136,7 +137,7 @@ src/
 
 ## REST API 一览（给未来的 App 用）
 
-所有接口需登录：Web 用 cookie；App 在登录后拿 token 放 `Authorization: Bearer <token>` 头（bearer 插件已启用）。注意 better-auth 的 CSRF 防护要求请求带 `Origin` 头。
+所有接口需登录：Web 用 cookie；App 在登录后拿 token 放 `Authorization: Bearer <token>` 头（bearer 插件已启用）。注意 better-auth 的 CSRF 防护要求请求带 `Origin` 头。各接口的完整契约（参数校验、响应示例、错误码）见 [API 参考文档](docs/BodyTrace_API_Reference.md)。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -157,6 +158,7 @@ src/
 | GET/PUT | `/api/v1/profile` | 基础资料；读取的体重优先取最新测量 |
 | GET/POST | `/api/v1/measurements` | 身体指标；GET 支持 `range=7/30/90/all`，默认 30 |
 | GET/PATCH/DELETE | `/api/v1/measurements/:id` | 指标详情、修改、删除 |
+| DELETE | `/api/v1/records` | 一键清空当前用户全部饮食记录与身体指标（不影响食物库、目标、计划与资料） |
 
 身体指标类型为 `weight`、`bodyFat`、`bloodPressure`。新增请求为 `{requestId, measurement}`，`requestId` 是本次操作的 UUID，网络重试复用同一编号；`measurement` 包含 `kind`、`date`、可选的 `time` 和 `note`。体重/体脂率使用十进制字符串 `value`（kg / %，最多两位小数）；血压使用整数 `systolic` 和 `diastolic`（mmHg），两项必须成对填写，并携带 `period`（`morning` 晨间 / `evening` 夜间），其他类型不接受该字段。修改请求为 `{version, measurement}`，删除请求为 `{version}`，旧版本冲突返回 409。
 

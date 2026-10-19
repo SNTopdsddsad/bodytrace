@@ -3,12 +3,14 @@
  * 右侧根据已填数据展示 BMI 和目标体重差距。
  */
 import Link from "next/link";
-import { ArrowRight, AtSign, Gauge, Scale, UserRound } from "lucide-react";
+import { ArrowRight, AtSign, Database, Gauge, Scale, UserRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
 import { ProfileForm } from "@/components/app/profile-form";
+import { ClearRecordsButton } from "@/components/app/clear-records-button";
 import { getSession } from "@/lib/api-auth";
 import { getProfileContext } from "@/services/profile";
+import { getRecordCounts } from "@/services/records";
 import { bmiLabel, calcBmi } from "@/lib/profile";
 import { round1 } from "@/lib/nutrition";
 
@@ -27,7 +29,10 @@ function MetricRow({ icon: Icon, label, value, hint }: { icon: typeof Gauge; lab
 export default async function ProfilePage() {
   const session = await getSession();
   const user = session!.user;
-  const context = await getProfileContext(user.id);
+  const [context, recordCounts] = await Promise.all([
+    getProfileContext(user.id),
+    getRecordCounts(user.id),
+  ]);
   const profile = context?.profile ?? null;
   const latestWeight = context?.latestWeight ?? null;
 
@@ -97,6 +102,22 @@ export default async function ProfilePage() {
               <Link href="/goals" className="mt-4 flex items-center justify-between border-t pt-4 text-xs text-muted-foreground transition-colors hover:text-primary">
                 调整每日营养目标<ArrowRight className="size-4" aria-hidden />
               </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Database className="size-4 text-primary" aria-hidden />数据管理</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs leading-6 text-muted-foreground">
+                {recordCounts.mealEntries + recordCounts.measurements === 0
+                  ? "当前没有饮食或身体指标记录。"
+                  : `当前有 ${recordCounts.mealEntries} 条饮食记录、${recordCounts.measurements} 条身体指标记录。清空后日记、趋势和最新指标立即归零，无法恢复；个人食物库、目标、计划和个人资料保持不变。`}
+              </p>
+              <div className="mt-4">
+                <ClearRecordsButton counts={recordCounts} />
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -210,6 +210,7 @@ Server Actions 可用于网页特定交互；核心业务仍有稳定 HTTP API�
 | GET 与 PATCH /api/v1/profile | 获取与更新本人档案 | 只接受允许修改的字段 |
 | GET 与 POST /api/v1/measurements | 查询与新增指标 | 来源、单位、时间和分页 |
 | PATCH 与 DELETE /api/v1/measurements/{id} | 修正或删除指标 | 归属校验与版本冲突 |
+| DELETE /api/v1/records | 一键清空本人饮食记录与身体指标 | 同一事务硬删除；食物库、目标、计划与资料不动 |
 | GET 与 POST /api/v1/plans | 查询与创建计划 | 日期范围和版本 |
 | POST /api/v1/diet-records | 新增实际饮食记录 | 实绩独立于计划 |
 | POST /api/v1/training-records | 新增训练摘要 | 实际发生时间 |
@@ -220,7 +221,7 @@ Server Actions 可用于网页特定交互；核心业务仍有稳定 HTTP API�
 | GET /api/v1/timeline | 查询统一时间线 | 游标分页、过滤范围 |
 | POST /api/v1/exports | 创建资料导出 | 核对归属，返回任务或结果 |
 
-这是一份实施起点，尚未上线的功能不必提前生成空接口。每完成一个用户任务，同时补齐该任务的 API 契约和验证样例。
+这是一份实施起点，尚未上线的功能不必提前生成空接口。每完成一个用户任务，同时补齐该任务的 API 契约和验证样例。已实现接口的完整契约、参数校验与响应示例统一维护在 [API 参考文档](BodyTrace_API_Reference.md)，下表保留路线图用途。
 
 ### 5.2 一个指标接口的示例
 
