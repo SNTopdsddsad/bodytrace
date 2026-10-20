@@ -93,12 +93,13 @@ npm run dev         # 打开 http://localhost:3000
 
 MySQL 迁移位于 `drizzle/mysql/`，初始迁移显式采用 InnoDB、utf8mb4 与区分大小写的标识符比较。`drizzle/` 根目录里的旧 PostgreSQL SQL 和 meta 仅作存档，不能应用到 MySQL。后续新表也要审查字符集和排序规则。`db:push` 只用于可重建的开发库；切换驱动不会自动导入 PostgreSQL 的旧账号或记录，旧数据库及其数据目录保留。
 
-MySQL 和密码找回测试不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行的应用。先启动本地 MySQL，再直接执行测试：
+MySQL 和密码找回测试不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行的应用。**本地 MySQL 统一用 Docker**：测试只连 `docker-compose.yml` 里的 `bodytrace-mysql`，不要装宿主机 MySQL 或连其他实例。先启动容器并确认 `healthy`，再直接执行测试：
 
 ```powershell
-docker compose up -d mysql
+docker compose up -d mysql   # 等容器 healthy 再往下：docker inspect --format='{{.State.Health.Status}}' bodytrace-mysql
 npm run test:mysql
 npm run test:password-reset
+docker compose stop mysql    # 跑完停掉
 ```
 
 默认测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`；需要其他本地测试库时设置 `TEST_DATABASE_URL`，只允许 `localhost` 或 `127.0.0.1`，并固定使用回环地址连接。测试会应用 MySQL 迁移，并在参考库为空时导入公开食物数据。不要把需要保留的业务资料放进这个测试库。

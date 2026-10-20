@@ -82,7 +82,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `db:push` 仅用于可重建的开发库；不要对真实业务库执行 reset、无条件清空、强制覆盖或试验性结构变更。已应用迁移通过新迁移修正，不随意改写历史。
 - `drizzle/` 根目录的 PostgreSQL SQL 与 meta 仅作存档，不能应用到 MySQL，也不要因切换数据库删除旧数据目录。
 - MySQL 不支持 PostgreSQL 的 `.returning()`；沿用 `$returningId()`、事务内回读及 `onDuplicateKeyUpdate()`。多步写入与并发修改保留必要的事务和行锁。
-- 本地 Docker 默认提供 MySQL 8.4、宿主机端口 3307。`docker-compose.yml` 的数据卷目前是 Windows 路径 `D:/docker/bodytrace-mysql`；在 macOS/Linux 使用前核对并配置合适的本地挂载，不直接假定可用，也不要重建或清除已有数据卷。
+- **本地 MySQL 统一用 Docker**：所有本地开发与测试都连 `docker-compose.yml` 里的 `bodytrace-mysql`（MySQL 8.4，宿主机端口 3307），不要装宿主机 MySQL、不要连别人的本地实例，也不要为跑测试另起数据库。启动顺序为 `docker compose up -d mysql`，等容器 `healthy`（`docker inspect --format='{{.State.Health.Status}}' bodytrace-mysql`）再执行命令；跑完用 `docker compose stop mysql` 停掉。
+- `docker-compose.yml` 的数据卷目前是 Windows 路径 `D:/docker/bodytrace-mysql`；在 macOS/Linux 使用前核对并配置合适的本地挂载，不直接假定可用，也不要重建或清除已有数据卷。
 
 ## 界面与交互
 
@@ -128,7 +129,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - 当前测试使用 Node.js 内置测试工具和脚本，尚未安装 Vitest 或 Playwright；没有通用 `npm test`。按现有能力验证，不照规划文档运行不存在的命令。
 - MySQL 与密码找回测试通过 `scripts/lib/local-test-app.mjs` 创建独立应用；不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行应用。
-- 默认本地测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`；改库使用 `TEST_DATABASE_URL`，仅允许 `localhost` 或 `127.0.0.1`。该配置控制数据库，不代表有独立库名；需要保留的数据不要放进测试库。
+- 默认本地测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`，即上面的 Docker MySQL；改库使用 `TEST_DATABASE_URL`，仅允许 `localhost` 或 `127.0.0.1`，不要指向云库或其他人的实例。该配置控制数据库，不代表有独立库名；需要保留的数据不要放进测试库。
+- 需要本地数据库的验证一律按 Docker 方式执行：先确认容器 `healthy`，再跑 `npm run test:mysql` 等命令。容器起不来时记录原因并把该项列为未验证，不要改用宿主机 MySQL 或云库顶替。
 - 集成测试会应用迁移，参考库为空时导入公开数据，并清理本轮合成账号与测试应用。新测试沿用这一生命周期，失败路径也必须释放自己的连接、服务器和临时副本。
 - 旧 `scripts/smoke-test.mjs` 和 `scripts/debug-pages.mjs` 会向目标应用写入账号及业务数据，且没有完整账号清理；前者接受 `SMOKE_BASE_URL`，后者固定请求 3000。优先用隔离测试，不在用户应用或云库上直接运行这两个脚本。
 - 业务规则测试覆盖独立预期值、边界、未登录、跨账号和失败路径；不要复制实现公式自证正确。样式修改以浏览器检查为主，HTTP 200 不能代替交互、响应式和键盘操作验证。
