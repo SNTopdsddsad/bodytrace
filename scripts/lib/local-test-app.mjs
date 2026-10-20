@@ -40,7 +40,7 @@ async function removeTestProject(project) {
 }
 
 /** 独立目录、独立进程、自动端口；应用与清理连接共用同一个测试连接串。 */
-export async function startLocalTestApp() {
+export async function startLocalTestApp({ smsMock = false, smsSettings = { codeLength: 6, expireMinutes: 5, rateLimitSeconds: 60 } } = {}) {
   const databaseUrl = resolveTestDatabaseUrl();
   const environment = {
     ...process.env,
@@ -51,6 +51,15 @@ export async function startLocalTestApp() {
     NODE_ENV: "development",
     APP_TIMEZONE: "Asia/Shanghai",
     AUTH_TRUSTED_IP_HEADER: "",
+    // 所有隔离测试均清除继承的真实短信凭证；仅手机号测试的副本替换供应商边界。
+    ALIYUN_ACCESS_KEY_ID: "",
+    ALIYUN_ACCESS_KEY_SECRET: "",
+    ALIYUN_SECURITY_TOKEN: "",
+    ALIYUN_SMS_SIGN_NAME: "",
+    ALIYUN_SMS_TEMPLATE_CODE: "",
+    SMS_CODE_LENGTH: String(smsSettings.codeLength),
+    SMS_CODE_EXPIRE_MINUTES: String(smsSettings.expireMinutes),
+    SMS_RATE_LIMIT_SECONDS: String(smsSettings.rateLimitSeconds),
   };
   // 父进程只负责测试 SQL 和清理，配置与子进程完全一致。
   process.env.DATABASE_URL = databaseUrl;
@@ -106,6 +115,25 @@ export async function startLocalTestApp() {
     for (const path of ["src", "public", "package.json", "package-lock.json", "tsconfig.json", "next.config.ts"]) {
       await cp(join(workspace, path), join(project, path), { recursive: true });
     }
+    if (smsMock) {
+      // 只替换独立副本里的供应商，不在业务代码增加“测试验证码”或绕过认证开关。
+      await writeFile(join(project, "src/lib/aliyun-sms.ts"), `
+import { getSmsCodeSettings } from "@/lib/sms-config";
+import { db } from "@/db";
+import { verification } from "@/db/schema";
+export function isSmsConfigured() { return true; }
+export async function sendLoginSms(phoneNumber: string, code: string) {
+  const pattern = new RegExp("^\\\\d{" + getSmsCodeSettings().codeLength + "}$");
+  if (!/^\\+861[3-9]\\d{9}$/.test(phoneNumber) || !pattern.test(code)) throw new Error("invalid mock SMS");
+  // 仅测试替身保留合成验证码，生产认证记录只存 HMAC 摘要。
+  const id = "sms-test:" + phoneNumber;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + getSmsCodeSettings().expireMinutes * 60000);
+  await db.insert(verification).values({ id, identifier: id, value: code, expiresAt, createdAt: now, updatedAt: now })
+    .onDuplicateKeyUpdate({ set: { value: code, expiresAt, updatedAt: now } });
+}
+`);
+    }
     // 开发编译器会独立读取配置文件，因此根目录也必须写进临时副本。
     const configPath = join(project, "next.config.ts");
     const configSource = await readFile(configPath, "utf8");
@@ -152,7 +180,7 @@ export async function startLocalTestApp() {
     const response = await fetch(new URL("/login", base), { signal: AbortSignal.timeout(45_000) });
     assert.equal(response.status, 200, `独立测试应用无法正常加载\n${output}`);
     console.log(`测试应用 ${base.origin}，监听 PID ${listenerPid}，连接本地 MySQL。`);
-    return { base: base.origin, pool, stop };
+    return { base: base.origin, pool, stop, smsRateLimitSecret: environment.BETTER_AUTH_SECRET };
   } catch (error) {
     try { await stop(); } finally { await pool.end(); }
     throw error;

@@ -14,13 +14,18 @@
     "test:measurements": "node --test scripts/measurements.test.mjs",
     "test:measurement-integration": "node scripts/measurement-integration-test.mjs",
     "test:test-isolation": "node --test scripts/local-test-app.test.mjs",
+    "test:phone-auth": "node --test scripts/phone-number.test.mjs scripts/aliyun-sms.test.mjs scripts/sms-config.test.mjs scripts/sms-rate-limit.test.mjs scripts/login-form.test.mjs",
+    "test:phone-auth-integration": "node scripts/phone-auth-integration-test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:import-reference": "node scripts/import-food-reference.mjs"
   },
   "dependencies": {
+    "@alicloud/dysmsapi20170525": "^4.6.0",
+    "@alicloud/openapi-core": "^1.0.8",
     "@base-ui/react": "^1.8.0",
+    "@darabonba/typescript": "^1.0.5",
     "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

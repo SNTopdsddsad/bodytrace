@@ -4,5 +4,8 @@
  * 未来的手机 app 则直接带 Authorization 头请求 API，无需这个文件。
  */
 import { createAuthClient } from "better-auth/react";
+import { phoneNumberClient } from "better-auth/client/plugins";
 
-export const authClient = createAuthClient();
+export const authClient = createAuthClient({
+  plugins: [phoneNumberClient()],
+});

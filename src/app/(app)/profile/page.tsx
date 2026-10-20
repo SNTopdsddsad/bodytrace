@@ -3,7 +3,7 @@
  * 右侧根据已填数据展示 BMI 和目标体重差距。
  */
 import Link from "next/link";
-import { ArrowRight, AtSign, Database, Gauge, Scale, UserRound } from "lucide-react";
+import { ArrowRight, AtSign, Database, Gauge, Scale, Smartphone, UserRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
 import { ProfileForm } from "@/components/app/profile-form";
@@ -13,6 +13,7 @@ import { getProfileContext } from "@/services/profile";
 import { getRecordCounts } from "@/services/records";
 import { bmiLabel, calcBmi } from "@/lib/profile";
 import { round1 } from "@/lib/nutrition";
+import { maskPhoneNumber } from "@/lib/phone-number";
 
 function MetricRow({ icon: Icon, label, value, hint }: { icon: typeof Gauge; label: string; value: string; hint?: string }) {
   return (
@@ -98,7 +99,9 @@ export default async function ProfilePage() {
             </CardHeader>
             <CardContent>
               <MetricRow icon={UserRound} label="昵称" value={user.name} />
-              <MetricRow icon={AtSign} label="注册邮箱" value={user.email} />
+              {user.phoneNumber && user.phoneNumberVerified
+                ? <MetricRow icon={Smartphone} label="登录手机号" value={maskPhoneNumber(user.phoneNumber)} />
+                : <MetricRow icon={AtSign} label="注册邮箱" value={user.email} />}
               <Link href="/goals" className="mt-4 flex items-center justify-between border-t pt-4 text-xs text-muted-foreground transition-colors hover:text-primary">
                 调整每日营养目标<ArrowRight className="size-4" aria-hidden />
               </Link>

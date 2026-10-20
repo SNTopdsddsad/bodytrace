@@ -32,6 +32,8 @@ export const user = mysqlTable("bodytrace_user", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
+  phoneNumber: varchar("phone_number", { length: 16 }).unique(),
+  phoneNumberVerified: boolean("phone_number_verified").notNull().default(false),
   image: text("image"),
   createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   updatedAt: datetime("updated_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
@@ -78,6 +80,14 @@ export const verification = mysqlTable("bodytrace_verification", {
 });
 
 /* ---------------- 业务表 ---------------- */
+
+/** 短信额度跨进程共享；key 为用途或带服务端密钥的摘要，不保存原手机号/IP。 */
+export const smsRateLimit = mysqlTable("bodytrace_sms_rate_limit", {
+  id: varchar("id", { length: 64 }).primaryKey().notNull(),
+  windowStartedAt: datetime("window_started_at", { mode: "date", fsp: 3 }).notNull(),
+  count: int("count").notNull().default(0),
+  nextAllowedAt: datetime("next_allowed_at", { mode: "date", fsp: 3 }).notNull(),
+});
 
 const mealTypes = [
   "breakfast",

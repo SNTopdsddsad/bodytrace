@@ -1,6 +1,6 @@
 # BodyTrace · 饮食与健身记录
 
-记录每天的饮食、训练和身体变化。多用户，邮箱注册即可使用。
+记录每天的饮食、训练和身体变化。多用户，手机号验证码登录，首次验证自动注册；原邮箱账号继续使用邮箱密码登录。
 
 当前版本（v1）支持**饮食与身体指标记录**：食物库、四餐记录、每日目标、营养趋势，以及体重、体脂率和血压的持续记录。健身记录是二期计划。
 
@@ -25,7 +25,7 @@
 | 框架 | Next.js 16（App Router）+ React 19 + TypeScript |
 | UI | Tailwind CSS v4 + shadcn/ui（base-nova 风格）+ Recharts |
 | 数据库 | MySQL 8.0 / 8.4 + Drizzle ORM + mysql2 |
-| 认证 | better-auth（邮箱密码；Web 走 cookie，已启用 bearer 插件支持未来 App） |
+| 认证 | better-auth（手机号验证码＋原邮箱密码；Web 走 cookie，已启用 bearer 插件支持未来 App） |
 | 校验 | zod |
 
 ## 本地开发
@@ -70,7 +70,33 @@ npm run db:migrate  # 在目标 MySQL 上应用已审查的迁移
 npm run dev         # 打开 http://localhost:3000
 ```
 
-首次使用：注册页创建账号 → 自动预置食物库 → 开始记录。
+首次使用：手机号获取验证码并登录 → 自动创建账号、预置食物库 → 开始记录。仅支持中国大陆 +86 手机号；原邮箱账号从登录页的“原邮箱账号登录”进入。本次不提供绑定、改号或账号合并，手机号登录不会关联旧邮箱账号的数据。`/register` 跳转手机号登录；旧邮箱注册 API 为兼容现有调用保留。
+
+### 阿里云短信登录配置
+
+使用**阿里云中国站短信服务 SMS**（不是号码认证产品的“短信认证”接口）。需要企业资质、已完成审核和实名报备的签名、审核通过的验证码模板、可用余额或对应套餐。使用默认配置时，模板示例为：`您正在登录 BodyTrace，验证码为 ${code}，5 分钟内有效，请勿泄露给他人。` 模板变量固定为 `code`，有效期文案必须与 `SMS_CODE_EXPIRE_MINUTES` 一致；修改有效期时同步调整阿里云模板。
+
+在本地 `.env` 和部署平台的服务端密钥配置中填写以下变量，勿提交凭证，也不要使用 `NEXT_PUBLIC_` 前缀：
+
+```dotenv
+ALIYUN_ACCESS_KEY_ID=<专用 RAM 用户的 AccessKey ID>
+ALIYUN_ACCESS_KEY_SECRET=<AccessKey Secret>
+ALIYUN_SMS_SIGN_NAME=<审核通过并完成报备的签名名称>
+ALIYUN_SMS_TEMPLATE_CODE=<SMS_ 开头的模板 CODE>
+SMS_CODE_LENGTH=6
+SMS_CODE_EXPIRE_MINUTES=5
+SMS_RATE_LIMIT_SECONDS=60
+```
+
+RAM 最小发送权限为 `dysms:SendSms`（资源 `*`）；使用 STS 临时凭证时另设 `ALIYUN_SECURITY_TOKEN` 并确保更新过期凭证。新增的三个运行依赖为官方短信 SDK `@alicloud/dysmsapi20170525`、配置库 `@alicloud/openapi-core` 和运行时 `@darabonba/typescript`，用于 HTTPS 签名请求、超时和错误处理。应用固定调用 `dysmsapi.aliyuncs.com`，不向浏览器暴露密钥。
+
+首次部署本功能前，备份目标库并应用新增迁移 `npm run db:migrate`，再重启应用。迁移只增加可空唯一手机号、验证状态和短信频控表，保留旧用户 ID 及业务数据。未完整配置短信变量时，页面提示“短信登录暂未开放”，旧邮箱登录仍可用；配置完整不等于供应商审核、余额和实际送达已验证，需用自己的测试号码联调。
+
+验证码位数、有效期和同号重发间隔分别由 `SMS_CODE_LENGTH`、`SMS_CODE_EXPIRE_MINUTES`、`SMS_RATE_LIMIT_SECONDS` 控制，未设置时默认 `6` 位、`5` 分钟、`60` 秒；必须分别为 `4–6`、`1–30`、`1–3600` 范围内的整数，非法配置会报错。位数范围遵循[阿里云验证码模板变量规范](https://help.aliyun.com/zh/sms/user-guide/verification-code-template-specifications/)。登录页的验证码输入、有效期提示和重发倒计时使用同一份服务端配置。验证码最多尝试 3 次，成功后一次性消费；重发作废旧验证码。服务端仅保存验证码的 HMAC 摘要，重发和验证通过同一记录的行锁串行更新，错误校验不会重新创建旧码。
+
+服务端频控存入 MySQL：同手机号按配置的秒数间隔发送、每 24 小时最多 10 次；同可信来源每分钟最多 5 次。未配置可信代理时来源使用共享桶，生产代理配置参见前文。额度在取得行锁后按数据库 UTC 时钟计算窗口，失败和结果未知也占用额度；SDK 不自动重试短信请求。发送超时若已收到验证码可直接填写，登录结果未知时先核对会话。刷新页面后仍可填写已有验证码；重发倒计时按手机号独立记录，429 优先采用服务端返回的剩余等待时间。
+
+测试命令 `npm run test:phone-auth` 无需数据库、不会发短信；`npm run test:phone-auth-integration` 使用 Docker MySQL 和独立测试应用，只在临时副本替换短信供应商，并清除继承的真实短信凭证。首次注册、账号隔离和验证码消费仍走实际认证接口。
 
 ## 常用命令
 
@@ -88,6 +114,8 @@ npm run dev         # 打开 http://localhost:3000
 | `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及七个页面 |
 | `npm run test:test-isolation` | 验证测试不会采用云库配置，拒绝非本地测试连接 |
 | `npm run test:request-timeout` | 无需数据库，验证登录响应体卡住时 15 秒取消请求，以及正常返回和计时器清理 |
+| `npm run test:phone-auth` | 无需数据库，验证大陆号码规范、脱敏、官方短信 SDK 配置、失败与超时，不真实发送 |
+| `npm run test:phone-auth-integration` | 独立 Docker MySQL 应用验证手机号登录、自动注册、限额、验证码消费、旧邮箱与账号隔离，不真实发送 |
 | `npm run test:measurements` | 无需数据库，验证三类指标输入、日期、精度、变化计算和缺失日期 |
 | `npm run test:measurement-integration` | 独立本地 MySQL 测试应用，验证记录、重试、编辑冲突、删除与账号隔离 |
 
@@ -165,7 +193,7 @@ src/
 
 每种指标独立解析最新值；同日优先按测量时间排序，无时间时按录入顺序。图表按日取最近一条，血压的晨间、夜间各自取每天最近一条并画在同一趋势图中对比；概要卡血压的"较上一次"按同时段比较（晨与晨、夜与夜），未标记记录之间互相比较。列表保留全部原记录，缺失日期保持断开。迁移时已有测量时间的旧血压按 12:00 前后回填时段，无时间的保持未标记，编辑时可补选。删除后记录从读取、趋势和最新值中隐藏，保留删除标记避免旧请求重放；删除账号时随用户级联清理。已有测量体重后，个人资料的 `weightKg` 为读取值，更新资料时省略该字段，改体重使用指标接口。
 
-认证相关（better-auth 提供）：`POST /api/auth/sign-up/email`、`POST /api/auth/sign-in/email`、`POST /api/auth/sign-out`、`GET /api/auth/get-session`。
+认证相关（better-auth 提供）：`POST /api/auth/phone-number/send-otp`、`POST /api/auth/phone-number/verify`、原邮箱 `POST /api/auth/sign-in/email`、`POST /api/auth/sign-out`、`GET /api/auth/get-session`。完整契约及保留的邮箱 API 见 API 参考。
 
 ## 部署到自己的服务器
 

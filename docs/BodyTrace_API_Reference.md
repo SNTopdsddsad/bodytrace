@@ -45,7 +45,9 @@
 
 | 方法与路径 | 用途 |
 | --- | --- |
-| `POST /api/auth/sign-up/email` | 注册，`{name, email, password}`，成功返回用户并设置会话 cookie |
+| `POST /api/auth/phone-number/send-otp` | 发送登录验证码，`{phoneNumber}`；支持大陆 11 位号码或 `+86` 格式，内部统一为 `+86`，成功返回 `{message:"code sent"}`，不返回验证码 |
+| `POST /api/auth/phone-number/verify` | 验证并登录，`{phoneNumber, code}`；`code` 为数字字符串，位数由 `SMS_CODE_LENGTH` 决定（默认 6 位）；首次验证自动注册，成功返回 `{status:true, token, user}` 并设置会话 cookie |
+| `POST /api/auth/sign-up/email` | 保留的邮箱注册 API，`{name, email, password}`；网页注册入口已统一到手机号，不接受手机号相关字段 |
 | `POST /api/auth/sign-in/email` | 登录，`{email, password}`；App 可从响应取 token 供 Bearer 调用 |
 | `POST /api/auth/sign-out` | 退出登录，作废当前会话 |
 | `GET /api/auth/get-session` | 查询当前会话与用户，未登录返回 `null` |
@@ -53,6 +55,16 @@
 | `POST /api/auth/reset-password` | 使用一次性令牌设置新密码，`{token, newPassword}`；成功后旧会话全部失效 |
 
 密码找回的重置链接只通过一次性令牌交付，令牌有过期时间，使用后其他令牌作废。
+
+手机号验证码接口只接受表中字段，不开放 `updatePhoneNumber`、`disableSession` 或额外用户字段。手机号仅支持大陆 +86；`/sign-in/phone-number`（手机密码登录）、`/phone-number/request-password-reset` 和 `/phone-number/reset-password` 未开放，返回 404。不支持邮箱账号绑定手机号、改号或账号合并，旧邮箱账号继续使用邮箱登录。
+
+验证码有效期由 `SMS_CODE_EXPIRE_MINUTES` 决定（默认 5 分钟），最多 3 次错误尝试、成功一次性消费，重发作废旧码。验证码摘要和错误次数在独立命名空间按固定主键保存，通过事务行锁处理重发与验证；错误次数原地更新，不能复活被重发替换的旧码。格式错误返回 400 `INVALID_PHONE_INPUT`；错码/过期/已消费返回 `INVALID_OTP`、`OTP_EXPIRED`、`OTP_NOT_FOUND` 等 400，尝试耗尽返回 403 `TOO_MANY_ATTEMPTS`。未配置短信返回 503 `SMS_UNAVAILABLE`，发送失败或结果未知返回 503 `SMS_SEND_FAILED`；收到短信后仍可验证，不自动重发，也不要求本次页面曾发起发送。
+
+同号发送间隔由 `SMS_RATE_LIMIT_SECONDS` 决定（默认 60 秒），另有同号每 24 小时 10 次、同来源每分钟 5 次的限制。窗口从首次占用起计算，失败/结果未知也占额度。数据库频控返回 429 `SMS_RATE_LIMITED` 并带 `Retry-After` 秒数；另有 Better Auth 自身接口限流。只有受控生产代理配置的来源头会被信任，否则使用共享桶。
+
+上述配置均为整数：`SMS_CODE_LENGTH` 允许 4–6（遵循[阿里云验证码模板变量规范](https://help.aliyun.com/zh/sms/user-guide/verification-code-template-specifications/)），`SMS_CODE_EXPIRE_MINUTES` 允许 1–30，`SMS_RATE_LIMIT_SECONDS` 允许 1–3600；非法配置会报错。登录页使用服务端传入的同一份配置。
+
+手机注册用户的 `user` 含 `phoneNumber`（规范化 `+86` 号码）和 `phoneNumberVerified:true`；`email` 为兼容认证模型而生成的内部 `.invalid` 地址，不能用于邮件联系或当作已填写邮箱展示。旧邮箱用户的 `phoneNumber` 可为 null，业务归属仍统一使用 `user.id`。请求与响应包含私人身份信息，不能记录验证码、会话 token 或完整手机号。
 
 ## 食物库（foods）
 
