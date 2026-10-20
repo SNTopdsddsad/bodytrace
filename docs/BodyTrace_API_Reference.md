@@ -227,12 +227,13 @@
   ],
   "totals": { "calories": 236, "protein": 49.2, "carbs": 1.2, "fat": 3.8 },
   "goals": { "calories": 2200, "protein": 140, "carbs": 230, "fat": 70 },
-  "goalSource": "plan",
-  "goalDayType": "medium"
+  "goalSource": "plan"
 }
 ```
 
-目标按日期解析：启用中的碳循环计划且日期在起始日（含）之后按当天日型取值（`goalSource: "plan"`，`goalDayType` 为该日 `high`/`medium`/`low`）；否则回落到每日目标（`goalSource: "base"`，`goalDayType: null`）。`date` 必填且格式合法，否则 400。
+目标按日期解析：启用中的饮食计划且日期在起始日（含）之后按当天计划目标取值（`goalSource: "plan"`）；否则回落到每日目标（`goalSource: "base"`）。`date` 必填且格式合法，否则 400。
+
+> 契约变更：本响应**不再包含** `goalDayType`（高/中/低碳日型概念已从计划中移除）。
 
 ### GET /api/v1/trends?days=30
 
@@ -271,7 +272,9 @@
 
 ### GET /api/v1/plan
 
-查询碳循环计划（每用户至多一条），没有时返回 `{ "plan": null }`。`weekday` 序号 0=周一 … 6=周日，按序号升序返回。
+查询饮食计划（每用户至多一条），没有时返回 `{ "plan": null }`。`weekday` 序号 0=周一 … 6=周日：`weekdays` 按序号升序返回；`items` 先按 `weekday` 升序、再按餐次（早餐 → 午餐 → 晚餐 → 加餐）、最后按保存时的请求数组顺序返回。`items` 在同一 `weekday` + `mealType` 内的相对顺序由 PUT 请求数组顺序决定并稳定保存，客户端应保持用户看到的顺序提交。
+
+计划是**逐天手写**的：七天各带自己的四个目标数值（`calories`/`protein`/`carbs`/`fat`），每天的三餐（含加餐）另挂在 `items` 里，写具体食物与克数。食物项**不存营养快照**：每次读取都按食物库当前每 100g 数值实时折算（保留 1 位小数，与饮食记录一致），所以食物库数值改了，计划里显示的摄入量也随之变化。计划**没有版本或生效区间模型**，只有当前这一条：任一时刻“某天生效的目标”都由同一条计划按周几解析，历史上没有别的计划快照可回溯。
 
 ```json
 {
@@ -279,25 +282,61 @@
     "startDate": "2026-10-12",
     "isActive": true,
     "weekdays": [
-      { "weekday": 0, "dayType": "high", "calories": 2600, "protein": 140, "carbs": 320, "fat": 60 },
-      { "weekday": 1, "dayType": "medium", "calories": 2200, "protein": 140, "carbs": 230, "fat": 70 }
-      // … 共 7 项
+      { "calories": 2600, "protein": 140, "carbs": 320, "fat": 60 },
+      { "calories": 2200, "protein": 140, "carbs": 230, "fat": 70 }
+      // … 共 7 项，顺序为周一到周日
+    ],
+    "items": [
+      {
+        "id": "6c1e9d0a-6f1b-4a2e-9c33-0f0d8a7b41c2",
+        "weekday": 0,
+        "mealType": "breakfast",
+        "foodId": "9a1c4b8e-2f57-4c6a-8d10-7b3c5e9f2a44",
+        "name": "燕麦片",
+        "grams": 50,
+        "per100g": { "calories": 379, "protein": 13, "carbs": 60.8, "fat": 6.8 },
+        "calories": 189.5,
+        "protein": 6.5,
+        "carbs": 30.4,
+        "fat": 3.4
+      },
+      {
+        "id": "b7e2c4f1-8a03-4d95-b6d7-1c2e3f4a5b60",
+        "weekday": 0,
+        "mealType": "dinner",
+        "foodId": null,
+        "name": "已从食物库删除的菜",
+        "grams": 120,
+        "per100g": null,
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      }
     ]
   }
 }
 ```
 
+`per100g` 返回食物库当前每 100g 的原始营养（`calories`/`protein`/`carbs`/`fat`），供客户端编辑克数时直接折算；不能从已舍入的食物项营养反推。该字段只在响应中提供，不接受客户端指定，也不存为快照。
+
+**失效项兜底**：食物被删除后该行 `foodId` 变为 `null`，`name` 与 `grams` 仍按原样返回，`per100g` 和四个营养字段返回 `null`（不是 0）。客户端要展示名称与克数并标注“食物已删除”，`null` 既不能计入合计，也不能当成 0 参与换算。
+
 ### PUT /api/v1/plan
 
-整体保存（全量替换七天），事务内完成。`startDate` 之前的日子不受计划影响，仍走每日目标。
+整体保存（全量替换七天目标与全部食物项），事务内完成：计划行 upsert → 七天目标先删后插 → 食物项先删后插。`startDate` 之前的日子不受计划影响，仍走每日目标。
 
 ```json
 {
   "startDate": "2026-10-12",
   "isActive": true,
   "weekdays": [
-    { "dayType": "high", "calories": 2600, "protein": 140, "carbs": 320, "fat": 60 }
+    { "calories": 2600, "protein": 140, "carbs": 320, "fat": 60 }
     // … 恰好 7 项，顺序为周一到周日
+  ],
+  "items": [
+    { "weekday": 0, "mealType": "breakfast", "foodId": "9a1c4b8e-2f57-4c6a-8d10-7b3c5e9f2a44", "grams": 50 },
+    { "weekday": 0, "mealType": "lunch", "foodId": "3f8b1d2c-5e64-4a17-9b28-c0d1e2f3a4b5", "grams": 200 }
   ]
 }
 ```
@@ -306,13 +345,33 @@
 | --- | --- |
 | `startDate` | 合法日历日期 `YYYY-MM-DD` |
 | `isActive` | boolean；`false` 表示停用但保留配置 |
-| `weekdays` | 恰好 7 项；每项 `dayType` 为 `high`/`medium`/`low`，宏量同每日目标范围 |
+| `weekdays` | 恰好 7 项；宏量范围同每日目标（热量 500–8000、蛋白 0–600、碳水 0–1200、脂肪 0–500） |
+| `items` | 最多 400 项（七天 × 三餐都写满仍有余量），可为空数组（这一天只记目标不记食物）；每项 `weekday` 为 0–6、`mealType` 为 `breakfast`/`lunch`/`dinner`/`snack`、`foodId` 为 uuid 或 `null`、`grams` 为 1–5000、`id` 可选（uuid） |
+| `items[].foodId` | 为 uuid 时引用食物库里的食物；为 `null` 时表示保留一条已失效的行（食物已删除），此时必须带 `id` |
+| `items[].id` | `foodId` 为 `null` 时必填，取该项在 GET 响应里的 `id`；`foodId` 为 uuid 时可选（新增行不带） |
+| `items[].name` | 不接受客户端传名：`foodId` 为 uuid 时名称以食物库为准，`foodId` 为 `null` 时名称沿用当前计划里那一行原有的值 |
 
-成功返回 `{ plan }`（保存的输入；`weekdays` 不含 `weekday` 序号，数组顺序即周一到周日）。
+**归属校验**：`items[].foodId` 为 uuid 的项必须全部是当前用户食物库里的食物。服务端用一次查询校验全部引用，只要有一项不存在或不属于当前用户就**整单拒绝**，返回 `400 {"error":"计划中的食物不存在或不属于当前用户，请刷新食物库后重试"}`；此时计划、七天目标与食物项都保持原样，不存在部分写入。
+
+**失效项兜底（读-改-写）**：GET 返回的 `foodId: null` 行可以原样 PUT 回来，语义是「保留这一条已失效的行」，名称与克数照旧落库。服务端在当前计划的既有行里找 `id` 匹配且 `food_id IS NULL` 的行，沿用它的 `name` 写入新行（新行会得到新的 `id`，以 PUT 的读回值为准）。以下情况整单拒绝、旧计划不被改写，返回 `400`：
+
+| 情况 | 返回 |
+| --- | --- |
+| `foodId: null` 但缺 `id` | `400 {"error":"items.<下标>.id: 食物已删除的项要带上它在计划里的 id 才能保留"}`（Zod 校验阶段） |
+| `foodId: null` 的 `id` 不是当前计划里的失效行（别的计划的行、已失效又被替换的行、随便的 uuid） | `400 {"error":"要保留的失效食物项在当前计划里不存在，请刷新页面后重试"}` |
+| 混入他人的食物或已删除食物（`foodId` 为 uuid） | `400 {"error":"计划中的食物不存在或不属于当前用户，请刷新食物库后重试"}` |
+
+两种情况都只按「不存在」处理，不透露别人的资源是否存在。
+
+成功返回 `{ plan }`，是保存后**读回**的完整计划（不是回显请求体）：`weekdays` 不含 `weekday` 序号，数组顺序即周一到周日；`items` 带展开后的食物名与按当前食物库实时折算的营养，客户端可直接用它刷新界面。
+
+**同餐顺序**：`items` 在同一 `weekday` + `mealType` 内的相对顺序由请求数组顺序决定，服务端按数组下标保存并在读取时原样返回，重复保存同一数组不会改变顺序。顺序是服务端保存的副作用，客户端不需要传任何顺序字段，但必须保持用户看到的顺序提交——不要先按名称排序或按其他集合顺序重组后再提交。
+
+保存是全量覆盖，会改写 `startDate`（含）之后**所有**日期的目标与食物项，包括已经过去的日期：接口不保留旧目标，也没有计划版本历史。饮食记录保存的是写入时的摄入快照，不随目标变化；但趋势、日记中这些日期用来对照的目标会变成新保存的数值。客户端在改写历史时必须在界面上明示，不能只靠本接口的返回值暗示。
 
 ### DELETE /api/v1/plan
 
-删除计划（七天安排级联清理），之后所有日期回落到每日目标。返回 `{ "status": true }`。
+删除计划（七天目标与食物项级联清理），之后所有日期回落到每日目标。返回 `{ "status": true }`。
 
 ## 身体指标（measurements）
 
@@ -443,7 +502,7 @@
 
 ### DELETE /api/v1/records
 
-一键清空当前用户的**全部饮食记录与身体指标**：同一事务内硬删除，包括此前软删除的测量行。个人食物库、每日目标、碳循环计划和个人资料不受影响。接口可安全重试，重复调用返回数量 0。
+一键清空当前用户的**全部饮食记录与身体指标**：同一事务内硬删除，包括此前软删除的测量行。个人食物库、每日目标、饮食计划和个人资料不受影响。接口可安全重试，重复调用返回数量 0。
 
 ```json
 { "ok": true, "cleared": { "mealEntries": 42, "measurements": 17 } }

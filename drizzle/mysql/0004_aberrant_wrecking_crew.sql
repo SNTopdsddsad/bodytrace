@@ -1,0 +1,1 @@
+ALTER TABLE `bodytrace_diet_plan_item` ADD `position` int DEFAULT 0 NOT NULL;

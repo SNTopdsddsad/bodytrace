@@ -69,7 +69,7 @@ export function ClearRecordsButton({ counts }: { counts: RecordCounts }) {
             <DialogTitle>清空全部饮食与身体记录？</DialogTitle>
             <DialogDescription>
               将永久删除你的 {counts.mealEntries} 条饮食记录和 {counts.measurements} 条身体指标记录（此前单独删除过的测量数据也会一并彻底移除），无法恢复。
-              日记、趋势和最新指标会立即清零；个人食物库、每日目标、碳循环计划和个人资料保持不变。
+              日记、趋势和最新指标会立即清零；个人食物库、每日目标、饮食计划和个人资料保持不变。
             </DialogDescription>
           </DialogHeader>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

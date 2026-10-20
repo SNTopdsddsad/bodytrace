@@ -1,6 +1,6 @@
 /**
  * 趋势服务：最近 N 天每天的营养合计，供图表展示。
- * 有碳循环计划时附带每天生效的热量目标，图上画成按天目标线。
+ * 有饮食计划时附带每天生效的热量目标，图上画成按天目标线。
  */
 import { shiftDate, todayStr } from "@/lib/date";
 import { resolveDayGoals } from "@/lib/plan";
@@ -14,7 +14,7 @@ export type TrendPoint = {
   protein: number;
   carbs: number;
   fat: number;
-  /** 当天生效的热量目标（计划日按日型，否则基准目标） */
+  /** 当天生效的热量目标（计划内日期按当天计划目标，否则每日目标） */
   goalCalories: number;
 };
 

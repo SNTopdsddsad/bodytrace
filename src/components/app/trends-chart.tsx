@@ -2,7 +2,7 @@
 
 /**
  * 30 天趋势图：柱子 = 每日热量（左轴），折线 = 每日蛋白质（右轴），
- * 虚线折线 = 每天生效的热量目标（碳循环计划下按日型逐天变化）。
+ * 虚线折线 = 每天生效的热量目标（有生效计划时按天变化）。
  * Recharts 只能在客户端跑，所以标了 "use client"。
  */
 import {
@@ -56,7 +56,7 @@ export function TrendsChart({ data }: { data: Point[] }) {
             dot={false}
             isAnimationActive={false}
           />
-          {/* 每天生效的目标：碳循环计划下是阶梯状折线，平时是水平线 */}
+          {/* 每天生效的目标：有生效计划时是按天变化的折线，平时是水平线 */}
           <Line
             yAxisId="cal"
             type="stepAfter"

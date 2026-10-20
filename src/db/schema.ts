@@ -193,10 +193,8 @@ export const measurement = mysqlTable("bodytrace_measurement", {
 
 /* ---------------- 饮食计划 ---------------- */
 
-const dayTypes = ["high", "medium", "low"] as const;
-
 /**
- * 饮食计划（当前只有碳循环）：每用户至多一条。
+ * 饮食计划：每用户至多一条。
  * startDate 之前的日子不受计划影响，仍走 daily_goal 兜底。
  */
 export const dietPlan = mysqlTable(
@@ -214,10 +212,7 @@ export const dietPlan = mysqlTable(
   (t) => [unique("diet_plan_user_unique").on(t.userId)],
 );
 
-/**
- * 计划里一周七天的安排：weekday 0=周一 … 6=周日。
- * 目标按天存（同一日型的天数值相同），按天取用时无需再按日型换算。
- */
+/** 计划里一周七天的目标：weekday 0=周一 … 6=周日，每行只属于那一天。 */
 export const dietPlanDay = mysqlTable(
   "bodytrace_diet_plan_day",
   {
@@ -226,13 +221,41 @@ export const dietPlanDay = mysqlTable(
       .notNull()
       .references(() => dietPlan.id, { onDelete: "cascade" }),
     weekday: int("weekday").notNull(),
-    dayType: mysqlEnum("day_type", dayTypes).notNull(),
     calories: int("calories").notNull(),
     protein: int("protein").notNull(),
     carbs: int("carbs").notNull(),
     fat: int("fat").notNull(),
   },
   (t) => [unique("diet_plan_day_plan_weekday_unique").on(t.planId, t.weekday)],
+);
+
+/**
+ * 计划里某天某一餐的具体食物：只存食物引用、名称和克数，不存营养快照。
+ * 营养按食物库当前值实时折算（Q2A）；食物被删则 foodId 置空，
+ * name 与 grams 保留作为展示兜底，营养由服务层返回 null。
+ */
+export const dietPlanItem = mysqlTable(
+  "bodytrace_diet_plan_item",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
+    planId: varchar("plan_id", { length: 36 })
+      .notNull()
+      .references(() => dietPlan.id, { onDelete: "cascade" }),
+    /** 0=周一 … 6=周日 */
+    weekday: int("weekday").notNull(),
+    mealType: mysqlEnum("meal_type", mealTypes).notNull(),
+    foodId: varchar("food_id", { length: 36 }).references(() => food.id, { onDelete: "set null" }),
+    /** 写入时的食物名，食物被删后仍用于展示 */
+    name: varchar("name", { length: 255 }).notNull(),
+    grams: double("grams").notNull(),
+    /**
+     * 同一 weekday + mealType 内的显示顺序，由服务端按提交数组顺序赋值（0 起）。
+     * created_at 在同一条多行 INSERT 里取值相同，不能用来稳定排序。
+     */
+    position: int("position").notNull().default(0),
+    createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  },
+  (t) => [index("diet_plan_item_plan_weekday_idx").on(t.planId, t.weekday)],
 );
 
 /**
@@ -262,4 +285,5 @@ export const foodReference = mysqlTable(
 export type Food = typeof food.$inferSelect;
 export type MealEntry = typeof mealEntry.$inferSelect;
 export type DailyGoal = typeof dailyGoal.$inferSelect;
+export type DietPlanItem = typeof dietPlanItem.$inferSelect;
 export type UserProfile = typeof userProfile.$inferSelect;
