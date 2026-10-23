@@ -12,19 +12,53 @@ const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const runsDirectory = join(workspace, ".next", "test-projects");
 const defaultDatabaseUrl = "mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace";
 
-/** 测试不读取 .env，也不接受应用的 DATABASE_URL 或 SMOKE_BASE_URL。 */
+/**
+ * 测试连接解析规则：
+ * - 默认只使用本地 127.0.0.1:3307 的 Docker 测试库；
+ * - 显式设置 TEST_DATABASE_URL 可改成本地其他库；
+ * - 云端/远程测试库必须同时设置 ALLOW_REMOTE_TEST_DATABASE=1，
+ *   且库名必须含 test（如 body_test），不能与 .env 的生产 DATABASE_URL 同库。
+ * 测试不读取 .env 的 DATABASE_URL 作为测试库，也不接受 SMOKE_BASE_URL。
+ */
 export function resolveTestDatabaseUrl(env = process.env) {
   let url;
   try {
     url = new URL(env.TEST_DATABASE_URL ?? defaultDatabaseUrl);
   } catch {
-    throw new Error("TEST_DATABASE_URL 必须是有效的本地 MySQL 连接串");
+    throw new Error("TEST_DATABASE_URL 必须是有效的 MySQL 连接串");
   }
-  if (url.protocol !== "mysql:" || !["localhost", "127.0.0.1"].includes(url.hostname) || url.pathname.length < 2) {
-    throw new Error("TEST_DATABASE_URL 仅允许 localhost 或 127.0.0.1 的 MySQL 测试库");
+  const database = decodeURIComponent(url.pathname.slice(1));
+  if (url.protocol !== "mysql:" || !database) {
+    throw new Error("TEST_DATABASE_URL 必须是带库名的 mysql:// 连接串");
   }
-  // 固定回环地址，避免 localhost 的解析配置把测试连接转向其他机器。
-  url.hostname = "127.0.0.1";
+  if (!url.username || !url.password) {
+    throw new Error("TEST_DATABASE_URL 必须包含用户名和密码");
+  }
+
+  const localHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+  if (localHosts.has(url.hostname)) {
+    // 固定回环地址，避免 localhost 的解析配置把测试连接转向其他机器。
+    url.hostname = "127.0.0.1";
+    return url.href;
+  }
+
+  if (env.ALLOW_REMOTE_TEST_DATABASE !== "1") {
+    throw new Error(
+      "TEST_DATABASE_URL 指向了远程库；如确认是独立测试库，请同时设置 ALLOW_REMOTE_TEST_DATABASE=1",
+    );
+  }
+  if (!/(?:^|[_-])test(?:$|[_-])/i.test(database)) {
+    throw new Error("远程测试库的库名必须包含 test（例如 body_test），不能使用生产库名");
+  }
+  let productionDatabase = "";
+  try {
+    productionDatabase = env.DATABASE_URL ? decodeURIComponent(new URL(env.DATABASE_URL).pathname.slice(1)) : "";
+  } catch {
+    productionDatabase = "";
+  }
+  if (productionDatabase && productionDatabase === database) {
+    throw new Error("远程测试库不能与 .env 的 DATABASE_URL 使用同一个库");
+  }
   return url.href;
 }
 
@@ -42,11 +76,13 @@ async function removeTestProject(project) {
 /** 独立目录、独立进程、自动端口；应用与清理连接共用同一个测试连接串。 */
 export async function startLocalTestApp({ smsMock = false, smsSettings = { codeLength: 6, expireMinutes: 5, rateLimitSeconds: 60 } } = {}) {
   const databaseUrl = resolveTestDatabaseUrl();
+  const testSsl = process.env.TEST_DATABASE_SSL === "require" ? "require" : "";
+  const testCaFile = testSsl ? (process.env.TEST_DATABASE_SSL_CA_FILE ?? "") : "";
   const environment = {
     ...process.env,
     DATABASE_URL: databaseUrl,
-    DATABASE_SSL: "",
-    DATABASE_SSL_CA_FILE: "",
+    DATABASE_SSL: testSsl,
+    DATABASE_SSL_CA_FILE: testCaFile,
     BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
     NODE_ENV: "development",
     APP_TIMEZONE: "Asia/Shanghai",
@@ -63,8 +99,8 @@ export async function startLocalTestApp({ smsMock = false, smsSettings = { codeL
   };
   // 父进程只负责测试 SQL 和清理，配置与子进程完全一致。
   process.env.DATABASE_URL = databaseUrl;
-  process.env.DATABASE_SSL = "";
-  process.env.DATABASE_SSL_CA_FILE = "";
+  process.env.DATABASE_SSL = testSsl;
+  process.env.DATABASE_SSL_CA_FILE = testCaFile;
   const pool = createMySqlPool(1);
   let project;
   let server;
@@ -101,12 +137,12 @@ export async function startLocalTestApp({ smsMock = false, smsSettings = { codeL
     // 先验证本地连接，应用启动前完成迁移和必要的公开参考数据初始化。
     await pool.query("SELECT 1");
     await run(process.execPath, [join(workspace, "node_modules/drizzle-kit/bin.cjs"), "migrate"], {
-      cwd: workspace, env: environment, windowsHide: true, timeout: 60_000,
+      cwd: workspace, env: environment, windowsHide: true, timeout: 120_000,
     });
     const [[reference]] = await pool.query("SELECT COUNT(*) AS count FROM bodytrace_food_reference");
     if (reference.count === 0) {
       await run(process.execPath, [join(workspace, "scripts/import-food-reference.mjs")], {
-        cwd: workspace, env: environment, windowsHide: true, timeout: 60_000,
+        cwd: workspace, env: environment, windowsHide: true, timeout: 120_000,
       });
     }
 
@@ -179,7 +215,7 @@ export async function sendLoginSms(phoneNumber: string, code: string) {
     assert.notEqual(base.port, "3000", "测试不能占用用户的 3000 端口");
     const response = await fetch(new URL("/login", base), { signal: AbortSignal.timeout(45_000) });
     assert.equal(response.status, 200, `独立测试应用无法正常加载\n${output}`);
-    console.log(`测试应用 ${base.origin}，监听 PID ${listenerPid}，连接本地 MySQL。`);
+    console.log(`测试应用 ${base.origin}，监听 PID ${listenerPid}，连接独立测试库。`);
     return { base: base.origin, pool, stop, smsRateLimitSecret: environment.BETTER_AUTH_SECRET };
   } catch (error) {
     try { await stop(); } finally { await pool.end(); }

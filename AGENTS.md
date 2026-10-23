@@ -79,11 +79,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 环境变量以 `.env.example` 为入口；不覆盖用户已有 `.env`，不提交或输出连接密码、认证密钥、cookie、token、真实健康资料。开发和测试使用合成数据。
 - 应用表统一带 `bodytrace_` 前缀；该前缀不能替代环境隔离。数据库操作前核对目标库，真实库的写入或迁移必须在用户授权的任务范围内。
 - 连接复用 `src/db/index.ts` 与 `src/db/connection.ts`。维护脚本也使用同一连接配置，保留 utf8mb4、UTC、连接池上限及 TLS 证书验证，不为每个请求创建新池。
-- schema 变更流程：修改 `src/db/schema.ts` → `npm run db:generate` → 审查 `drizzle/mysql/` 的 SQL 与元数据 → 在本地测试库执行 `npm run db:migrate` 并验证。SQL 审查包括数据保留、外键、唯一约束、索引、字符集和排序规则。
+- schema 变更流程：修改 `src/db/schema.ts` → `npm run db:generate` → 审查 `drizzle/mysql/` 的 SQL 与元数据 → 在本地测试库（或显式开启的独立云测试库）执行 `npm run db:migrate` 并验证。SQL 审查包括数据保留、外键、唯一约束、索引、字符集和排序规则。
 - `db:push` 仅用于可重建的开发库；不要对真实业务库执行 reset、无条件清空、强制覆盖或试验性结构变更。已应用迁移通过新迁移修正，不随意改写历史。
 - `drizzle/` 根目录的 PostgreSQL SQL 与 meta 仅作存档，不能应用到 MySQL，也不要因切换数据库删除旧数据目录。
 - MySQL 不支持 PostgreSQL 的 `.returning()`；沿用 `$returningId()`、事务内回读及 `onDuplicateKeyUpdate()`。多步写入与并发修改保留必要的事务和行锁。
-- **本地 MySQL 统一用 Docker**：所有本地开发与测试都连 `docker-compose.yml` 里的 `bodytrace-mysql`（MySQL 8.4，宿主机端口 3307），不要装宿主机 MySQL、不要连别人的本地实例，也不要为跑测试另起数据库。启动顺序为 `docker compose up -d mysql`，等容器 `healthy`（`docker inspect --format='{{.State.Health.Status}}' bodytrace-mysql`）再执行命令；跑完用 `docker compose stop mysql` 停掉。
+- **本地 MySQL 统一用 Docker**：本地开发与默认测试都连 `docker-compose.yml` 里的 `bodytrace-mysql`（MySQL 8.4，宿主机端口 3307），不要装宿主机 MySQL、不要连别人的本地实例，也不要为跑测试另起数据库。确需云端独立测试库时，按验证章节的 `TEST_DATABASE_URL` + `ALLOW_REMOTE_TEST_DATABASE=1` + `_test` 库名规则执行，不得指向生产库。启动顺序为 `docker compose up -d mysql`，等容器 `healthy`（`docker inspect --format='{{.State.Health.Status}}' bodytrace-mysql`）再执行命令；跑完用 `docker compose stop mysql` 停掉。
 - `docker-compose.yml` 的数据卷目前是 Windows 路径 `D:/docker/bodytrace-mysql`；在 macOS/Linux 使用前核对并配置合适的本地挂载，不直接假定可用，也不要重建或清除已有数据卷。
 
 ## 界面与交互
@@ -121,8 +121,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `npx tsc --noEmit` | TypeScript 检查；新检出缺少生成类型时先执行 `npx next typegen` |
 | `npm run build` | 生产编译及路由检查；不能据此认定真实交互已验证 |
 | `npm run test:request-timeout` | 无需数据库，验证请求超时、取消与计时器清理 |
-| `npm run test:test-isolation` | 无需数据库，验证拒绝云库及采用显式本地测试连接 |
-| `npm run test:mysql` | 需要本地 MySQL，验证写入、日期、中文与 emoji、快照、账号隔离和页面 |
+| `npm run test:test-isolation` | 无需数据库，验证默认本地连接、显式远程测试库开关与库名保护 |
+| `npm run test:mysql` | 默认需要本地 MySQL；也支持显式开启的独立云测试库，验证写入、日期、中文与 emoji、快照、账号隔离和页面 |
 | `npm run test:password-reset` | 需要本地 MySQL，验证重置令牌、会话失效与认证限流 |
 | `npm run test:mysql-pool` | 需要本地 MySQL，验证空闲回收后重建 UTC 连接，约需 32 秒 |
 | `npm run test:measurements` | 无需数据库，验证身体指标校验、精度、变化计算与趋势缺失值 |
@@ -130,11 +130,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - 当前测试使用 Node.js 内置测试工具和脚本，尚未安装 Vitest 或 Playwright；没有通用 `npm test`。按现有能力验证，不照规划文档运行不存在的命令。
 - MySQL 与密码找回测试通过 `scripts/lib/local-test-app.mjs` 创建独立应用；不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行应用。
-- 默认本地测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`，即上面的 Docker MySQL；改库使用 `TEST_DATABASE_URL`，仅允许 `localhost` 或 `127.0.0.1`，不要指向云库或其他人的实例。该配置控制数据库，不代表有独立库名；需要保留的数据不要放进测试库。
-- 需要本地数据库的验证一律按 Docker 方式执行：先确认容器 `healthy`，再跑 `npm run test:mysql` 等命令。容器起不来时记录原因并把该项列为未验证，不要改用宿主机 MySQL 或云库顶替。
+- 默认本地测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`，即上面的 Docker MySQL；改本地库使用 `TEST_DATABASE_URL`，只允许 `localhost` 或 `127.0.0.1`，并固定使用回环地址连接。
+- 确需使用云数据库跑集成测试时，必须同时满足：显式设置 `TEST_DATABASE_URL`、设置 `ALLOW_REMOTE_TEST_DATABASE=1`、库名包含 `test`（例如 `body_test`），且不能与 `.env` 的 `DATABASE_URL` 同库。测试会创建和删除合成账号、应用迁移并写入公开参考数据，只能指向独立的测试库，不得指向生产库或其他人的实例。
+- 需要数据库的验证优先按 Docker 方式执行：先确认容器 `healthy`，再跑 `npm run test:mysql` 等命令；本地容器不可用时，可使用上述受保护的独立云测试库并记录实际使用的库。容器和云测试库都不可用时，记录原因并将该项列为未验证，不要改用宿主机 MySQL 或生产库顶替。
 - 集成测试会应用迁移，参考库为空时导入公开数据，并清理本轮合成账号与测试应用。新测试沿用这一生命周期，失败路径也必须释放自己的连接、服务器和临时副本。
 - 旧 `scripts/smoke-test.mjs` 和 `scripts/debug-pages.mjs` 会向目标应用写入账号及业务数据，且没有完整账号清理；前者接受 `SMOKE_BASE_URL`，后者固定请求 3000。优先用隔离测试，不在用户应用或云库上直接运行这两个脚本。
 - 业务规则测试覆盖独立预期值、边界、未登录、跨账号和失败路径；不要复制实现公式自证正确。样式修改以浏览器检查为主，HTTP 200 不能代替交互、响应式和键盘操作验证。
-- 缺少本地数据库或其他必要环境时，完成可运行检查，明确列出未验证项与原因；不连接真实库来补测试，也不关闭类型、认证或 TLS 校验绕过失败。
+- 缺少本地数据库或其他必要环境时，完成可运行检查，明确列出未验证项与原因；可以连接受保护的独立云测试库，但不得连接生产库补测试，也不关闭类型、认证或 TLS 校验绕过失败。
 - 完成前检查 `git diff --check` 和 `git diff`，确保只包含任务所需变更；不提交 `.env`、生成类型、构建产物、临时测试文件或日志。行为、命令或配置改变时同步相关文档。
 - 交付说明包含用户可见变化、实际运行的检查及结果、未验证项和实际限制。提交、推送与发布按用户的授权范围执行。

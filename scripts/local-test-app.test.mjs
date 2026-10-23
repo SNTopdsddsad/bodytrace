@@ -31,3 +31,34 @@ test("拒绝云库、伪装的本地主机名、其他协议和缺少库名的�
     assert.throws(() => resolveTestDatabaseUrl({ TEST_DATABASE_URL: url }), /TEST_DATABASE_URL/);
   }
 });
+
+test("远程测试库必须显式开关、库名含 test 且不能复用生产库名", () => {
+  const remote = "mysql://test:example@cloud.example.com:3306/body_test";
+  assert.throws(
+    () => resolveTestDatabaseUrl({ TEST_DATABASE_URL: remote }),
+    /ALLOW_REMOTE_TEST_DATABASE=1/,
+  );
+  assert.throws(
+    () => resolveTestDatabaseUrl({
+      TEST_DATABASE_URL: "mysql://test:example@cloud.example.com:3306/body",
+      ALLOW_REMOTE_TEST_DATABASE: "1",
+    }),
+    /必须包含 test/,
+  );
+  assert.throws(
+    () => resolveTestDatabaseUrl({
+      TEST_DATABASE_URL: remote,
+      ALLOW_REMOTE_TEST_DATABASE: "1",
+      DATABASE_URL: "mysql://prod:example@cloud.example.com:3306/body_test",
+    }),
+    /同一个库/,
+  );
+
+  const url = new URL(resolveTestDatabaseUrl({
+    TEST_DATABASE_URL: remote,
+    ALLOW_REMOTE_TEST_DATABASE: "1",
+    DATABASE_URL: "mysql://prod:example@cloud.example.com:3306/body",
+  }));
+  assert.equal(url.hostname, "cloud.example.com");
+  assert.equal(url.pathname, "/body_test");
+});

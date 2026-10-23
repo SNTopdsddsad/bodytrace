@@ -7,7 +7,11 @@ import next from "next";
 const [project, workspace] = process.argv.slice(2);
 assert(project && workspace && process.send, "测试服务器只能由测试入口创建");
 const database = new URL(process.env.DATABASE_URL);
-assert.equal(database.hostname, "127.0.0.1", "测试服务器只能连接固定的本地测试库");
+const testDatabaseName = decodeURIComponent(database.pathname.slice(1));
+if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(database.hostname)) {
+  assert.equal(process.env.ALLOW_REMOTE_TEST_DATABASE, "1", "远程测试库需要显式开关");
+  assert.match(testDatabaseName, /(?:^|[_-])test(?:$|[_-])/i, "远程测试库名必须包含 test");
+}
 let app;
 let handler;
 let stopping = false;
