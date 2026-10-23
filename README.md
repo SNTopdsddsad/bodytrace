@@ -34,7 +34,7 @@ Next.js 与 `eslint-config-next` 固定为 16.4.2，包含 2026-10-14 的框架�
 
 ### 1. 准备数据库
 
-开发运行时使用 Node.js 24 LTS。项目根目录已带 `docker-compose.yml`（MySQL 8.4 LTS，端口 3307，数据落在 `D:\docker\bodytrace-mysql`）：
+开发运行时使用 Node.js 24 LTS（≥24.22.1）。仓库用根目录的 `.nvmrc`（`24`）和 `package.json` 的 `engines` 固定主版本：安装依赖或启动前先 `nvm use` / `fnm use`，避免本机、构建机与服务器跑在不同大版本。项目根目录已带 `docker-compose.yml`（MySQL 8.4 LTS，端口 3307，数据落在 `D:\docker\bodytrace-mysql`）：
 
 ```bash
 docker compose up -d mysql     # 启动；停止用 docker compose stop mysql
@@ -226,11 +226,12 @@ src/
 
 ## 部署到自己的服务器
 
-最简单的路线（已有云 MySQL）：
+最简单的路线（已有云 MySQL）。服务器同样要 Node.js 24 LTS（≥24.22.1，以 `.nvmrc` 为准），先 `node -v` 核对；不要用发行版 apt 的 `nodejs`，用 nvm/fnm 装好再继续。
 
 ```bash
 # 服务器上
 git clone <你的仓库> && cd bodytrace
+node -v        # 必须是 v24.22.1 及以上的 24.x
 npm ci
 npm run build
 
@@ -246,6 +247,8 @@ npm run db:migrate     # 应用已审查的 MySQL 迁移
 npm i -g pm2
 pm2 start "npm run start" --name bodytrace
 ```
+
+换过 Node 大版本后要 `pm2 delete bodytrace` 再重新 `pm2 start`：pm2 记着旧解释器路径，直接 `pm2 restart` 可能还在用旧 node（核对：`pm2 describe bodytrace | grep -i interpreter`）。也不要在 macOS 上 `npm run build` 后把 `.next` 拷到服务器——`@next/swc-*` 原生二进制按平台区分，服务器要各自 `npm ci && npm run build`。
 
 前面挂 Nginx 或 Caddy 反代到 3000 端口并配 HTTPS 即可。**务必上 HTTPS**，否则登录 cookie 不安全。
 

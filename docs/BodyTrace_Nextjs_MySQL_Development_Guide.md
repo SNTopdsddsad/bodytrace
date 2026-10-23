@@ -8,7 +8,7 @@ BodyTrace 先以 Next.js 网页端验证个人身体档案的使用价值，同�
 
 当前推荐采用一个 Next.js 项目、你现有的 MySQL 和一套私有报告文件存储。业务规则集中在服务层；网页服务端与 HTTP API 共同调用。第一版以记录、整理、计划执行和回看为主。AI 首先作为开发工具使用，产品内的 OCR 与个人助手按阶段加入。
 
-**先执行的决定**：Next.js 16 稳定分支、Node.js 24 LTS、TypeScript strict、现有 MySQL、Drizzle ORM 与 mysql2、Better Auth、Tailwind CSS 4 与 shadcn/ui。生产依赖采用经过验证的兼容版本并提交 package-lock.json。云 MySQL 已核对为 8.0.36；版本维护、生产权限、部署地域、首批用户来源和经营主体仍需在接收真实用户健康资料之前确定。[S01][S02][S03][S04][S07][S36]
+**先执行的决定**：Next.js 16 稳定分支、Node.js 24 LTS（`.nvmrc` 与 `engines` 固定主版本）、TypeScript strict、现有 MySQL、Drizzle ORM 与 mysql2、Better Auth、Tailwind CSS 4 与 shadcn/ui。生产依赖采用经过验证的兼容版本并提交 package-lock.json。云 MySQL 已核对为 8.0.36；版本维护、生产权限、部署地域、首批用户来源和经营主体仍需在接收真实用户健康资料之前确定。[S01][S02][S03][S04][S07][S36]
 
 **阅读顺序**：先看第 1 至 3 章确定范围和选型；按第 4 至 9 章实施；第 10 至 13 章用于上线与后续扩展；第 14 至 16 章确定发展顺序、验收和 AI 协作方式。附录保留官方资料入口。文中的人数、配额和恢复目标属于本项目建议，须通过实际使用与演练调整。
 
@@ -44,7 +44,7 @@ BodyTrace 先以 Next.js 网页端验证个人身体档案的使用价值，同�
 
 | 层次 | 默认选择 | 用途与边界 |
 | --- | --- | --- |
-| 运行时 | Node.js 24 LTS | 开发、CI、生产保持同一主版本 |
+| 运行时 | Node.js 24 LTS（≥24.22.1） | 由 `.nvmrc` 与 `engines` 固定；开发、CI、生产保持同一主版本，服务器构建产物不跨平台复制 |
 | 应用框架 | Next.js 16 稳定分支与 App Router | 网页、服务端渲染、HTTP 接口 |
 | 语言 | TypeScript strict | 核心逻辑与契约避免隐式 any |
 | 包管理 | npm 与 package-lock.json | CI 使用 npm ci，保持依赖版本一致 |

@@ -25,7 +25,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## 当前技术与目录
 
-- 运行时使用 Node.js 24 LTS；包管理使用 npm 和 `package-lock.json`，已有锁文件时用 `npm ci` 安装。新增或调整依赖时说明用途，并同步锁文件；不要同时引入其他包管理器的锁文件。
+- 运行时使用 Node.js 24 LTS（≥24.22.1）。仓库根目录的 `.nvmrc`（`24`）与 `package.json` 的 `engines` 固定主版本，本机、构建机与服务器保持同一大版本，切换前先 `nvm use` / `fnm use`；服务器升级 Node 后要 `pm2 delete` 再 `pm2 start`，否则仍可能跑旧解释器。包管理使用 npm 和 `package-lock.json`，已有锁文件时用 `npm ci` 安装。新增或调整依赖时说明用途，并同步锁文件；不要同时引入其他包管理器的锁文件。
 - 当前框架为 Next.js 16 App Router、React 19、TypeScript strict。UI 使用 Tailwind CSS v4、shadcn/ui（`base-nova` / Base UI）、Lucide 和 Recharts。
 - 数据库使用 MySQL、Drizzle ORM 和 mysql2；认证使用 Better Auth；输入校验使用 Zod。具体依赖版本以 `package.json` 和锁文件为准。
 
