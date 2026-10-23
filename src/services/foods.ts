@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, max, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { food, foodReference, mealEntry } from "@/db/schema";
@@ -43,24 +43,20 @@ export async function listFavorites(userId: string) {
 
 /** 最近吃过的食物：按最近一次记录时间倒序去重。 */
 export async function listRecentFoods(userId: string, limit = 12) {
-  const rows = await db
-    .select({ food, lastAt: mealEntry.createdAt })
+  // 先在全部记录中按食物聚合，再限制食物数量，避免重复记录挤掉其他食物。
+  const recent = db
+    .select({ foodId: mealEntry.foodId, lastAt: max(mealEntry.createdAt).as("last_at") })
     .from(mealEntry)
-    .innerJoin(food, eq(mealEntry.foodId, food.id))
     .where(eq(mealEntry.userId, userId))
-    .orderBy(desc(mealEntry.createdAt))
-    .limit(200);
-
-  const seen = new Set<string>();
-  const result: (typeof food.$inferSelect)[] = [];
-  for (const row of rows) {
-    if (!seen.has(row.food.id)) {
-      seen.add(row.food.id);
-      result.push(row.food);
-      if (result.length >= limit) break;
-    }
-  }
-  return result;
+    .groupBy(mealEntry.foodId)
+    .as("recent");
+  const rows = await db
+    .select({ food })
+    .from(recent)
+    .innerJoin(food, and(eq(recent.foodId, food.id), eq(food.userId, userId)))
+    .orderBy(desc(recent.lastAt), asc(food.id))
+    .limit(limit);
+  return rows.map(row => row.food);
 }
 
 export async function createFood(userId: string, input: z.infer<typeof foodInputSchema>) {

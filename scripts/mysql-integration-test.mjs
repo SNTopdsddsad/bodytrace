@@ -80,6 +80,30 @@ try {
   const resized = await api(a, `/api/v1/meals/${entry.id}`, "PATCH", { grams: 300 });
   check("删除食物保留快照并可改克数", resized.json.entry.foodId === null && resized.json.entry.calories === 300 && resized.json.entry.protein === 30);
 
+  // 用单独的合成账号构造超过 200 条重复记录，不影响其他快照与清空数量的断言。
+  const recentOwner = await signup();
+  const recentFoods = (await api(recentOwner, "/api/v1/foods")).json.foods
+    .slice(0, 14).sort((left, right) => left.id.localeCompare(right.id));
+  const now = Date.now();
+  const recentRows = [
+    ...recentFoods.slice(0, 13).map((row, index) => ({ row, at: new Date(now - (index <= 2 ? 1 : index) * 60_000) })),
+    ...Array.from({ length: 201 }, () => ({ row: recentFoods[0], at: new Date(now) })),
+  ].map(({ row, at }) => [randomUUID(), recentOwner.id, today, "breakfast", row.id, row.name, 100, row.calories, row.protein, row.carbs, row.fat, at]);
+  await pool.execute(
+    `INSERT INTO bodytrace_meal_entry (id, user_id, date, meal_type, food_id, name, grams, calories, protein, carbs, fat, created_at) VALUES ${recentRows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
+    recentRows.flat(),
+  );
+  const recentResult = await api(recentOwner, "/api/v1/foods/recents");
+  assert.equal(recentResult.status, 200);
+  assert.deepEqual(recentResult.json.foods.map(row => row.id), recentFoods.slice(0, 12).map(row => row.id));
+  check("最近食物先去重再取 12 种，超过 200 条重复记录不挤掉其他食物，同时间按 ID 稳定排序", true);
+  check("最近食物只包含本人的已食用食物", recentResult.json.foods.every(row => row.userId === recentOwner.id) &&
+    !(await api(b, "/api/v1/foods/recents")).json.foods.length);
+  assert.equal((await api(null, "/api/v1/foods/recents")).status, 401);
+  assert.equal((await api(recentOwner, `/api/v1/foods/${recentFoods[0].id}`, "DELETE")).status, 200);
+  assert.deepEqual((await api(recentOwner, "/api/v1/foods/recents")).json.foods.map(row => row.id), recentFoods.slice(1, 13).map(row => row.id));
+  check("最近食物排除已删食物，并从更早记录补足 12 种", true);
+
   const profile = { gender: null, heightCm: 175.5, weightKg: 80.4, targetWeightKg: null };
   await api(a, "/api/v1/profile", "PUT", { ...profile, weightKg: 81 });
   await api(a, "/api/v1/profile", "PUT", profile);
