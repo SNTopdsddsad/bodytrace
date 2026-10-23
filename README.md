@@ -22,11 +22,13 @@
 
 | 用途 | 选型 |
 |---|---|
-| 框架 | Next.js 16（App Router）+ React 19 + TypeScript |
+| 框架 | Next.js 16.4.2（App Router）+ React 19 + TypeScript |
 | UI | Tailwind CSS v4 + shadcn/ui（base-nova 风格）+ Recharts |
 | 数据库 | MySQL 8.0 / 8.4 + Drizzle ORM + mysql2 |
 | 认证 | better-auth（手机号验证码＋原邮箱密码；Web 走 cookie，已启用 bearer 插件支持未来 App） |
 | 校验 | zod |
+
+Next.js 与 `eslint-config-next` 固定为 16.4.2，包含 2026-10-14 的框架安全修复。更新依赖后需重启已有开发或生产进程，确保运行新版本；保留框架的安全升级检查。[安全公告](https://nextjs.org/blog/nextjs-security-update-october-14-2026)
 
 ## 本地开发
 
