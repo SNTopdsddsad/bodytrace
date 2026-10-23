@@ -74,7 +74,7 @@ async function removeTestProject(project) {
 }
 
 /** 独立目录、独立进程、自动端口；应用与清理连接共用同一个测试连接串。 */
-export async function startLocalTestApp({ smsMock = false, smsSettings = { codeLength: 6, expireMinutes: 5, rateLimitSeconds: 60 } } = {}) {
+export async function startLocalTestApp({ smsMock = false, photoStorageMock = false, smsSettings = { codeLength: 6, expireMinutes: 5, rateLimitSeconds: 60 } } = {}) {
   const databaseUrl = resolveTestDatabaseUrl();
   const testSsl = process.env.TEST_DATABASE_SSL === "require" ? "require" : "";
   const testCaFile = testSsl ? (process.env.TEST_DATABASE_SSL_CA_FILE ?? "") : "";
@@ -96,6 +96,15 @@ export async function startLocalTestApp({ smsMock = false, smsSettings = { codeL
     SMS_CODE_LENGTH: String(smsSettings.codeLength),
     SMS_CODE_EXPIRE_MINUTES: String(smsSettings.expireMinutes),
     SMS_RATE_LIMIT_SECONDS: String(smsSettings.rateLimitSeconds),
+    // 本地测试绝不能误传真实 COS 桶；照片上传在未配置时返回 503。
+    COS_SECRET_ID: "",
+    COS_SECRET_KEY: "",
+    COS_BUCKET: "",
+    COS_REGION: "",
+    COS_UPLOAD_PATH_PREFIX: "",
+    COS_PUBLIC_BASE_URL: "",
+    COS_PHOTO_ACCESS: "",
+    COS_PHOTO_URL_TTL: "",
   };
   // 父进程只负责测试 SQL 和清理，配置与子进程完全一致。
   process.env.DATABASE_URL = databaseUrl;
@@ -150,6 +159,10 @@ export async function startLocalTestApp({ smsMock = false, smsSettings = { codeL
     project = await mkdtemp(join(runsDirectory, "mysql-"));
     for (const path of ["src", "public", "package.json", "package-lock.json", "tsconfig.json", "next.config.ts"]) {
       await cp(join(workspace, path), join(project, path), { recursive: true });
+    }
+    if (photoStorageMock) {
+      // 只在临时副本替换 COS；真实认证、图片解码、服务和 MySQL 事务仍执行。
+      await cp(join(workspace, "scripts/lib/meal-photo-storage-mock.ts"), join(project, "src/lib/cos.ts"));
     }
     if (smsMock) {
       // 只替换独立副本里的供应商，不在业务代码增加“测试验证码”或绕过认证开关。
@@ -216,7 +229,8 @@ export async function sendLoginSms(phoneNumber: string, code: string) {
     const response = await fetch(new URL("/login", base), { signal: AbortSignal.timeout(45_000) });
     assert.equal(response.status, 200, `独立测试应用无法正常加载\n${output}`);
     console.log(`测试应用 ${base.origin}，监听 PID ${listenerPid}，连接独立测试库。`);
-    return { base: base.origin, pool, stop, smsRateLimitSecret: environment.BETTER_AUTH_SECRET };
+    return { base: base.origin, pool, stop, smsRateLimitSecret: environment.BETTER_AUTH_SECRET,
+      photoStorageDirectory: photoStorageMock ? join(project, ".photo-test") : undefined };
   } catch (error) {
     try { await stop(); } finally { await pool.end(); }
     throw error;

@@ -7,11 +7,17 @@
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { food, mealEntry } from "@/db/schema";
+import { food, mealEntry, mealPhoto } from "@/db/schema";
 import { MEAL_ORDER, MEAL_LABELS, ZERO_MACRO, addMacro, round1, scaleMacro } from "@/lib/nutrition";
 import type { MacroLike, MealType } from "@/lib/nutrition";
 import { getGoalsForDate } from "./goals";
 import { isValidDateStr, todayStr } from "@/lib/date";
+import {
+  deletePhotoObjectsBestEffort,
+  getPhotosForEntries,
+  getPhotosForEntry,
+} from "./meal-photos";
+import type { MealEntryWithPhotos } from "./meal-photos";
 
 /** API 入参校验：zod 会先验证数据形状，不合法直接报错，脏数据进不了数据库。 */
 export const mealCreateSchema = z.object({
@@ -29,7 +35,10 @@ export const mealPatchSchema = z.object({
 });
 
 /** 添加一条饮食记录：查食物 → 按克数折算营养 → 存快照。 */
-export async function addEntry(userId: string, input: z.infer<typeof mealCreateSchema>) {
+export async function addEntry(
+  userId: string,
+  input: z.infer<typeof mealCreateSchema>,
+): Promise<MealEntryWithPhotos | null> {
   // 只能吃自己食物库里的东西（同时校验归属和数据存在）
   const [f] = await db
     .select()
@@ -38,7 +47,7 @@ export async function addEntry(userId: string, input: z.infer<typeof mealCreateS
   if (!f) return null;
 
   const macro = scaleMacro(f, input.grams);
-  return db.transaction(async (tx) => {
+  const row = await db.transaction(async (tx) => {
     const [{ id }] = await tx
       .insert(mealEntry)
       .values({
@@ -58,6 +67,7 @@ export async function addEntry(userId: string, input: z.infer<typeof mealCreateS
     const [row] = await tx.select().from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
     return row;
   });
+  return row ? { ...row, photos: [] } : null;
 }
 
 /** 修改某条记录的克数：营养值按新旧克数比例缩放（对已删食物的记录同样有效）。 */
@@ -65,8 +75,8 @@ export async function updateEntryGrams(
   userId: string,
   id: string,
   grams: number,
-) {
-  return db.transaction(async (tx) => {
+): Promise<MealEntryWithPhotos | null> {
+  const row = await db.transaction(async (tx) => {
     const [entry] = await tx
       .select()
       .from(mealEntry)
@@ -88,28 +98,66 @@ export async function updateEntryGrams(
     const [row] = await tx.select().from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
     return row ?? null;
   });
+  if (!row) return null;
+  return { ...row, photos: await getPhotosForEntry(userId, id) };
 }
 
 export async function deleteEntry(userId: string, id: string) {
-  const [result] = await db
-    .delete(mealEntry)
-    .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
-  return result.affectedRows > 0;
+  const photos = await db.transaction(async (tx) => {
+    const [entry] = await tx
+      .select({ id: mealEntry.id })
+      .from(mealEntry)
+      .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)))
+      .for("update");
+    if (!entry) return null;
+
+    const rows = await tx
+      .select({ objectKey: mealPhoto.objectKey, thumbKey: mealPhoto.thumbKey })
+      .from(mealPhoto)
+      .where(eq(mealPhoto.entryId, id));
+
+    // 照片行随 meal_entry 外键级联删除，COS 对象在事务提交后清理。
+    await tx.delete(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+    return rows;
+  });
+
+  if (!photos) return false;
+  await deletePhotoObjectsBestEffort(photos.flatMap((row) => [row.objectKey, row.thumbKey]));
+  return true;
 }
 
-/** 某一天的全部记录，按创建顺序排列。 */
-export async function getDayEntries(userId: string, date: string) {
-  return db
+/** 某一天的全部记录，按创建顺序排列，并附带每条的图片。 */
+export async function getDayEntries(
+  userId: string,
+  date: string,
+): Promise<MealEntryWithPhotos[]> {
+  const entries = await db
     .select()
     .from(mealEntry)
     .where(and(eq(mealEntry.userId, userId), eq(mealEntry.date, date)))
     .orderBy(asc(mealEntry.createdAt));
+  const photos = await getPhotosForEntries(userId, entries.map((entry) => entry.id));
+  return entries.map((entry) => ({ ...entry, photos: photos.get(entry.id) ?? [] }));
+}
+
+/** 单条记录 + 图片，供 PATCH/上传后的响应复用。 */
+export async function getEntryWithPhotos(
+  userId: string,
+  id: string,
+): Promise<MealEntryWithPhotos | null> {
+  const [entry] = await db
+    .select()
+    .from(mealEntry)
+    .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)))
+    .limit(1);
+  if (!entry) return null;
+  return { ...entry, photos: await getPhotosForEntry(userId, id) };
 }
 
 export type DaySummary = {
   date: string;
   /** 按餐次分组的记录 */
-  byMeal: { mealType: MealType; label: string; entries: Awaited<ReturnType<typeof getDayEntries>> }[];
+  byMeal: { mealType: MealType; label: string; entries: MealEntryWithPhotos[] }[];
   /** 全天合计 */
   totals: MacroLike;
   goals: { calories: number; protein: number; carbs: number; fat: number };

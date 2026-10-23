@@ -20,3 +20,20 @@ export async function api<T = unknown>(path: string, init?: RequestInit): Promis
   }
   return data as T;
 }
+
+/**
+ * multipart 上传专用：不能设置 Content-Type，浏览器要自己补 boundary。
+ * 其余错误处理与 api() 保持一致。
+ */
+export async function apiForm<T = unknown>(
+  path: string,
+  form: FormData,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(path, { ...init, method: init?.method ?? "POST", body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError((data as { error?: string }).error ?? `请求失败（${res.status}）`, res.status);
+  }
+  return data as T;
+}

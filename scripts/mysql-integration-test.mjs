@@ -28,6 +28,22 @@ async function api(user, path, method = "GET", body) {
   return { response, status: response.status, json, text };
 }
 
+async function uploadPhoto(user, entryId) {
+  const form = new FormData();
+  form.append("file", new Blob([Buffer.from("not-a-real-image")], { type: "image/jpeg" }), "test.jpg");
+  const response = await fetch(`${base}/api/v1/meals/${entryId}/photos`, {
+    method: "POST",
+    headers: { Origin: base, Cookie: user?.cookie ?? "" },
+    body: form,
+    redirect: "manual",
+    signal: AbortSignal.timeout(30_000),
+  });
+  const text = await response.text();
+  let json;
+  try { json = JSON.parse(text); } catch { /* 页面响应保留 HTML。 */ }
+  return { response, status: response.status, json, text };
+}
+
 async function signup() {
   const email = `mysql_${randomUUID()}@bodytrace.dev`;
   createdEmails.push(email);
@@ -75,6 +91,10 @@ try {
   });
   check("日期字符串及营养快照正确", recorded.status === 201 && entry.date === today && entry.calories === 200 && entry.protein === 20);
   check("日期时间按 UTC 返回", Math.abs(Date.parse(entry.createdAt) - Date.now()) < 60_000);
+  check("新记录的 photos 是空数组", Array.isArray(entry.photos) && entry.photos.length === 0);
+  check("测试环境未配置 COS 时照片上传返回 503", (await uploadPhoto(a, entry.id)).status === 503);
+  check("不能给他人的饮食记录上传照片", (await uploadPhoto(b, entry.id)).status === 404);
+  check("删除不存在的照片返回 404", (await api(a, `/api/v1/meals/${entry.id}/photos/${randomUUID()}`, "DELETE")).status === 404);
   await api(a, `/api/v1/foods/${food.id}`, "PATCH", { calories: 999 });
   await api(a, `/api/v1/foods/${food.id}`, "DELETE");
   const resized = await api(a, `/api/v1/meals/${entry.id}`, "PATCH", { grams: 300 });

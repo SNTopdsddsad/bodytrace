@@ -9,12 +9,16 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import type { MealEntry } from "@/db/schema";
+import type { MealPhotoDto } from "@/lib/meal-photo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api-client";
 import type { MealType } from "@/lib/nutrition";
 import { FoodPicker } from "./food-picker";
+import { MealPhotoGallery } from "./meal-photo-gallery";
 import { MEAL_STYLES } from "./meal-styles";
+
+type EntryWithPhotos = MealEntry & { photos: MealPhotoDto[] };
 
 export function MealSection({
   date,
@@ -25,7 +29,7 @@ export function MealSection({
   date: string;
   mealType: MealType;
   label: string;
-  entries: MealEntry[];
+  entries: EntryWithPhotos[];
 }) {
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -37,8 +41,9 @@ export function MealSection({
   const style = MEAL_STYLES[mealType];
   const MealIcon = style.icon;
 
-  async function handleDelete(id: string, name: string, grams: number) {
-    if (!window.confirm(`确定删除「${name} ${grams}g」吗？`)) return;
+  async function handleDelete(id: string, name: string, grams: number, photoCount = 0) {
+    const photoNote = photoCount > 0 ? `及其 ${photoCount} 张照片` : "";
+    if (!window.confirm(`确定删除「${name} ${grams}g」${photoNote}吗？`)) return;
     setBusy(true);
     try {
       await api(`/api/v1/meals/${id}`, { method: "DELETE" });
@@ -138,8 +143,19 @@ export function MealSection({
                   >
                     <span className="block">{e.grams} g · 点击调整份量</span>
                     <span className="block text-[11px]">蛋白 {Math.round(e.protein)}g · 碳水 {Math.round(e.carbs)}g · 脂肪 {Math.round(e.fat)}g</span>
+                    {(e.photos?.length ?? 0) > 0 && (
+                      <span className="block text-[11px] text-muted-foreground/80">
+                        {e.photos.length} 张照片
+                      </span>
+                    )}
                   </button>
                 )}
+                <MealPhotoGallery
+                  entryId={e.id}
+                  entryName={e.name}
+                  photos={e.photos ?? []}
+                  disabled={busy}
+                />
               </div>
               <span className="text-sm font-semibold tabular-nums">
                 {Math.round(e.calories)}
@@ -150,7 +166,7 @@ export function MealSection({
                 size="icon"
                 className="size-10 text-muted-foreground hover:text-destructive"
                 disabled={busy}
-                onClick={() => handleDelete(e.id, e.name, e.grams)}
+                onClick={() => handleDelete(e.id, e.name, e.grams, e.photos?.length ?? 0)}
                 title="删除"
                 aria-label={`删除${e.name}`}
               >

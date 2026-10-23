@@ -7,6 +7,7 @@
 import { and, count, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { mealEntry, measurement } from "@/db/schema";
+import { deletePhotoObjectsBestEffort, getPhotoKeysForUser } from "./meal-photos";
 
 export type RecordCounts = { mealEntries: number; measurements: number };
 
@@ -27,9 +28,13 @@ export async function getRecordCounts(userId: string): Promise<RecordCounts> {
  * 包括此前软删除的测量行（真正移除数据，请求编号等唯一键一并释放）。
  */
 export async function clearAllRecords(userId: string): Promise<RecordCounts> {
-  return db.transaction(async (tx) => {
+  // 先取 COS key；事务失败时对象仍然有用，不能提前删除。
+  const photoKeys = await getPhotoKeysForUser(userId);
+  const cleared = await db.transaction(async (tx) => {
     const [mealsResult] = await tx.delete(mealEntry).where(eq(mealEntry.userId, userId));
     const [measurementsResult] = await tx.delete(measurement).where(eq(measurement.userId, userId));
     return { mealEntries: mealsResult.affectedRows, measurements: measurementsResult.affectedRows };
   });
+  await deletePhotoObjectsBestEffort(photoKeys.flatMap((row) => [row.objectKey, row.thumbKey]));
+  return cleared;
 }

@@ -143,6 +143,47 @@ export const mealEntry = mysqlTable(
   (t) => [index("meal_entry_user_date_idx").on(t.userId, t.date)],
 );
 
+/**
+ * 饮食照片：一条饮食记录最多 6 张，对象存 COS（公有读、私有写），
+ * 这里只保存元数据与对象 key。删除记录时数据库行随外键级联删除，
+ * COS 对象由服务层在事务提交后清理。
+ */
+export const mealPhoto = mysqlTable(
+  "bodytrace_meal_photo",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    entryId: varchar("entry_id", { length: 36 })
+      .notNull()
+      .references(() => mealEntry.id, { onDelete: "cascade" }),
+    /** 旧客户端可不传；同一用户的请求编号只能用于同一条记录和同一份文件。 */
+    requestId: varchar("request_id", { length: 36 }),
+    contentHash: varchar("content_hash", { length: 64 }),
+    /** 保留幂等标记，避免照片删除后旧上传请求将其重新创建。 */
+    deletedAt: datetime("deleted_at", { mode: "date", fsp: 3 }),
+    /** COS 对象 key（主图） */
+    objectKey: varchar("object_key", { length: 512 }).notNull(),
+    /** COS 对象 key（列表用缩略图） */
+    thumbKey: varchar("thumb_key", { length: 512 }).notNull(),
+    mimeType: varchar("mime_type", { length: 64 }).notNull(),
+    byteSize: int("byte_size").notNull(),
+    width: int("width").notNull(),
+    height: int("height").notNull(),
+    /** 同一条记录内的展示顺序，0 起 */
+    position: int("position").notNull(),
+    createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  },
+  (t) => [
+    index("meal_photo_entry_position_idx").on(t.entryId, t.position),
+    unique("meal_photo_entry_position_unique").on(t.entryId, t.position),
+    unique("meal_photo_object_unique").on(t.objectKey),
+    unique("meal_photo_user_request_unique").on(t.userId, t.requestId),
+    index("meal_photo_user_idx").on(t.userId),
+  ],
+);
+
 /** 每用户一行每日目标，未设置时按代码里的默认值展示。 */
 export const dailyGoal = mysqlTable("bodytrace_daily_goal", {
   userId: varchar("user_id", { length: 255 })
