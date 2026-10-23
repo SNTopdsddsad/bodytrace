@@ -7,7 +7,7 @@
 ## 功能
 
 - **今日总览**：热量环 + 蛋白/碳水/脂肪进度条，一眼看到"今天还能吃多少"
-- **饮食日记**：按日期翻阅，早/午/晚/加餐四区；添加食物支持 **最近吃过 / 收藏 / 搜索 / 官方参考库** 四个入口；克数可改可删，营养值自动重算
+- **饮食日记**：按日期翻阅，早/午/晚/加餐四区；添加食物支持 **最近吃过 / 收藏 / 搜索 / 官方参考库** 四个入口；克数可改可删，营养值自动重算；每条记录可附最多 6 张照片，添加记录时拍照/选图，记录卡片内查看、补传和删除
 - **食物参考库**：内置《中国食物成分表（标准版第6版）》1677 种食物（数据来自 [Sanotsu/china-food-composition-data](https://github.com/Sanotsu/china-food-composition-data)，个人学习研究用途），添加食物时可搜索官方数值一键抄录进自己的库
 - **食物库**：响应式卡片网格，平板、桌面和大屏每行展示 2 / 3 / 4 种食物，窄屏单列；营养按每 100g 录入（照抄包装袋营养成分表即可）；可设"一份 = 多少克"快捷录入；注册时自动预置 24 种常见食物
 - **每日目标** + **30 天趋势图**（热量柱状 + 蛋白质折线 + 目标参考线）
@@ -100,6 +100,16 @@ RAM 最小发送权限为 `dysms:SendSms`（资源 `*`）；使用 STS 临时凭
 
 测试命令 `npm run test:phone-auth` 无需数据库、不会发短信；`npm run test:phone-auth-integration` 使用 Docker MySQL 和独立测试应用，只在临时副本替换短信供应商，并清除继承的真实短信凭证。首次注册、账号隔离和验证码消费仍走实际认证接口。
 
+### 腾讯云 COS 配置（饮食照片）
+
+饮食照片使用“公有读、私有写”的 COS 桶。在 `.env` 和部署平台填写 `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_BUCKET`、`COS_REGION`、`COS_UPLOAD_PATH_PREFIX`；凭证只留在服务端，不要加 `NEXT_PUBLIC_`。建议使用子账号，CAM 只授予该前缀的 `PutObject`、`GetObject`、`DeleteObject`、`HeadObject`（孤儿清理脚本还需要 List 权限）。
+
+公开读意味着拿到对象 URL 的人都能查看照片；对象 key 只含随机 UUID，不包含用户信息，上传时会去掉 EXIF/GPS。不要把更敏感的报告原件放进这个公开读桶。若以后改为私有读，设置 `COS_PHOTO_ACCESS=signed` 可返回短时签名地址，但桶 ACL 仍需另外修改。
+
+自托管云服务器通过 Nginx 反代时，需要允许照片上传的体积，例如在站点配置中加 `client_max_body_size 12m;`，否则 8 MB 的照片会在到达 Next.js 前被 413。照片不落本地磁盘，全部转存 COS；上传会消耗服务器 CPU 做 WebP 转码和缩略图。
+
+部署前备份数据库并执行 `npm run db:migrate`：`0006` 新增 `bodytrace_meal_photo`，`0007` 增加可空的上传编号、文件摘要、删除标记及用户/上传编号唯一约束，保留已有照片。新网页上传与重试使用固定编号；响应丢失时先核对结果，避免重复保存。单独删除照片后保留删除标记，旧上传请求不能重新创建照片。删除记录或一键清空会级联删除照片行并尽力清理 COS 对象；对象清理失败不影响主结果，可用 `npm run db:cleanup-photos` 先 dry-run 检查孤儿对象，再加 `--apply` 删除超过 24 小时且数据库没有有效照片引用的对象（包括已删照片清理失败留下的文件）。
+
 ## 常用命令
 
 | 命令 | 作用 |
@@ -110,20 +120,24 @@ RAM 最小发送权限为 `dysms:SendSms`（资源 `*`）；使用 STS 临时凭
 | `npm run db:generate` | 生成 MySQL SQL 迁移到 `drizzle/mysql/`，执行前审查 |
 | `npm run db:migrate` | 应用 `drizzle/mysql/` 中尚未执行的迁移，生产使用此命令 |
 | `npm run db:import-reference` | 导入《中国食物成分表》1677 种食物到参考库（数据在 `data/`，可重复执行） |
+| `npm run db:cleanup-photos` | 对比数据库与 COS，报告饮食照片孤儿对象；加 `--apply` 才删除 |
 | `node scripts/smoke-test.mjs` | 端到端冒烟测试（需先 `npm run start`） |
 | `node scripts/debug-pages.mjs` | 检查五个页面是否正常渲染 |
 | `npm run test:password-reset` | 自行启动独立测试应用，验证有效期、令牌作废、会话失效和伪造 IP 不能绕过限流 |
-| `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及七个页面 |
+| `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及七个页面；默认本地库，也支持显式开启的独立云测试库 |
 | `npm run test:test-isolation` | 验证测试不会采用云库配置，拒绝非本地测试连接 |
 | `npm run test:request-timeout` | 无需数据库，验证登录响应体卡住时 15 秒取消请求，以及正常返回和计时器清理 |
 | `npm run test:phone-auth` | 无需数据库，验证大陆号码规范、脱敏、官方短信 SDK 配置、失败与超时，不真实发送 |
 | `npm run test:phone-auth-integration` | 独立 Docker MySQL 应用验证手机号登录、自动注册、限额、验证码消费、旧邮箱与账号隔离，不真实发送 |
 | `npm run test:measurements` | 无需数据库，验证三类指标输入、日期、精度、变化计算和缺失日期 |
+| `npm run test:date` | 无需数据库，验证真实日历日期、闰年、跨月跨年及应用时区的午夜切换 |
+| `npm run test:meal-photo` | 无需数据库和 COS，验证真实 AVIF、WebP 转码、响应丢失核对、固定编号重试、弹窗关闭与份量锁定 |
+| `npm run test:meal-photo-integration` | 隔离 MySQL 应用，只替换 COS，验证并发幂等、配额、账号隔离、删除重放、旧客户端与清空 |
 | `npm run test:measurement-integration` | 独立本地 MySQL 测试应用，验证记录、重试、编辑冲突、删除与账号隔离 |
 
 MySQL 迁移位于 `drizzle/mysql/`，初始迁移显式采用 InnoDB、utf8mb4 与区分大小写的标识符比较。`drizzle/` 根目录里的旧 PostgreSQL SQL 和 meta 仅作存档，不能应用到 MySQL。后续新表也要审查字符集和排序规则。`db:push` 只用于可重建的开发库；切换驱动不会自动导入 PostgreSQL 的旧账号或记录，旧数据库及其数据目录保留。
 
-MySQL 和密码找回测试不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行的应用。**本地 MySQL 统一用 Docker**：测试只连 `docker-compose.yml` 里的 `bodytrace-mysql`，不要装宿主机 MySQL 或连其他实例。先启动容器并确认 `healthy`，再直接执行测试：
+MySQL 和密码找回测试默认不读取 `.env` 的云库连接，也不使用 `DATABASE_URL` 或 `SMOKE_BASE_URL` 指向已运行的应用。**默认仍用 Docker 本地测试库**：测试连 `docker-compose.yml` 里的 `bodytrace-mysql`，先启动容器并确认 `healthy`，再执行测试：
 
 ```powershell
 docker compose up -d mysql   # 等容器 healthy 再往下：docker inspect --format='{{.State.Health.Status}}' bodytrace-mysql
@@ -133,6 +147,16 @@ docker compose stop mysql    # 跑完停掉
 ```
 
 默认测试库为 `mysql://bodytrace:bodytrace@127.0.0.1:3307/bodytrace`；需要其他本地测试库时设置 `TEST_DATABASE_URL`，只允许 `localhost` 或 `127.0.0.1`，并固定使用回环地址连接。测试会应用 MySQL 迁移，并在参考库为空时导入公开食物数据。不要把需要保留的业务资料放进这个测试库。
+
+本机没有 Docker 时，也可以显式使用云上的**独立测试库**。必须同时设置 `TEST_DATABASE_URL` 和 `ALLOW_REMOTE_TEST_DATABASE=1`，库名必须包含 `test`（例如 `body_test`），并且不能与 `.env` 里的生产 `DATABASE_URL` 同库：
+
+```bash
+TEST_DATABASE_URL='mysql://用户:密码@数据库地址:3306/body_test' \
+ALLOW_REMOTE_TEST_DATABASE=1 \
+npm run test:mysql
+```
+
+规则在 `scripts/lib/local-test-app.mjs` 中强制检查；不满足条件会直接拒绝。集成测试会创建并清理合成账号、应用迁移、写入公开参考数据，因此只能指向独立的 `_test` 库，不要指向生产库。第一次使用远程测试库时，先由有权限的账号创建它（例如 `body_test`），测试会自动建表。
 
 每次测试在 `.next/test-projects/` 创建独立应用副本，不复制 `.env`，以相同测试连接启动自己的服务器和 SQL 清理连接。服务器绑定自动端口并记录实际监听 PID，可与用户的 3000 开发服务器同时运行；退出时停止自己的进程、清理合成账号并移除临时副本。每次密码找回测试使用新进程，因此无需等待上一轮限流窗口结束。维护脚本使用 Node.js 24 的内置 TypeScript 支持。
 
@@ -168,7 +192,7 @@ src/
 
 ## REST API 一览（给未来的 App 用）
 
-所有接口需登录：Web 用 cookie；App 在登录后拿 token 放 `Authorization: Bearer <token>` 头（bearer 插件已启用）。注意 better-auth 的 CSRF 防护要求请求带 `Origin` 头。各接口的完整契约（参数校验、响应示例、错误码）见 [API 参考文档](docs/BodyTrace_API_Reference.md)。
+下表业务接口均需登录：Web 用 cookie；App 在登录后拿 token 放 `Authorization: Bearer <token>` 头（bearer 插件已启用）。业务写请求若携带 Origin，host 不匹配返回 401，预期错误为 `{error}`；认证接口使用 Better Auth 的来源校验与 `{code, message}`，Cookie 写请求应携带可信 Origin，来源校验失败返回 403。各接口的完整契约（参数校验、响应示例、错误码）见 [API 参考文档](docs/BodyTrace_API_Reference.md)。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -182,6 +206,9 @@ src/
 | POST | `/api/v1/meals` | 记一笔 `{date, mealType, foodId, grams}` |
 | PATCH | `/api/v1/meals/:id` | 改克数（营养按比例重算） |
 | DELETE | `/api/v1/meals/:id` | 删除 |
+| POST | `/api/v1/meals/:id/photos` | 上传单张照片；multipart `file` + 可选幂等编号 `requestId` |
+| GET | `/api/v1/meals/:id/photos?requestId=` | 核对一次上传结果；不用于获取照片列表 |
+| DELETE | `/api/v1/meals/:id/photos/:photoId` | 删除照片，保留删除标记防止旧请求重放 |
 | GET | `/api/v1/summary?date=` | 某天汇总（分餐 + 合计 + 目标） |
 | GET | `/api/v1/trends?days=30` | 近 N 天每日合计 |
 | GET/PUT | `/api/v1/goals` | 每日目标 |

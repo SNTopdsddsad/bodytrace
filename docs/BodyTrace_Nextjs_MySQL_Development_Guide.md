@@ -193,7 +193,9 @@ Server Actions 可用于网页特定交互；核心业务仍有稳定 HTTP API�
 
 事件时刻建议转为 UTC 后存入 DATETIME(3)，驱动读写也按 UTC 处理；原 IANA 时区另存。DATETIME 本身不保存时区，不能仅凭这个字段还原用户当地日期。日计划与只知道日期的报告使用独立 DATE 语义，禁止因为转成 JavaScript Date 就让日期偏移。[S43]
 
-数值列按业务定义 Decimal 的精度和范围；结构化核心字段独立建列，JSON 用于有版本的来源信息或扩展内容。PDF、图片和大附件保存在私有文件空间，MySQL 保存元数据与关联，避免把所有资料打包为一个难以查询的大 JSON。
+数值列按业务定义 Decimal 的精度和范围；结构化核心字段独立建列，JSON 用于有版本的来源信息或扩展内容。PDF、图片和大附件保存在独立文件空间，MySQL 保存元数据与关联，避免把所有资料打包为一个难以查询的大 JSON。
+
+饮食照片当前使用腾讯云 COS 的**公有读、私有写**桶：数据库 `bodytrace_meal_photo` 保存对象 key、尺寸和顺序，浏览器拿到的是带随机 UUID 的对象地址。这样实现简单、可直接使用 CDN，但公开地址一旦泄露就无法撤回，只能删除对象。因此对象 key 不包含用户 ID、邮箱或手机号，上传前统一去 EXIF/GPS，不开放桶内对象列举；删除照片会同时删除对象。更敏感的报告原件不应复用这个公开读桶，仍应使用私有读配置（`COS_PHOTO_ACCESS=signed` 只解决读取地址，不改变桶的 ACL）。
 
 索引从真实查询开始，例如指标列表的 subjectId、type、occurredAt 与 id，以及计划的所属人和日期范围。幂等键采用对应用户与操作范围内的唯一约束。数据库约束配合事务实现规则，不能只靠前端先查询是否存在。
 
@@ -203,16 +205,34 @@ Server Actions 可用于网页特定交互；核心业务仍有稳定 HTTP API�
 
 ### 5.1 接口约定
 
-业务接口使用 /api/v1；对外 JSON 使用 camelCase。身份从服务端验证的会话获得。输入和响应 DTO 与 ORM 内部对象分开，避免直接暴露数据库字段、内部状态或认证数据。
+业务接口使用 `/api/v1`；对外 JSON 使用 camelCase，身份从服务端验证的会话获得。以下为**当前已实现**的接口概览，完整参数、响应与错误行为统一以 [API 参考文档](BodyTrace_API_Reference.md) 为准。
 
 | 接口 | 用途 | 重要约定 |
 | --- | --- | --- |
-| GET 与 PATCH /api/v1/profile | 获取与更新本人档案 | 只接受允许修改的字段 |
-| GET 与 POST /api/v1/measurements | 查询与新增指标 | 来源、单位、时间和分页 |
-| PATCH 与 DELETE /api/v1/measurements/{id} | 修正或删除指标 | 归属校验与版本冲突 |
-| DELETE /api/v1/records | 一键清空本人饮食记录与身体指标 | 同一事务硬删除；食物库、目标、计划与资料不动 |
-| GET 与 POST /api/v1/plans | 查询与创建计划 | 日期范围和版本 |
-| POST /api/v1/diet-records | 新增实际饮食记录 | 实绩独立于计划 |
+| GET 与 POST /api/v1/foods | 食物库列表、搜索与新增 | 每 100g 营养、收藏筛选、按用户隔离 |
+| PATCH 与 DELETE /api/v1/foods/{id} | 修改或删除食物 | 饮食历史快照不变 |
+| GET /api/v1/foods/recents | 最近吃过的食物 | 全部记录先去重，再取最近 12 种 |
+| GET /api/v1/foods/reference | 搜索共享参考库 | 需登录，只读，最多 20 条 |
+| GET 与 POST /api/v1/meals | 按日查询与新增饮食记录 | 真实日历日期，新增不能为未来，营养快照 |
+| PATCH 与 DELETE /api/v1/meals/{id} | 改克数或删除记录 | 用原记录快照缩放 |
+| GET /api/v1/summary | 某天汇总 | 四餐、合计、当天生效目标 |
+| GET /api/v1/trends | 营养趋势 | 7–180 天，非法参数回落 30 |
+| GET 与 PUT /api/v1/goals | 每日目标 | 整体保存，返回 `{goals}` |
+| GET、PUT 与 DELETE /api/v1/plan | 当前饮食计划 | 每用户一条，无历史版本；整体保存七天目标与食物项 |
+| GET 与 PUT /api/v1/profile | 获取与保存本人资料 | PUT 必须提交性别、身高、目标体重，可用 null 表示未填 |
+| GET 与 POST /api/v1/measurements | 查询与新增指标 | `range=7/30/90/all`，JSON 请求体 `requestId` 幂等 |
+| GET、PATCH 与 DELETE /api/v1/measurements/{id} | 指标详情、修改与软删除 | 归属校验、`version` 冲突与幂等重试 |
+| PATCH 与 DELETE /api/v1/meals/{id} | 改克数或删除记录 | 删除时级联照片行并清理 COS 对象 |
+| GET、POST /api/v1/meals/{id}/photos | 核对上传结果、添加照片 | POST 为 multipart `file` + 可选 UUID `requestId`；同编号同文件返回原照片；最多 6 张、8 MB、服务端转 WebP 去 EXIF |
+| DELETE /api/v1/meals/{id}/photos/{photoId} | 删除一条饮食记录的照片 | 校验记录归属与照片归属 |
+| DELETE /api/v1/records | 一键清空本人饮食记录与身体指标 | 同一事务硬删除；食物库、目标、计划与资料不动；照片对象提交后清理 |
+
+饮食记录的响应增加 `photos` 数组（没有照片时为 `[]`），元素含 `id`、`url`、`thumbUrl`、`width`、`height`、`position`；照片默认公开读，`COS_PHOTO_ACCESS=signed` 时返回短时签名地址。业务写入的预期错误为 `{error: "说明"}`，状态为 400、401、404 或 409；照片上传另外可能返回 413、502、503；同编号不同内容及已删除照片的重放返回 409。照片删除保留幂等标记，读取和数量上限只计算未删除行，清理脚本也只将有效照片视为对象引用。`/api/auth` 采用 Better Auth 自身的 `{code, message}` 和来源校验，不能套用业务接口的错误格式。逐步为新增接口定义明确 DTO；现有食物、饮食记录和参考库响应仍带代码实际返回的字段，不能仅改文档就删掉旧客户端依赖的字段。
+
+以下接口仅为**后续路线图**，路径和字段尚未定稿，当前没有实现，不可直接调用：
+
+| 规划接口 | 用途 | 待落实的约定 |
+| --- | --- | --- |
 | POST /api/v1/training-records | 新增训练摘要 | 实际发生时间 |
 | POST /api/v1/uploads | 创建上传授权 | 文件配额与随机对象键 |
 | POST /api/v1/uploads/{id}/complete | 确认上传完成 | 服务端核对真实对象 |
@@ -221,49 +241,50 @@ Server Actions 可用于网页特定交互；核心业务仍有稳定 HTTP API�
 | GET /api/v1/timeline | 查询统一时间线 | 游标分页、过滤范围 |
 | POST /api/v1/exports | 创建资料导出 | 核对归属，返回任务或结果 |
 
-这是一份实施起点，尚未上线的功能不必提前生成空接口。每完成一个用户任务，同时补齐该任务的 API 契约和验证样例。已实现接口的完整契约、参数校验与响应示例统一维护在 [API 参考文档](BodyTrace_API_Reference.md)，下表保留路线图用途。
+尚未上线的功能不提前生成空接口。饮食计划版本、历史目标、分页及来源扩展也属于后续任务，实施时另行设计迁移和兼容性；当前饮食记录使用 `/meals`、计划使用单数 `/plan`，不另行引入 `/diet-records` 或 `/plans` 平行契约。
 
-### 5.2 一个指标接口的示例
+### 5.2 当前指标接口的示例
 
 以下内容为虚构测试数据，不代表用户本人的身体情况。
 
 ```http
 POST /api/v1/measurements
 Content-Type: application/json
-Idempotency-Key: <client-generated-uuid>
+Authorization: Bearer <session-token>
 ```
 
 ```json
 {
-  "type": "body_weight",
-  "value": "86.4",
-  "unit": "kg",
-  "occurredAt": "2026-10-12T06:30:00Z",
-  "timeZone": "Asia/Shanghai",
-  "source": { "kind": "manual" }
-}
-```
-
-成功响应建议返回 201，以及稳定 ID、规范化字段、createdAt、updatedAt、version。错误响应统一使用 code、message、fieldErrors 和 requestId，前端不依赖数据库或异常库的原始错误字符串。
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "请检查输入内容",
-    "fieldErrors": { "unit": ["不支持该单位"] },
-    "requestId": "<request-id>"
+  "requestId": "7f3a9c1e-3333-4d8a-b6f5-9e8d7c6b5a4f",
+  "measurement": {
+    "kind": "weight",
+    "date": "2026-10-12",
+    "time": "14:30",
+    "value": "86.4",
+    "note": null
   }
 }
 ```
 
-### 5.3 现在就预留的兼容性
+`requestId` 是 JSON 必填字段，不读取 `Idempotency-Key` 头。`kind` 为 `weight`、`bodyFat` 或 `bloodPressure`；体重与体脂率使用十进制字符串，单位由类型决定。日期和可选时间表达用户填写的测量时间，时区由服务端 `APP_TIMEZONE` 设置，客户端不提交 `type`、`unit`、`occurredAt`、`timeZone` 或 `source`。
 
-新建操作用幂等键处理网络重试；同一用户、同一操作和同一键只产生一次业务结果。同键但不同请求内容应被拒绝，不能静默返回无关结果。幂等不代替来源数据去重。
+首次创建返回 `201 {entry}`；相同用户、相同编号且与记录当前内容一致的重试返回 `200 {entry}`，冲突返回 409。`entry` 包含稳定 ID、规范化为 `"86.40"` 的值、服务端时区、UTC 时间戳与 `version: 1`，完整结构见 API 参考。网页使用 Cookie 登录并携带可信 Origin，原生 App 可以使用上例 Bearer。
 
-编辑操作携带版本号，旧版本修改返回明确冲突结果，例如 409。若改用 HTTP 条件请求，应统一遵循对应语义。重要记录不采用无条件最后写入覆盖。
+例如提交不存在的测量日期 `2026-02-30` 时，返回 400：
 
-列表使用稳定排序和游标，游标同时考虑时间与 ID。破坏性字段变化进入新版本；新增可选字段尽量保持兼容。Swift 客户端需要处理未知枚举值、可空字段和未来新增字段。
+```json
+{
+  "error": "measurement.date: 请填写有效日期"
+}
+```
+
+### 5.3 当前兼容性与后续约定
+
+当前只有身体指标新增使用 `requestId` 幂等；食物与饮食新增尚未提供幂等键，不能直接自动重试创建。指标软删除保留编号以阻止重放，一键清空会硬删除该编号；清空后客户端应丢弃旧新增重试。未来新增需要重试的操作，应按用户与操作范围设计唯一约束，拒绝同键不同内容，幂等不代替来源数据去重。
+
+当前身体指标修改和删除携带 `version`，冲突返回 409，并支持紧接一次相同操作的重试。其他模块没有版本号，饮食计划仍整体覆盖当前配置，不能宣称支持历史目标或并发版本保护。后续新增重要记录沿用明确的冲突处理；若改用 HTTP 条件请求，统一遵循对应语义。
+
+当前业务列表没有游标分页；身体指标以 `range` 筛选，`latest` 与 `previous` 始终按全部记录解析。后续需要分页时采用时间与 ID 组成的稳定游标。破坏性字段变化进入新版本；新增可选字段尽量保持兼容，Swift 客户端需要处理未知枚举值、可空字段和未来新增字段。
 
 首版维护一份清楚的接口说明及请求响应样例。核心接口稳定后补 OpenAPI，并在 App 阶段评估生成客户端。仅有 TypeScript 类型不能替代运行时校验，也不能自动成为 Swift 的契约。
 

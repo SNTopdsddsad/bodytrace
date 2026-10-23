@@ -128,6 +128,9 @@ try {
   await api(a, "/api/v1/profile", "PUT", { ...profile, weightKg: 81 });
   await api(a, "/api/v1/profile", "PUT", profile);
   check("资料 upsert 保留小数和空值", JSON.stringify((await api(a, "/api/v1/profile")).json.profile) === JSON.stringify(profile));
+  assert.equal((await api(a, "/api/v1/profile", "PUT", { heightCm: 180 })).status, 400);
+  assert.deepEqual((await api(a, "/api/v1/profile")).json.profile, profile);
+  check("资料 PUT 缺少必填字段时拒绝请求并保留旧资料", true);
   const goals = { calories: 2200, protein: 140, carbs: 230, fat: 70 };
   await api(a, "/api/v1/goals", "PUT", { ...goals, calories: 2000 });
   await api(a, "/api/v1/goals", "PUT", goals);
@@ -193,6 +196,13 @@ try {
   check("食物删除保留计划项的名称和克数，营养为空", deletedFoodPlan.items.length === 2 && deletedFoodPlan.items.every(item =>
     item.name === planFood.name && item.grams === 100 && item.foodId === null && item.per100g === null &&
     item.calories === null && item.protein === null && item.carbs === null && item.fat === null));
+  const missingStaleId = await api(a, "/api/v1/plan", "PUT", {
+    ...plan, items: [{ weekday: 0, mealType: "breakfast", foodId: null, grams: 100 }],
+  });
+  assert.equal(missingStaleId.status, 400);
+  assert.deepEqual(missingStaleId.json, { error: "items.0: 食物项格式不正确；食物已删除的项要带上它在计划里的 id 才能保留" });
+  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, deletedFoodPlan);
+  check("失效计划项缺少 ID 时返回文档约定的错误且不改写旧计划", true);
   assert.equal((await api(a, "/api/v1/plan", "PUT", plan)).status, 400);
   assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, deletedFoodPlan);
   check("引用已删除食物时不改写旧计划", true);
