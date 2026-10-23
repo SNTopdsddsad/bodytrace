@@ -8,7 +8,10 @@ export function todayStr(): string {
 }
 
 export function isValidDateStr(s: string): boolean {
-  return DATE_RE.test(s) && !Number.isNaN(new Date(`${s}T00:00:00Z`).getTime());
+  if (!DATE_RE.test(s)) return false;
+  const date = new Date(`${s}T00:00:00Z`);
+  // Date 会把 2 月 30 日等输入进位到下个月，必须回读日期确认没有溢出。
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === s;
 }
 
 /** n 天前/后的 YYYY-MM-DD。 */

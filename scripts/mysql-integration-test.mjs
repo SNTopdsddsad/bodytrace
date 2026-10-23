@@ -57,6 +57,14 @@ try {
     date: today, mealType: "breakfast", foodId: food.id, grams: 100,
   })).status === 404);
 
+  for (const date of ["2026-02-30", "2026-04-31", "1900-02-29"]) {
+    assert.equal((await api(a, `/api/v1/meals?date=${date}`)).status, 400);
+    assert.equal((await api(a, `/api/v1/summary?date=${date}`)).status, 400);
+    assert.equal((await api(a, "/api/v1/meals", "POST", { date, mealType: "breakfast", foodId: food.id, grams: 100 })).status, 400);
+  }
+  assert.equal((await api(a, "/api/v1/meals?date=2024-02-29")).status, 200);
+  check("饮食查询、汇总与新增拒绝不存在的日历日期，真实闰日可查询", true);
+
   await api(a, `/api/v1/foods/${food.id}`, "PATCH", { isFavorite: true });
   const sameUpdate = await api(a, `/api/v1/foods/${food.id}`, "PATCH", { isFavorite: true });
   check("重复更新同值仍返回记录和布尔值", sameUpdate.status === 200 && sameUpdate.json.food.isFavorite === true);
@@ -83,7 +91,13 @@ try {
 
   const plan = { startDate: today, isActive: true, weekdays: Array.from({ length: 7 }, () => ({ ...goals })), items: [] };
   check("未登录不能读取或保存计划", (await api(null, "/api/v1/plan")).status === 401 && (await api(null, "/api/v1/plan", "PUT", plan)).status === 401);
-  assert.equal((await api(a, "/api/v1/plan", "PUT", plan)).status, 200);
+  const initialPlan = await api(a, "/api/v1/plan", "PUT", plan);
+  assert.equal(initialPlan.status, 200);
+  for (const startDate of ["2026-02-30", "2026-04-31", "1900-02-29"]) {
+    assert.equal((await api(a, "/api/v1/plan", "PUT", { ...plan, startDate })).status, 400);
+  }
+  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, initialPlan.json.plan);
+  check("计划拒绝不存在的起始日，旧计划保持不变", true);
   const [[before]] = await pool.execute("SELECT id FROM bodytrace_diet_plan WHERE user_id = ?", [a.id]);
   const per100g = { calories: 46, protein: 3.4, carbs: 4.8, fat: 1.5 };
   const planFoodResult = await api(a, "/api/v1/foods", "POST", { name: "计划 🥛 合成食物", ...per100g });

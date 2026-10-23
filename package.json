@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:date": "node --test scripts/date.test.mjs",
     "test:request-timeout": "node --test scripts/request-timeout.test.mjs",
     "test:password-reset": "node scripts/password-reset-test.mjs",
     "test:mysql": "node scripts/mysql-integration-test.mjs",
