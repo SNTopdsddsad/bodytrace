@@ -18,18 +18,20 @@ import { FoodPicker } from "./food-picker";
 import { MealPhotoGallery } from "./meal-photo-gallery";
 import { MEAL_STYLES } from "./meal-styles";
 
-type EntryWithPhotos = MealEntry & { photos: MealPhotoDto[] };
-
 export function MealSection({
   date,
   mealType,
   label,
   entries,
+  photos,
+  canRecord,
 }: {
   date: string;
   mealType: MealType;
   label: string;
-  entries: EntryWithPhotos[];
+  entries: MealEntry[];
+  photos: MealPhotoDto[];
+  canRecord: boolean;
 }) {
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -41,9 +43,8 @@ export function MealSection({
   const style = MEAL_STYLES[mealType];
   const MealIcon = style.icon;
 
-  async function handleDelete(id: string, name: string, grams: number, photoCount = 0) {
-    const photoNote = photoCount > 0 ? `及其 ${photoCount} 张照片` : "";
-    if (!window.confirm(`确定删除「${name} ${grams}g」${photoNote}吗？`)) return;
+  async function handleDelete(id: string, name: string, grams: number) {
+    if (!window.confirm(`确定删除「${name} ${grams}g」吗？餐次照片会保留。`)) return;
     setBusy(true);
     try {
       await api(`/api/v1/meals/${id}`, { method: "DELETE" });
@@ -84,18 +85,23 @@ export function MealSection({
           </span>
           <div>
             <h2 className="text-sm font-semibold">{label}</h2>
-            <p className="mt-1 text-xs tabular-nums text-muted-foreground">{entries.length > 0 ? `${entries.length} 项食物 · ${kcalTotal} 千卡` : "等待记录"}</p>
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">{entries.length > 0 ? `${entries.length} 项食物 · ${kcalTotal} 千卡` : photos.length > 0 ? "已记录照片 · 尚未添加食物" : "等待记录"}</p>
           </div>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setPickerOpen(true)}>
+        <Button size="sm" variant="secondary" disabled={!canRecord} onClick={() => setPickerOpen(true)}>
           <Plus className="size-4" aria-hidden />
           添加
         </Button>
       </div>
 
+      <div className="px-4 pb-4 sm:px-5">
+        <MealPhotoGallery date={date} mealType={mealType} mealLabel={label} photos={photos} disabled={!canRecord} />
+        {!canRecord && <p className="mt-2 text-xs text-muted-foreground">不能记录未来日期</p>}
+      </div>
+
       {/* 记录列表 */}
       {entries.length === 0 ? (
-        <button type="button" onClick={() => setPickerOpen(true)} className="flex min-h-22 w-full items-center justify-center gap-2 px-4 py-5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-primary"><Plus className="size-3.5" aria-hidden />添加食物，记录这一餐</button>
+        <button type="button" disabled={!canRecord} onClick={() => setPickerOpen(true)} className="flex min-h-22 w-full items-center justify-center gap-2 px-4 py-5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-primary"><Plus className="size-3.5" aria-hidden />添加食物，记录这一餐</button>
       ) : (
         <ul className="divide-y">
           {entries.map((e) => (
@@ -143,19 +149,8 @@ export function MealSection({
                   >
                     <span className="block">{e.grams} g · 点击调整份量</span>
                     <span className="block text-[11px]">蛋白 {Math.round(e.protein)}g · 碳水 {Math.round(e.carbs)}g · 脂肪 {Math.round(e.fat)}g</span>
-                    {(e.photos?.length ?? 0) > 0 && (
-                      <span className="block text-[11px] text-muted-foreground/80">
-                        {e.photos.length} 张照片
-                      </span>
-                    )}
                   </button>
                 )}
-                <MealPhotoGallery
-                  entryId={e.id}
-                  entryName={e.name}
-                  photos={e.photos ?? []}
-                  disabled={busy}
-                />
               </div>
               <span className="text-sm font-semibold tabular-nums">
                 {Math.round(e.calories)}
@@ -166,7 +161,7 @@ export function MealSection({
                 size="icon"
                 className="size-10 text-muted-foreground hover:text-destructive"
                 disabled={busy}
-                onClick={() => handleDelete(e.id, e.name, e.grams, e.photos?.length ?? 0)}
+                onClick={() => handleDelete(e.id, e.name, e.grams)}
                 title="删除"
                 aria-label={`删除${e.name}`}
               >

@@ -28,10 +28,12 @@ async function api(user, path, method = "GET", body) {
   return { response, status: response.status, json, text };
 }
 
-async function uploadPhoto(user, entryId) {
+async function uploadPhoto(user) {
   const form = new FormData();
+  form.append("date", today);
+  form.append("mealType", "breakfast");
   form.append("file", new Blob([Buffer.from("not-a-real-image")], { type: "image/jpeg" }), "test.jpg");
-  const response = await fetch(`${base}/api/v1/meals/${entryId}/photos`, {
+  const response = await fetch(`${base}/api/v1/meal-photos`, {
     method: "POST",
     headers: { Origin: base, Cookie: user?.cookie ?? "" },
     body: form,
@@ -91,10 +93,11 @@ try {
   });
   check("日期字符串及营养快照正确", recorded.status === 201 && entry.date === today && entry.calories === 200 && entry.protein === 20);
   check("日期时间按 UTC 返回", Math.abs(Date.parse(entry.createdAt) - Date.now()) < 60_000);
-  check("新记录的 photos 是空数组", Array.isArray(entry.photos) && entry.photos.length === 0);
-  check("测试环境未配置 COS 时照片上传返回 503", (await uploadPhoto(a, entry.id)).status === 503);
-  check("不能给他人的饮食记录上传照片", (await uploadPhoto(b, entry.id)).status === 404);
-  check("删除不存在的照片返回 404", (await api(a, `/api/v1/meals/${entry.id}/photos/${randomUUID()}`, "DELETE")).status === 404);
+  check("食物记录不再附带照片", !("photos" in entry));
+  check("当天照片独立返回空数组", (await api(a, `/api/v1/meals?date=${today}`)).json.photos.length === 0);
+  check("测试环境未配置 COS 时照片上传返回 503", (await uploadPhoto(a)).status === 503);
+  check("未登录不能上传照片", (await uploadPhoto(null)).status === 401);
+  check("删除不存在的照片返回 404", (await api(a, `/api/v1/meal-photos/${randomUUID()}`, "DELETE")).status === 404);
   await api(a, `/api/v1/foods/${food.id}`, "PATCH", { calories: 999 });
   await api(a, `/api/v1/foods/${food.id}`, "DELETE");
   const resized = await api(a, `/api/v1/meals/${entry.id}`, "PATCH", { grams: 300 });
@@ -263,7 +266,7 @@ try {
   assert.equal((await api(b, "/api/v1/measurements", "POST", { requestId: randomUUID(), measurement: { kind: "bodyFat", date: today, value: "18.5" } })).status, 201);
   check("未登录不能一键清空", (await api(null, "/api/v1/records", "DELETE")).status === 401);
   const cleared = (await api(a, "/api/v1/records", "DELETE")).json;
-  check("一键清空返回两类删除数量", cleared.ok === true && cleared.cleared.mealEntries === 1 && cleared.cleared.measurements === 1);
+  check("一键清空返回三类删除数量", cleared.ok === true && cleared.cleared.mealEntries === 1 && cleared.cleared.measurements === 1 && cleared.cleared.mealPhotos === 0);
   check("清空后当日饮食与全部指标为空", (await api(a, `/api/v1/meals?date=${today}`)).json.entries.length === 0 && (await api(a, "/api/v1/measurements?range=all")).json.entries.length === 0);
   check("清空保留目标与个人资料", (await api(a, "/api/v1/goals")).json.goals.calories === 2200 && (await api(a, "/api/v1/profile")).json.profile.heightCm === 175.5);
   check("清空只影响本人记录", (await api(b, "/api/v1/measurements?range=all")).json.entries.length === 1);
@@ -271,7 +274,7 @@ try {
   const [[measureLeft]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_measurement WHERE user_id = ?", [a.id]);
   check("清空为硬删除，软删除测量行一并移除", mealLeft.count === 0 && measureLeft.count === 0);
   const repeat = (await api(a, "/api/v1/records", "DELETE")).json;
-  check("重复清空成功且数量为零", repeat.ok === true && repeat.cleared.mealEntries === 0 && repeat.cleared.measurements === 0);
+  check("重复清空成功且数量为零", repeat.ok === true && repeat.cleared.mealEntries === 0 && repeat.cleared.measurements === 0 && repeat.cleared.mealPhotos === 0);
   check("清空后个人资料页正常渲染", (await api(a, "/profile")).status === 200);
   console.log(`\n${passed} 项 MySQL 集成检查通过。`);
 } finally {

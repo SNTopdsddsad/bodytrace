@@ -178,7 +178,7 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 
 ## 饮食记录与汇总
 
-记录保存写入时刻的食物名称与营养快照；修改克数按记录内已有快照等比缩放，与食物库当前状态无关。餐次固定为 `breakfast` / `lunch` / `dinner` / `snack`。每条记录最多附带 6 张照片；照片文件存腾讯云 COS，数据库只保存对象 key 与尺寸等元数据。
+记录保存写入时刻的食物名称与营养快照；修改克数按记录内已有快照等比缩放，与食物库当前状态无关。餐次固定为 `breakfast` / `lunch` / `dinner` / `snack`。照片独立归属用户、日期和餐次，每餐最多上传 6 张有效照片；照片文件存腾讯云 COS，数据库只保存对象 key 与尺寸等元数据。
 
 ### GET /api/v1/meals?date=YYYY-MM-DD
 
@@ -199,23 +199,25 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
       "protein": 49.2,
       "carbs": 1.2,
       "fat": 3.8,
-      "createdAt": "2026-10-18T00:30:00.000Z",
-      "photos": [
-        {
-          "id": "9b7f2a41-2222-4a9b-8c1d-3e4f5a6b7c8d",
-          "url": "https://bodytrace-1250000000.cos.ap-guangzhou.myqcloud.com/bodytrace/meal-photos/2026-10/9b7f2a41.webp",
-          "thumbUrl": "https://bodytrace-1250000000.cos.ap-guangzhou.myqcloud.com/bodytrace/meal-photos/2026-10/9b7f2a41_thumb.webp",
-          "width": 1600,
-          "height": 1200,
-          "position": 0
-        }
-      ]
+      "createdAt": "2026-10-18T00:30:00.000Z"
+    }
+  ],
+  "photos": [
+    {
+      "id": "9b7f2a41-2222-4a9b-8c1d-3e4f5a6b7c8d",
+      "date": "2026-10-18",
+      "mealType": "breakfast",
+      "url": "https://images.example.com/main.webp",
+      "thumbUrl": "https://images.example.com/thumb.webp",
+      "width": 1600,
+      "height": 1200,
+      "position": 0
     }
   ]
 }
 ```
 
-`foodId` 在食物被删除后为 `null`，记录仍可改克数、可删除。`photos` 始终是数组，没有照片时为空数组；元素结构和排序见[饮食照片接口](#饮食照片接口)。
+`foodId` 在食物被删除后为 `null`，记录仍可改克数、可删除。顶层 `photos` 为当天全部照片，按早/午/晚/加餐及餐内 `position` 排序，始终是数组，没有照片时为空数组；元素结构和排序见[饮食照片接口](#饮食照片接口)。
 
 照片默认放在“公有读、私有写”的 COS 桶，`url` / `thumbUrl` 是对象地址；如果部署改为私有读桶，设置 `COS_PHOTO_ACCESS=signed` 后会返回带时效的签名地址。客户端不应缓存或长期保存这两个字段，页面刷新会重新解析。`url` 用于大图，`thumbUrl` 用于列表缩略图。
 
@@ -234,170 +236,94 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 | `foodId` | uuid | 必须存在于本人食物库 |
 | `grams` | number | 1–5000 |
 
-成功 `201` 返回 `{ entry }`（营养按克数折算后的快照，`photos` 初始为 `[]`）；食物不存在或非本人返回 `404 {"error":"食物不存在"}`。
+成功 `201` 返回 `{ entry }`（营养按克数折算后的快照，不含 `photos`）；食物不存在或非本人返回 `404 {"error":"食物不存在"}`。
 
 ### PATCH /api/v1/meals/:id
 
-修改克数，营养值按新旧克数比例重算。请求 `{ "grams": 300 }`（1–5000）。成功返回 `{ entry }`（含现有 `photos`），不存在返回 404。
+修改克数，营养值按新旧克数比例重算。请求 `{ "grams": 300 }`（1–5000）。成功返回 `{ entry }`（不含 `photos`），不存在返回 404。
 
 ### DELETE /api/v1/meals/:id
 
-删除一条记录，返回 `{ "ok": true }`；不存在（含重复删除）返回 404。记录的照片行随外键级联删除，COS 对象在数据库提交后清理；对象清理失败只记录日志，不影响删除结果。
+删除一条记录，返回 `{ "ok": true }`；不存在（含重复删除）返回 404。该餐的照片及删除标记不受影响，即使删除最后一条食物记录也保留照片。
 
 ### 饮食照片接口
 
-照片上传前必须先创建饮食记录，使用返回的 `entry.id` 作为路由参数。三个接口均需登录；POST / DELETE 沿用通用约定中的 Origin 检查。所有归属由服务端会话确定，不接受客户端指定 `userId`。
+照片属于 `(userId, date, mealType)`，一餐可以只有照片。三个接口均需登录；POST / DELETE 沿用 Origin 检查，`userId` 只来自服务端会话。旧 `/api/v1/meals/:id/photos` 及其删除子路由已移除。
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/api/v1/meals/:id/photos` | 上传单张照片；支持按 `requestId` 幂等重试 |
-| GET | `/api/v1/meals/:id/photos?requestId=UUID` | 核对一次上传是否已经保存 |
-| DELETE | `/api/v1/meals/:id/photos/:photoId` | 删除指定照片 |
+| POST | `/api/v1/meal-photos` | 上传单张照片，支持按 `requestId` 幂等重试 |
+| GET | `/api/v1/meal-photos?requestId=UUID` | 核对一次上传是否已经保存 |
+| DELETE | `/api/v1/meal-photos/:photoId` | 删除本人照片 |
 
-照片列表随 `GET /api/v1/meals?date=...` 的 `entries[].photos`、`GET /api/v1/summary?date=...` 的 `byMeal[].entries[].photos` 返回。上面的 GET 是**上传结果查询**，不是照片列表接口；省略 `requestId` 会返回 400。
+照片列表从 `GET /api/v1/meals?date=` 的顶层 `photos`、`GET /api/v1/summary?date=` 的 `byMeal[].photos` 读取。食物记录对象不再附带 `photos`。照片不产生热量或营养估计。
 
 **照片对象 `MealPhotoDto`**
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | UUID string | 照片 ID，删除接口使用此值；与上传的 `requestId` 不同 |
-| `url` | string | 处理后的 WebP 主图地址 |
-| `thumbUrl` | string | WebP 缩略图地址 |
-| `width` / `height` | number | 处理后主图的宽、高，单位 px |
-| `position` | number | 同一记录内的排序值，从 0 递增；删除后不重排，因此可能不连续，也可能大于 5 |
+| `id` | UUID string | 照片 ID，与上传的请求编号不同 |
+| `date` | string | 业务日期 `YYYY-MM-DD` |
+| `mealType` | enum | breakfast / lunch / dinner / snack |
+| `url` / `thumbUrl` | string | WebP 主图 / 缩略图地址 |
+| `width` / `height` | number | 主图宽高，单位 px |
+| `position` | number | 餐内排序值，从 0 递增；删除后不重排，可能不连续或大于 5 |
 
-响应不包含存储凭证、对象 key、文件摘要或 `requestId`；客户端自行保存本次操作的 `requestId`。列表按 `position` 升序排列，只包含未删除的照片。
+响应不包含凭证、对象 key、文件摘要或 `requestId`。列表只包含未删除照片；地址生成失败时仅隐藏该张，不使整页失败。签名地址不能长期缓存，刷新时重新获取。
 
-#### POST /api/v1/meals/:id/photos
+#### POST /api/v1/meal-photos
 
-为本人饮食记录上传一张照片。请求类型为 `multipart/form-data`：
+请求类型为 `multipart/form-data`：
 
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | path | UUID string | 是 | 已存在的本人饮食记录 ID |
-| `file` | form-data | File | 是 | 非空文件，一次请求只处理一张 |
-| `requestId` | form-data | UUID string | 否 | 本次上传的幂等编号；在当前用户内唯一，不是照片 ID |
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| `date` | 是 | 真实日历日期 `YYYY-MM-DD`，不能晚于 `APP_TIMEZONE`（默认 Asia/Shanghai）的今天 |
+| `mealType` | 是 | breakfast / lunch / dinner / snack |
+| `requestId` | 否，新客户端必传 | UUID；当前用户内唯一；重试复用编号和同一份实际上传文件字节 |
+| `file` | 是 | 单张非空文件，1 B–8 MiB |
 
-新客户端应为每张照片生成一次 `requestId`，在所有重试中复用该编号和**同一份实际上传文件的字节**。重新压缩、转码后即使画面相同，也可能被判定为不同内容。编号从 multipart 字段读取，不读取 `Idempotency-Key` 头；旧客户端省略编号仍可上传，但没有幂等保证。
+输入实际解码支持 JPEG / PNG / WebP / AVIF，最多 40,000,000 像素；HEVC 编码的 HEIC 需客户端先转换。服务端按 EXIF 方向旋转、去 EXIF/GPS、转 WebP，主图长边最多 1600px，缩略图最多 480px，小图不放大。每餐最多六张有效照片；迁移得到的历史超额照片保留，但不允许继续上传。
 
-| 限制 | 值 |
-| --- | --- |
-| 每条记录照片数 | 最多 6 张未删除照片 |
-| 单张文件大小 | 1–8,388,608 bytes（8 MiB，错误提示显示为 8 MB） |
-| 输入像素数 | 不超过 40,000,000 像素 |
-| 接受格式 | JPEG / PNG / WebP / AVIF；根据文件实际解码结果判断，不依赖扩展名或声明的 MIME |
-| HEIC / HEIF | HEVC 编码的 HEIC 不直接接受；客户端需先转为可接受格式。AVIF 的 HEIF 容器 + AV1 编码可接受 |
-| 服务端处理 | 按 EXIF 方向旋转、去 EXIF/GPS、统一转 WebP；主图长边最多 1600px，缩略图长边最多 480px，小图不放大 |
-
-以下 curl 示例使用 Bearer 会话。先设置 `BASE_URL`、`SESSION_TOKEN`、`ENTRY_ID` 和 `PHOTO_REQUEST_ID`，并准备合成测试图片；不要把真实会话值写进文档或提交到仓库。curl 的 `-F` 和浏览器的 `FormData` 会生成 multipart boundary，不要手动覆盖 `Content-Type`。
+为每张照片生成一次请求编号，重新压缩可能改变摘要，不应在重试时重新压缩。省略编号仍可上传，但不具备幂等保证。
 
 ```bash
-curl --request POST "$BASE_URL/api/v1/meals/$ENTRY_ID/photos" \
+curl --request POST "$BASE_URL/api/v1/meal-photos" \
   --header "Authorization: Bearer $SESSION_TOKEN" \
+  --form "date=$MEAL_DATE" \
+  --form "mealType=lunch" \
   --form "requestId=$PHOTO_REQUEST_ID" \
   --form "file=@./synthetic-photo.png;type=image/png"
 ```
 
-首次保存成功返回 `201`；同一用户以相同编号、相同记录和相同文件重放返回 `200`，响应均为：
+使用合成图片；变量只在本地设置，勿提交真实会话。不要手动设置 multipart Content-Type。
 
-```json
-{
-  "photo": {
-    "id": "9b7f2a41-2222-4a9b-8c1d-3e4f5a6b7c8d",
-    "url": "https://images.example.com/bodytrace/meal-photos/2026-10/9b7f2a41.webp",
-    "thumbUrl": "https://images.example.com/bodytrace/meal-photos/2026-10/9b7f2a41_thumb.webp",
-    "width": 1600,
-    "height": 1200,
-    "position": 0
-  }
-}
-```
-
-成功重放返回原照片，不重复占用配额；即使已满六张，仍可重放。不同用户可以独立使用相同编号。同一用户将编号用于其他记录或不同文件，或者该照片已删除时，返回 `409`。相同文件使用新的编号属于新的上传，不做跨编号的内容去重。
+首次成功为 `201 { photo }`；相同用户、编号、日期、餐次及文件重放为 `200 { photo }`，即使满六张仍可重放。相同文件配新编号是新上传；不同用户可以使用相同编号。
 
 | 状态 | 场景 |
 | --- | --- |
-| 400 | UUID 非法、请求不是 multipart、缺少/空 `file`、文件无法解码或格式/像素数不支持、已满 6 张 |
-| 401 | 未登录、会话过期或写请求 Origin 校验失败 |
-| 404 | 记录不存在或不属于当前用户 |
-| 409 | 上传编号用于其他记录/不同文件，或对应照片已删除 |
-| 413 | 文件超过 8 MiB，或请求声明的 Content-Length 超过 8 MiB + 512 KiB multipart 开销 |
-| 502 | COS 上传失败，或数据库写入结果暂时无法确认；不代表照片一定未保存 |
-| 503 | 新上传需要的 COS 配置不完整 |
+| 400 | 日期/餐次/UUID 非法、未来日期、非 multipart、缺少或空文件、解码/格式/像素数失败、该餐满六张 |
+| 401 | 未登录、会话过期或 Origin 校验失败 |
+| 404 | 上传提交前用户已被删除 |
+| 409 | 编号用于其他日期/餐次/文件，或对应照片已删除 |
+| 413 | 文件超过 8 MiB，或 Content-Length 超过 8 MiB + 512 KiB multipart 开销 |
+| 502 | COS、读取地址或数据库结果无法确认；不能据此认定未保存 |
+| 503 | 新上传所需 COS 配置不完整 |
 
-业务错误响应示例：
+预期错误均为 `{ "error": "说明" }`。
 
-```json
-{ "error": "本次上传编号已用于其他内容，请重新选择照片" }
-```
+#### GET /api/v1/meal-photos?requestId=UUID
 
-#### GET /api/v1/meals/:id/photos?requestId=UUID
+只按当前用户和编号核对，不需要传日期、餐次或文件，不比较文件摘要。已保存且未删除返回 `200 { photo }`；尚未查到（含只有其他用户使用过该编号）返回 `200 { "photo": null }`。缺少或非法编号为 400，未登录为 401，照片已删除为 409，数据库或地址生成暂不可用为 502。
 
-核对当前用户的一次上传。此接口不接收文件，不比较文件摘要；以 `requestId` 查询并校验记录归属。
+`null` 不代表旧请求已取消，它可能仍在执行。查询错误、超时、非 JSON 响应不能当成 `null`。
 
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | path | UUID string | 是 | 本人饮食记录 ID |
-| `requestId` | query | UUID string | 是 | 上传时使用的编号 |
+客户端为每张照片保存 `date + mealType + requestId + file`。重试先 GET 核对，核对到照片时检查所属餐次并视为完成；返回 `null` 才用原编号、原文件 POST。POST 结果未知时先查询，核对失败保留待重试项，不自动重建。409 不得通过更换编号静默重传。关闭页面或取消请求不撤销服务端上传，重新进入时刷新照片列表。
 
-```bash
-curl "$BASE_URL/api/v1/meals/$ENTRY_ID/photos?requestId=$PHOTO_REQUEST_ID" \
-  --header "Authorization: Bearer $SESSION_TOKEN"
-```
+#### DELETE /api/v1/meal-photos/:photoId
 
-已保存且未删除时返回 `200 { photo }`，照片结构与上传成功响应相同。尚未查到已提交记录时返回 `200`：
+无请求体。成功为 `200 { "ok": true }`；非法 UUID 为 400，未登录或 Origin 失败为 401；不存在、非本人或已删除（含重复删除）均为 404。
 
-```json
-{ "photo": null }
-```
-
-`null` 只表示本次查询尚未查到结果，旧上传可能仍在进行；它不是取消成功或上传失败的证明。查询错误、超时、非 JSON 响应也不能当成 `null`。
-
-| 状态 | 场景 |
-| --- | --- |
-| 400 | 缺少 `requestId`，或 `id` / `requestId` 不是合法 UUID |
-| 401 | 未登录或会话过期 |
-| 404 | 饮食记录不存在或不属于当前用户 |
-| 409 | 该编号已用于当前用户的另一条记录，或对应照片已删除 |
-
-**客户端上传与重试顺序**
-
-1. 创建饮食记录，为每张照片保存一组 `entryId + requestId + file`。
-2. 上传前先 GET 核对；返回 `photo` 时直接视为已完成，返回 `null` 时才使用该编号和文件 POST。
-3. POST 超时、网络断开或返回 5xx 后先 GET 核对；查询失败时保留待重试项，不自动再次创建。
-4. 用户再次重试时重复上述流程。服务端唯一约束会处理仍在执行的旧请求；遇到 409 时处理冲突，不通过换编号静默重传。
-
-取消浏览器请求或关闭弹窗不会撤销已在服务端执行的上传。重新进入记录后刷新照片列表，必要时用保留的编号核对结果。
-
-#### DELETE /api/v1/meals/:id/photos/:photoId
-
-删除本人饮食记录中的指定照片，无请求体：
-
-| 参数 | 位置 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- | --- |
-| `id` | path | UUID string | 是 | 本人饮食记录 ID |
-| `photoId` | path | UUID string | 是 | 该记录下照片的 `photo.id` |
-
-将上传或查询返回的 `photo.id` 设置为 `PHOTO_ID`：
-
-```bash
-curl --request DELETE "$BASE_URL/api/v1/meals/$ENTRY_ID/photos/$PHOTO_ID" \
-  --header "Authorization: Bearer $SESSION_TOKEN"
-```
-
-成功返回 `200`：
-
-```json
-{ "ok": true }
-```
-
-| 状态 | 场景 |
-| --- | --- |
-| 400 | `id` / `photoId` 不是合法 UUID |
-| 401 | 未登录、会话过期或写请求 Origin 校验失败 |
-| 404 | 记录或照片不存在、不属于本人、不属于该记录，或照片已删除（包括重复删除） |
-
-删除后照片立即从列表隐藏，释放六张配额，并尽力清理 COS 主图与缩略图。对象清理失败不改变成功响应；由维护脚本后续清理。数据库保留删除标记，旧上传编号再次 GET / POST 均返回 409；删除饮食记录或一键清空时，照片及删除标记随记录级联删除，客户端应丢弃相关待重试操作。
+事务内设置删除标记，提交后尽力清理 COS 主图和缩略图，清理失败由孤儿清理脚本兜底。删除释放有效照片配额，保留原编号和排序位置；旧编号 GET / POST 返回 409。删除食物不会删除照片。一键清空则硬删除所有照片及标记，边界见下文数据管理。
 
 ### GET /api/v1/summary?date=YYYY-MM-DD
 
@@ -407,10 +333,10 @@ curl --request DELETE "$BASE_URL/api/v1/meals/$ENTRY_ID/photos/$PHOTO_ID" \
 {
   "date": "2026-10-18",
   "byMeal": [
-    { "mealType": "breakfast", "label": "早餐", "entries": [ /* MealEntry & { photos } */ ] },
-    { "mealType": "lunch", "label": "午餐", "entries": [] },
-    { "mealType": "dinner", "label": "晚餐", "entries": [] },
-    { "mealType": "snack", "label": "加餐", "entries": [] }
+    { "mealType": "breakfast", "label": "早餐", "entries": [ /* MealEntry */ ], "photos": [ /* MealPhotoDto */ ] },
+    { "mealType": "lunch", "label": "午餐", "entries": [], "photos": [] },
+    { "mealType": "dinner", "label": "晚餐", "entries": [], "photos": [] },
+    { "mealType": "snack", "label": "加餐", "entries": [], "photos": [] }
   ],
   "totals": { "calories": 236, "protein": 49.2, "carbs": 1.2, "fat": 3.8 },
   "goals": { "calories": 2200, "protein": 140, "carbs": 230, "fat": 70 },
@@ -705,10 +631,10 @@ curl --request DELETE "$BASE_URL/api/v1/meals/$ENTRY_ID/photos/$PHOTO_ID" \
 
 ### DELETE /api/v1/records
 
-一键清空当前用户的**全部饮食记录与身体指标**：同一事务内硬删除，包括此前软删除的测量行。个人食物库、每日目标、饮食计划和个人资料不受影响。接口可安全重试，重复调用返回数量 0。饮食记录的照片行随外键级联删除，COS 对象在事务提交后批量清理；对象清理失败只记录日志，不影响清空结果。
+一键清空当前用户的**全部饮食记录、餐次照片与身体指标**：同一事务内硬删除，包括此前软删除的测量行与照片标记。个人食物库、每日目标、饮食计划和个人资料不受影响。接口可安全重试，重复调用返回数量 0。清空与照片上传、删除先锁同一用户行，在事务内取得对象 key 并显式删除照片，COS 对象在事务提交后批量清理；对象清理失败只记录日志，不影响清空结果。
 
-返回的 `cleared.measurements` 包括原先已软删除的行，所以可能大于清空前界面可见的指标数。硬删除也会清除测量的 `requestId` 占用与删除标记；清空后重放旧新增请求可能重新创建记录，客户端应丢弃待重试的旧新增操作并刷新状态。
+返回的 `cleared.measurements` / `cleared.mealPhotos` 包括各自已软删除的行，所以可能大于清空前界面可见的指标数。硬删除会清除测量和照片的 `requestId` 占用与删除标记；清空后重放旧新增请求可能重新创建记录，客户端应停止上传、丢弃待重试的旧新增操作并刷新状态。用户行锁只保证事务串行，不会使尚在转码/上传或其他设备保留的旧请求失效；这些请求在清空后提交仍可能创建照片。跨设备阻止恢复需要另外的服务端失效机制。
 
 ```json
-{ "ok": true, "cleared": { "mealEntries": 42, "measurements": 17 } }
+{ "ok": true, "cleared": { "mealEntries": 42, "measurements": 17, "mealPhotos": 8 } }
 ```

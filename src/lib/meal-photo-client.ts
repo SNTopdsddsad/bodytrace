@@ -8,7 +8,7 @@
 import { api, apiForm, ApiError } from "./api-client";
 import { withRequestTimeout } from "./request-timeout";
 import { MEAL_PHOTO_MAX_BYTES } from "./meal-photo";
-import type { MealPhotoDto } from "./meal-photo";
+import type { MealPhotoDto, MealSlot } from "./meal-photo";
 
 const MAX_EDGE = 1600;
 
@@ -97,12 +97,12 @@ export async function prepareMealPhoto(file: File): Promise<PreparedMealPhoto> {
 }
 
 export async function uploadMealPhoto(
-  entryId: string,
+  slot: MealSlot,
   file: File,
   requestId: string,
   signal?: AbortSignal,
 ): Promise<MealPhotoDto> {
-  const path = `/api/v1/meals/${encodeURIComponent(entryId)}/photos`;
+  const path = "/api/v1/meal-photos";
   const combined = (timeout: AbortSignal) => signal ? AbortSignal.any([signal, timeout]) : timeout;
   const lookup = () => withRequestTimeout(async (timeout) => {
     signal?.throwIfAborted();
@@ -110,6 +110,9 @@ export async function uploadMealPhoto(
       `${path}?requestId=${encodeURIComponent(requestId)}`, { signal: combined(timeout) },
     );
     if (!("photo" in data)) throw new Error("暂时无法核对照片，请稍后重试");
+    if (data.photo && (data.photo.date !== slot.date || data.photo.mealType !== slot.mealType)) {
+      throw new ApiError("本次上传编号已用于其他餐次，请重新选择照片", 409);
+    }
     return data.photo;
   });
 
@@ -120,6 +123,8 @@ export async function uploadMealPhoto(
     return await withRequestTimeout(async (timeout) => {
       signal?.throwIfAborted();
       const form = new FormData();
+      form.append("date", slot.date);
+      form.append("mealType", slot.mealType);
       form.append("file", file);
       form.append("requestId", requestId);
       const data = await apiForm<{ photo: MealPhotoDto }>(path, form, { signal: combined(timeout) });

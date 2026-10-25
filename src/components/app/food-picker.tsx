@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Search, Star, History, BookOpen, Loader2 } from "lucide-react";
+import { Search, Star, History, BookOpen } from "lucide-react";
 import type { Food } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api-client";
-import { prepareMealPhoto, uploadMealPhoto } from "@/lib/meal-photo-client";
-import { MEAL_PHOTO_MAX } from "@/lib/meal-photo";
-import { MealPhotoPicker } from "./meal-photo-picker";
-import type { SelectedMealPhoto } from "./meal-photo-picker";
+import { api, ApiError } from "@/lib/api-client";
 import type { MealType } from "@/lib/nutrition";
 
 /** 参考库条目（《中国食物成分表》公共只读数据） */
@@ -84,33 +80,15 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
   const [grams, setGrams] = useState(100);
   const [saving, setSaving] = useState(false);
 
-  // 照片先在本地预览/压缩，记录创建成功后再逐张上传；创建过记录后不再重复创建。
-  const [selectedPhotos, setSelectedPhotos] = useState<SelectedMealPhoto[]>([]);
-  const [preparingPhotos, setPreparingPhotos] = useState(false);
-  const [createdEntry, setCreatedEntry] = useState<{ id: string; name: string; grams: number } | null>(null);
-  const [photoError, setPhotoError] = useState("");
-  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
-  const photosRef = useRef<SelectedMealPhoto[]>([]);
-
+  const [saveError, setSaveError] = useState("");
+  const [uncertain, setUncertain] = useState(false);
+  const uncertainRef = useRef(false);
   const active = useRef(true);
   const savingRef = useRef(false);
-  const preparingRef = useRef(false);
-  const creatingRef = useRef(false);
-  const uploadController = useRef<AbortController | null>(null);
-
   useEffect(() => {
     active.current = true;
-    return () => {
-      active.current = false;
-      uploadController.current?.abort();
-      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
-    };
+    return () => { active.current = false; };
   }, []);
-
-  function replacePhotos(photos: SelectedMealPhoto[]) {
-    photosRef.current = photos;
-    setSelectedPhotos(photos);
-  }
 
   // 三个列表的数据源
   const [recents, setRecents] = useState<Food[]>([]);
@@ -154,65 +132,17 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
   }, [q]);
 
   function pick(f: Food) {
-    if (!active.current || savingRef.current || createdEntry) return;
+    if (!active.current || savingRef.current || uncertainRef.current) return;
     setPicked(f);
     // 默认克数：有“一份”定义就用一份，否则 100g
     setGrams(f.servingGrams ?? 100);
   }
 
   function closeDialog() {
-    if (creatingRef.current) return;
+    if (savingRef.current) return;
     active.current = false;
-    uploadController.current?.abort();
     onOpenChange(false);
-    if (createdEntry) router.refresh();
-  }
-
-  async function addPhotos(files: File[]) {
-    if (!active.current || createdEntry || savingRef.current || preparingRef.current) return;
-    const remaining = MEAL_PHOTO_MAX - photosRef.current.length;
-    if (files.length > remaining) toast.error(`每条记录最多 ${MEAL_PHOTO_MAX} 张照片，已保留前 ${Math.max(remaining, 0)} 张`);
-    const accepted = files.slice(0, Math.max(remaining, 0));
-    if (accepted.length === 0) return;
-    preparingRef.current = true;
-    setPreparingPhotos(true);
-    for (const file of accepted) {
-      if (!active.current) break;
-      try {
-        const id = crypto.randomUUID();
-        const prepared = await prepareMealPhoto(file);
-        if (!active.current) {
-          URL.revokeObjectURL(prepared.previewUrl);
-          break;
-        }
-        replacePhotos([...photosRef.current, { id, ...prepared }]);
-      } catch (error) {
-        if (active.current) toast.error(error instanceof Error ? error.message : "这张照片无法读取");
-      }
-    }
-    preparingRef.current = false;
-    if (active.current) setPreparingPhotos(false);
-  }
-
-  function removePhoto(id: string) {
-    if (createdEntry || savingRef.current) return;
-    const target = photosRef.current.find((photo) => photo.id === id);
-    if (target) URL.revokeObjectURL(target.previewUrl);
-    replacePhotos(photosRef.current.filter((photo) => photo.id !== id));
-  }
-
-  async function uploadSelected(entryId: string, items: SelectedMealPhoto[], signal: AbortSignal) {
-    setUploadProgress({ done: 0, total: items.length });
-    for (let index = 0; index < items.length; index++) {
-      if (!active.current) return;
-      const item = items[index];
-      await uploadMealPhoto(entryId, item.file, item.id, signal);
-      if (!active.current) return;
-      URL.revokeObjectURL(item.previewUrl);
-      replacePhotos(photosRef.current.filter((photo) => photo.id !== item.id));
-      setUploadProgress({ done: index + 1, total: items.length });
-    }
-    setUploadProgress(null);
+    if (uncertainRef.current) router.refresh();
   }
 
   /** 从参考库选中：库里已有同名食物就直接复用，否则抄录一条新的 */
@@ -272,43 +202,29 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
   }, [refQ]);
 
   async function handleSave() {
-    if (!active.current || !picked || savingRef.current || preparingRef.current) return;
+    if (!active.current || !picked || savingRef.current || uncertainRef.current) return;
     savingRef.current = true;
     setSaving(true);
-    setPhotoError("");
-    let entry = createdEntry;
-    const pendingPhotos = photosRef.current;
-    const controller = new AbortController();
-    uploadController.current = controller;
+    setSaveError("");
     try {
-      if (!entry) {
-        creatingRef.current = true;
-        const data = await api<{ entry: { id: string; name: string; grams: number } }>("/api/v1/meals", {
-          method: "POST",
-          body: JSON.stringify({ date, mealType, foodId: picked.id, grams }),
-        });
-        entry = data.entry;
-        creatingRef.current = false;
-        if (!active.current) { router.refresh(); return; }
-        setCreatedEntry(entry);
-        setGrams(entry.grams);
-      }
-      if (pendingPhotos.length > 0) await uploadSelected(entry.id, pendingPhotos, controller.signal);
-      if (!active.current) return;
-      toast.success(`已记录到${mealLabel}：${entry.name} ${entry.grams}g${pendingPhotos.length > 0 ? `，上传 ${pendingPhotos.length} 张照片` : ""}`);
+      const { entry } = await api<{ entry: { id: string; name: string; grams: number } }>("/api/v1/meals", {
+        method: "POST",
+        body: JSON.stringify({ date, mealType, foodId: picked.id, grams }),
+      });
+      if (!entry?.id) throw new Error("保存结果尚未确认");
+      if (!active.current) { router.refresh(); return; }
+      toast.success(`已记录到${mealLabel}：${entry.name} ${entry.grams}g`);
+      savingRef.current = false;
       closeDialog();
       router.refresh();
     } catch (error) {
       if (!active.current) return;
-      if (entry) {
-        setPhotoError(`记录已保存，但照片上传没有完成：${error instanceof Error ? error.message : "请稍后重试"}`);
-        setUploadProgress(null);
-        router.refresh();
-      } else {
-        toast.error(error instanceof Error ? error.message : "保存失败");
-      }
+      // 饮食新增没有幂等编号。网络或服务器故障后禁止原地重发，先返回日记核对。
+      const unknown = !(error instanceof ApiError && error.status < 500);
+      uncertainRef.current = unknown;
+      setUncertain(unknown);
+      setSaveError(unknown ? "保存结果尚未确认，请关闭并返回日记核对，避免重复记录。" : error.message);
     } finally {
-      creatingRef.current = false;
       savingRef.current = false;
       if (active.current) setSaving(false);
     }
@@ -332,7 +248,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
         <DialogHeader>
           <DialogTitle>{picked ? `记入${mealLabel}` : `添加到${mealLabel}`}</DialogTitle>
           <DialogDescription>
-            {createdEntry ? `已保存 ${createdEntry.name} ${createdEntry.grams}g，份量可关闭后在记录中调整` : picked ? "输入克数，确认记录" : "从食物库选择，或搜索"}
+            {picked ? "输入克数，确认记录。照片可在餐次区添加。" : "从食物库选择，或搜索"}
           </DialogDescription>
         </DialogHeader>
 
@@ -470,7 +386,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
                   max={5000}
                   value={grams}
                   aria-label="食物克数"
-                  disabled={saving || Boolean(createdEntry)}
+                  disabled={saving || uncertain}
                   onChange={(e) => setGrams(Number(e.target.value) || 0)}
                   className="flex-1"
                   autoFocus
@@ -487,7 +403,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
                       type="button"
                       variant={grams === g ? "default" : "secondary"}
                       size="sm"
-                      disabled={saving || Boolean(createdEntry)}
+                      disabled={saving || uncertain}
                       onClick={() => setGrams(g)}
                     >
                       {g === picked.servingGrams ? `一份(${g}g)` : `${g}g`}
@@ -503,50 +419,23 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
               </p>
             )}
 
-            <MealPhotoPicker
-              photos={selectedPhotos}
-              disabled={saving || Boolean(createdEntry)}
-              preparing={preparingPhotos}
-              onAdd={addPhotos}
-              onRemove={removePhoto}
-            />
-
-            {photoError && (
-              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-5 text-destructive">
-                {photoError}
-                {<br />}
-                记录已保存，可重试未上传的照片，或关闭后从这条记录继续添加。
-              </p>
-            )}
-
-            {uploadProgress && (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                正在上传照片 {Math.min(uploadProgress.done + 1, uploadProgress.total)} / {uploadProgress.total}…
-              </p>
-            )}
+            {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
 
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 className="flex-1"
-                disabled={saving && !createdEntry}
-                onClick={() => (createdEntry ? closeDialog() : setPicked(null))}
+                disabled={saving}
+                onClick={() => (uncertain ? closeDialog() : setPicked(null))}
               >
-                {createdEntry ? "关闭" : "返回重选"}
+                {uncertain ? "关闭并核对" : "返回重选"}
               </Button>
               <Button
                 className="flex-1"
-                disabled={saving || preparingPhotos || !picked || grams < 1}
+                disabled={saving || uncertain || !picked || grams < 1 || grams > 5000}
                 onClick={handleSave}
               >
-                {saving
-                  ? "保存中…"
-                  : createdEntry
-                    ? selectedPhotos.length > 0
-                      ? "重试上传照片"
-                      : "完成"
-                    : "确认记录"}
+                {saving ? "保存中…" : "确认记录"}
               </Button>
             </div>
           </div>

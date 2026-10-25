@@ -31,7 +31,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
           </CardContent>
         </Card>
         <div className="min-w-0 space-y-4">
-          {byMeal.map((meal) => <MealSection key={meal.mealType} date={date} mealType={meal.mealType} label={meal.label} entries={meal.entries} />)}
+          {byMeal.map((meal) => <MealSection key={`${date}:${meal.mealType}`} date={date} mealType={meal.mealType} label={meal.label} entries={meal.entries} photos={meal.photos} canRecord={date <= todayStr()} />)}
         </div>
       </div>
     </div>

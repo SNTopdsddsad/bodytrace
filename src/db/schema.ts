@@ -144,9 +144,8 @@ export const mealEntry = mysqlTable(
 );
 
 /**
- * 饮食照片：一条饮食记录最多 6 张，对象存 COS（公有读、私有写），
- * 这里只保存元数据与对象 key。删除记录时数据库行随外键级联删除，
- * COS 对象由服务层在事务提交后清理。
+ * 饮食照片归属用户、日期与餐次，每餐最多 6 张有效照片。
+ * 与食物记录独立；清空记录或删除账号时删除，COS 对象提交后清理。
  */
 export const mealPhoto = mysqlTable(
   "bodytrace_meal_photo",
@@ -155,10 +154,9 @@ export const mealPhoto = mysqlTable(
     userId: varchar("user_id", { length: 255 })
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    entryId: varchar("entry_id", { length: 36 })
-      .notNull()
-      .references(() => mealEntry.id, { onDelete: "cascade" }),
-    /** 旧客户端可不传；同一用户的请求编号只能用于同一条记录和同一份文件。 */
+    date: date("date", { mode: "string" }).notNull(),
+    mealType: mysqlEnum("meal_type", mealTypes).notNull(),
+    /** 同一用户的请求编号只能用于同一餐和同一份上传文件。 */
     requestId: varchar("request_id", { length: 36 }),
     contentHash: varchar("content_hash", { length: 64 }),
     /** 保留幂等标记，避免照片删除后旧上传请求将其重新创建。 */
@@ -171,13 +169,12 @@ export const mealPhoto = mysqlTable(
     byteSize: int("byte_size").notNull(),
     width: int("width").notNull(),
     height: int("height").notNull(),
-    /** 同一条记录内的展示顺序，0 起 */
+    /** 同一餐内的展示顺序，0 起；删除后不重排 */
     position: int("position").notNull(),
     createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
   },
   (t) => [
-    index("meal_photo_entry_position_idx").on(t.entryId, t.position),
-    unique("meal_photo_entry_position_unique").on(t.entryId, t.position),
+    unique("meal_photo_meal_position_unique").on(t.userId, t.date, t.mealType, t.position),
     unique("meal_photo_object_unique").on(t.objectKey),
     unique("meal_photo_user_request_unique").on(t.userId, t.requestId),
     index("meal_photo_user_idx").on(t.userId),

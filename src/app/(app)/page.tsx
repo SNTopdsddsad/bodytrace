@@ -15,7 +15,7 @@ export default async function TodayPage() {
   const today = todayStr();
   const { totals, goals, byMeal, goalSource } = await getDaySummary(session!.user.id, today);
   const entries = byMeal.flatMap((meal) => meal.entries.map((entry) => ({ ...entry, mealLabel: meal.label })));
-  const recordedMeals = byMeal.filter((meal) => meal.entries.length > 0).length;
+  const recordedMeals = byMeal.filter((meal) => meal.entries.length > 0 || meal.photos.length > 0).length;
   const progress = goals.calories > 0 ? Math.round((totals.calories / goals.calories) * 100) : 0;
 
   return (
@@ -35,7 +35,7 @@ export default async function TodayPage() {
             </div>
             <NutritionRing consumed={totals.calories} goal={goals.calories} inverse />
           </div>
-          <div className="relative mt-6 flex items-center gap-2 border-t border-white/15 pt-4 text-xs text-white/65"><span className="size-1.5 rounded-full bg-(--brand-light)" aria-hidden />{entries.length === 0 ? "今天的记录，从第一餐开始。" : `已记录 ${recordedMeals} 餐，共 ${entries.length} 项食物。`}</div>
+          <div className="relative mt-6 flex items-center gap-2 border-t border-white/15 pt-4 text-xs text-white/65"><span className="size-1.5 rounded-full bg-(--brand-light)" aria-hidden />{recordedMeals === 0 ? "今天的记录，从第一餐开始。" : `已记录 ${recordedMeals} 餐，共 ${entries.length} 项食物。`}</div>
         </section>
         <Card className="justify-between">
           <CardHeader className="flex items-center justify-between"><CardTitle>营养摄入</CardTitle><span className="text-xs text-muted-foreground">已摄入 / 目标</span></CardHeader>
@@ -55,8 +55,8 @@ export default async function TodayPage() {
               <Link key={meal.mealType} href={`/diary#meal-${meal.mealType}`} className="group rounded-2xl border bg-card p-4 transition-colors hover:border-primary/35 hover:bg-secondary/30 sm:p-5">
                 <div className="flex items-center justify-between"><span className={`flex size-10 items-center justify-center rounded-xl ${style.chip}`}><MealIcon className="size-5" strokeWidth={1.7} aria-hidden /></span><ChevronRight className="size-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" aria-hidden /></div>
                 <h3 className="mt-4 text-sm font-medium">{meal.label}</h3>
-                <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{kcal}<span className="ml-1.5 text-xs font-normal text-muted-foreground">千卡</span></p>
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">{meal.entries.length > 0 ? <><Check className="size-3 text-primary" aria-hidden />{meal.entries.length} 项食物</> : <><Plus className="size-3" aria-hidden />添加记录</>}</p>
+                <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{meal.entries.length === 0 && meal.photos.length > 0 ? "—" : kcal}<span className="ml-1.5 text-xs font-normal text-muted-foreground">千卡</span></p>
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">{meal.entries.length > 0 ? <><Check className="size-3 text-primary" aria-hidden />{meal.entries.length} 项食物</> : meal.photos.length > 0 ? <>{meal.photos.length} 张照片 · 待补食物</> : <><Plus className="size-3" aria-hidden />添加记录</>}</p>
               </Link>
             );
           })}

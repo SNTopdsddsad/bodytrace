@@ -3,6 +3,8 @@
  * POST /api/v1/meals                  添加记录 {date, mealType, foodId, grams}
  */
 import { getSession, requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
+import { getPhotosForDay } from "@/services/meal-photos";
+import { MEAL_ORDER } from "@/lib/nutrition";
 import { isValidDateStr } from "@/lib/date";
 import { addEntry, getDayEntries, mealCreateSchema } from "@/services/meals";
 
@@ -14,7 +16,11 @@ export async function GET(request: Request) {
   if (!isValidDateStr(date)) {
     return Response.json({ error: "date 参数格式应为 YYYY-MM-DD" }, { status: 400 });
   }
-  return Response.json({ entries: await getDayEntries(session.user.id, date) });
+  const [entries, byMeal] = await Promise.all([
+    getDayEntries(session.user.id, date),
+    getPhotosForDay(session.user.id, date),
+  ]);
+  return Response.json({ entries, photos: MEAL_ORDER.flatMap((meal) => byMeal.get(meal) ?? []) });
 }
 
 export async function POST(request: Request) {

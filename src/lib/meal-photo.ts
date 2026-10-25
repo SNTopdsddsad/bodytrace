@@ -1,8 +1,12 @@
 /**
  * 饮食照片的共享常量（客户端与服务端都可以引用，不包含 Node 专用模块）。
- * 一条饮食记录最多 6 张；服务端会再次校验，客户端限制只用于提前提示。
+ * 每餐最多 6 张；服务端会再次校验，客户端限制只用于提前提示。
  */
-export type MealPhotoDto = {
+import type { MealType } from "./nutrition";
+
+export type MealSlot = { date: string; mealType: MealType };
+
+export type MealPhotoDto = MealSlot & {
   id: string;
   url: string;
   thumbUrl: string;
