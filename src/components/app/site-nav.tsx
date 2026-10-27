@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BookOpen, CalendarRange, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
+import { Activity, BookOpen, CalendarRange, ChartNoAxesCombined, ChevronRight, Dumbbell, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -18,6 +18,7 @@ const LINKS = [
 
 /** 侧边栏的次要入口：不占移动端底部导航的五个位置。 */
 const SIDEBAR_LINKS = [
+  { href: "/training", label: "训练记录", icon: Dumbbell },
   { href: "/plan", label: "饮食计划", icon: CalendarRange },
   { href: "/measurements", label: "身体变化", icon: Activity },
   { href: "/profile", label: "个人资料", icon: UserRound },
@@ -25,6 +26,7 @@ const SIDEBAR_LINKS = [
 
 export function SiteNav({ userName }: { userName: string }) {
   const pathname = usePathname();
+  const trainingEditor = pathname.startsWith("/training/");
   const router = useRouter();
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
@@ -91,13 +93,13 @@ export function SiteNav({ userName }: { userName: string }) {
           <Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录" aria-label="退出登录"><LogOut className="size-4" aria-hidden /></Button>
         </div>
       </header>
-      <nav aria-label="移动端导航" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
+      {!trainingEditor && <nav aria-label="移动端导航" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
         {LINKS.map(({ href, short, icon: Icon }) => (
           <Link key={href} href={href} aria-current={isActive(href) ? "page" : undefined} className={`flex min-h-18 flex-col items-center justify-center gap-1.5 text-[11px] font-medium transition-colors ${isActive(href) ? "text-primary" : "text-muted-foreground"}`}>
             <span className={`rounded-xl px-4 py-1 ${isActive(href) ? "bg-secondary" : ""}`}><Icon className="size-5" strokeWidth={1.8} aria-hidden /></span>{short}
           </Link>
         ))}
-      </nav>
+      </nav>}
     </>
   );
 }

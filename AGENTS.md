@@ -20,7 +20,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [开发指南](docs/BodyTrace_Nextjs_MySQL_Development_Guide.md)：架构、数据语义、权限、迁移和后续路线。
 - [产品与界面设计指南](docs/BodyTrace_Product_UI_Design_Guide.md)：产品方向、视觉、交互状态和页面验收。
 - [API 参考](docs/BodyTrace_API_Reference.md)：已实现业务接口按模块分类的契约、参数校验与响应示例。
-- 两份指南包含后续规划。当前已实现体重、体脂率、血压持续记录；训练记录、报告、时间线、OCR、助手和 SwiftUI 客户端仍是规划，也不要为无关任务提前添加空接口、占位入口或新目录体系。
+- 两份指南包含后续规划。当前已实现体重、体脂率、血压持续记录；训练已支持力量逐组与有氧、自动保存草稿、补录和历史维护；报告、时间线、OCR、助手和 SwiftUI 客户端仍是规划，也不要为无关任务提前添加空接口、占位入口或新目录体系。
 - 开始修改前简要说明用户行为、变更范围和验证方式；遇到会影响范围或数据契约的冲突，说明差异并按当前任务对齐。
 
 ## 当前技术与目录
@@ -126,6 +126,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `npm run test:password-reset` | 需要本地 MySQL，验证重置令牌、会话失效与认证限流 |
 | `npm run test:mysql-pool` | 需要本地 MySQL，验证空闲回收后重建 UTC 连接，约需 32 秒 |
 | `npm run test:measurements` | 无需数据库，验证身体指标校验、精度、变化计算与趋势缺失值 |
+| `npm run test:training` | 无需数据库，验证训练规则、服务器校时、导航保护、迟到响应与请求体边界 |
+| `npm run test:training-integration` | 需要独立测试 MySQL，验证训练读写、幂等、冲突、账号隔离和清空 |
 | `npm run test:measurement-integration` | 需要本地 MySQL，验证身体指标读写、幂等、版本冲突和账号隔离 |
 
 - 当前测试使用 Node.js 内置测试工具和脚本，尚未安装 Vitest 或 Playwright；没有通用 `npm test`。按现有能力验证，不照规划文档运行不存在的命令。

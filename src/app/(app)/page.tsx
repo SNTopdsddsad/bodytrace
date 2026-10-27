@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Check, ChevronRight, Plus, Target, Utensils } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, ChevronRight, Dumbbell, Plus, Target, Utensils } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MacroBars } from "@/components/app/macro-bars";
@@ -12,16 +13,17 @@ import { getDaySummary } from "@/services/meals";
 
 export default async function TodayPage() {
   const session = await getSession();
+  if (!session) redirect("/login");
   const today = todayStr();
-  const { totals, goals, byMeal, goalSource } = await getDaySummary(session!.user.id, today);
+  const { totals, goals, byMeal, goalSource } = await getDaySummary(session.user.id, today);
   const entries = byMeal.flatMap((meal) => meal.entries.map((entry) => ({ ...entry, mealLabel: meal.label })));
   const recordedMeals = byMeal.filter((meal) => meal.entries.length > 0 || meal.photos.length > 0).length;
   const progress = goals.calories > 0 ? Math.round((totals.calories / goals.calories) * 100) : 0;
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="每一天，都值得好好记录" title="今日概览" description={`${session!.user.name}，从今天的每一餐，了解自己的饮食节奏。`}
-        action={<div className="flex flex-wrap items-center gap-3"><span className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="size-4" aria-hidden />{formatDateCn(today)}</span><Button render={<Link href="/diary" />} nativeButton={false}><Plus className="size-4" aria-hidden />记录饮食</Button></div>} />
+      <PageHeader eyebrow="每一天，都值得好好记录" title="今日概览" description={`${session.user.name}，从今天的每一餐，了解自己的饮食节奏。`}
+        action={<div className="flex flex-wrap items-center gap-3"><span className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="size-4" aria-hidden />{formatDateCn(today)}</span><Button variant="outline" render={<Link href="/training" />} nativeButton={false}><Dumbbell className="size-4" aria-hidden />记录训练</Button><Button render={<Link href="/diary" />} nativeButton={false}><Plus className="size-4" aria-hidden />记录饮食</Button></div>} />
 
       <div className="grid gap-5 xl:grid-cols-[1.3fr_1fr]">
         <section className="relative overflow-hidden rounded-2xl bg-(--brand-deep) p-6 text-white sm:p-7" aria-labelledby="energy-title">

@@ -21,7 +21,9 @@ import {
   index,
   unique,
   check,
+  json,
 } from "drizzle-orm/mysql-core";
+import type { TrainingItem } from "@/lib/training";
 
 /**
  * better-auth 要求的四张认证表。
@@ -236,6 +238,40 @@ export const measurement = mysqlTable("bodytrace_measurement", {
     (${t.kind} = 'weight' AND ${t.value} IS NOT NULL AND ${t.value} > 0 AND ${t.value} <= 500 AND ${t.systolic} IS NULL AND ${t.diastolic} IS NULL AND ${t.period} IS NULL)
     OR (${t.kind} = 'bodyFat' AND ${t.value} IS NOT NULL AND ${t.value} > 0 AND ${t.value} <= 100 AND ${t.systolic} IS NULL AND ${t.diastolic} IS NULL AND ${t.period} IS NULL)
     OR (${t.kind} = 'bloodPressure' AND ${t.value} IS NULL AND ${t.systolic} IS NOT NULL AND ${t.diastolic} IS NOT NULL AND ${t.systolic} > ${t.diastolic} AND ${t.systolic} <= 400 AND ${t.diastolic} > 0 AND (${t.period} IS NULL OR ${t.period} IN ('morning', 'evening')))
+  `),
+]);
+
+/** 一次训练及有序项目快照。整单更新与版本号在同一事务内提交。 */
+export const trainingRecord = mysqlTable("bodytrace_training_record", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => user.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 100 }).notNull(),
+  date: date("date", { mode: "string" }).notNull(),
+  time: varchar("time", { length: 5 }),
+  timeZone: varchar("time_zone", { length: 64 }).notNull(),
+  mode: varchar("mode", { length: 16, enum: ["live", "manual"] }).notNull(),
+  status: varchar("status", { length: 16, enum: ["inProgress", "completed"] }).notNull(),
+  startedAt: datetime("started_at", { mode: "date", fsp: 3 }),
+  durationMinutes: double("duration_minutes"),
+  note: varchar("note", { length: 2000 }),
+  items: json("items").$type<TrainingItem[]>().notNull(),
+  requestId: varchar("request_id", { length: 36 }).notNull(),
+  version: int("version").notNull().default(1),
+  createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  updatedAt: datetime("updated_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  /** 保留请求编号，阻止删除后重放旧的创建请求。 */
+  deletedAt: datetime("deleted_at", { mode: "date", fsp: 3 }),
+}, t => [
+  index("training_user_date_idx").on(t.userId, t.date),
+  index("training_user_status_date_idx").on(t.userId, t.status, t.date),
+  unique("training_user_request_unique").on(t.userId, t.requestId),
+  check("training_values_valid", sql`
+    ${t.version} > 0
+    AND ${t.status} IN ('inProgress', 'completed')
+    AND ((${t.mode} = 'live' AND ${t.startedAt} IS NOT NULL) OR (${t.mode} = 'manual' AND ${t.startedAt} IS NULL))
+    AND (${t.durationMinutes} IS NULL OR ${t.durationMinutes} > 0)
+    AND JSON_TYPE(${t.items}) = 'ARRAY'
+    AND JSON_LENGTH(${t.items}) <= 50
   `),
 ]);
 

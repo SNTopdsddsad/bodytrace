@@ -13,6 +13,7 @@
 - [饮食照片接口](#饮食照片接口)
 - [目标与计划（goals / plan）](#目标与计划)
 - [身体指标（measurements）](#身体指标measurements)
+- [训练记录（training-records）](#训练记录training-records)
 - [个人资料（profile）](#个人资料profile)
 - [数据管理（records）](#数据管理records)
 
@@ -598,6 +599,102 @@ curl --request POST "$BASE_URL/api/v1/meal-photos" \
 - 记录不存在（含已被一键清空硬删除）返回 404。
 - 已删除记录搭配不匹配的 `version` 返回 404；未删除记录 `version` 不匹配返回 409。
 
+## 训练记录（training-records）
+
+每条记录代表一次训练，包含有序力量／有氧项目。`status=inProgress` 表示进行中或补录草稿，`completed` 表示用户已核对结束；未完成项目仍保留，不计入完成数。请求和项目对象均严格校验，不接受 `userId` 等额外字段。JSON 请求体最大 256 KiB（按实际字节读取，超出返回 413）。
+
+网页在训练请求中携带初始账号的 `X-BodyTrace-User`，服务端仅将其与当前验证会话比较：不一致返回 401，防止其他标签切换账号后把旧输入提交给新账号。此头不授予权限、不决定资源归属；原生客户端可省略，身份始终来自会话。
+
+### GET /api/v1/training-records
+
+查询参数 `range=7|30|90|all`（默认 30）、`kind=all|strength|cardio|mixed`（默认 all）、`status=all|inProgress|completed`（默认 all）。类型为互斥分类：strength 仅纯力量，cardio 仅纯有氧，mixed 包含两者；空草稿只在 all 中出现。返回 `{ entries: TrainingRecord[] }`，按业务日期、时间、创建时间、ID 倒序，不包含删除记录。尚无游标分页。
+
+使用 `?requestId=UUID` 核对一次新增，返回 `{ entry: TrainingRecord | null }`；尚未查到（含编号属于其他账号）返回 null，属于本人且已删除返回 409。非法参数返回 400。
+
+### GET /api/v1/training-records/clock
+
+登录后返回 `{ serverNow: "2026-10-27T12:00:00.000Z" }`，为当前服务端 UTC 时刻，响应使用 `Cache-Control: private, no-store`，不读取或创建训练记录。沿用 `X-BodyTrace-User` 账号核对；未登录或账号已切换返回 401。
+
+网页在首次创建、后续保存和结束核对前校准服务端时间，再按单调计时器的经过时间计算当前日期、时间与实时开始时刻，避免设备时钟偏快、偏慢或被调整影响录入。未来时间校验保持严格；原生客户端也可使用该接口校准。未知 POST 的核对与重试始终保留原 `requestId` 和原 `training`，不能重新取时刻后更换同一次请求的内容。
+
+### POST /api/v1/training-records
+
+请求 `{ requestId: UUID, training: TrainingInput }`。首次创建返回 `201 { entry }`，同编号同内容返回同一记录 `200 { entry }`；同编号换内容、记录已被修改为其他内容或已单条删除时返回 409。未知结果先 GET 按编号核对，确认未保存才用原编号和原内容重试。
+
+合成示例：
+
+```json
+{
+  "requestId": "d2b35b3d-412d-4687-a5e9-5aba7b929010",
+  "training": {
+    "title": "力量与跑步",
+    "date": "2026-10-26",
+    "time": "18:30",
+    "mode": "manual",
+    "status": "completed",
+    "startedAt": null,
+    "durationMinutes": 60,
+    "note": null,
+    "items": [
+      {
+        "id": "405a702f-914c-4fc0-a090-71d105431010",
+        "kind": "strength",
+        "name": "杠铃卧推",
+        "mode": "weighted",
+        "sets": [{
+          "id": "405a702f-914c-4fc0-a090-71d105431011",
+          "weightKg": 40,
+          "reps": 10,
+          "durationSeconds": null,
+          "completed": true
+        }]
+      },
+      {
+        "id": "405a702f-914c-4fc0-a090-71d105431012",
+        "kind": "cardio",
+        "name": "跑步",
+        "durationMinutes": 20,
+        "distanceKm": 2.5,
+        "completed": true
+      }
+    ]
+  }
+}
+```
+
+`TrainingInput` 字段必须全部提供，可空字段明确传 null：
+
+| 字段 | 契约 |
+| --- | --- |
+| title | 去首尾空白后 1–80 字 |
+| date / time | 真实日期 `YYYY-MM-DD`，不早于 1000-01-01、不晚于应用今天；时间为 `HH:mm` 或 null，同日时间不能晚于当前应用时间 |
+| mode | live 实时／manual 补录，创建后不能修改 |
+| startedAt | live 必须提供带时区 ISO 时刻，规范化为 UTC，不能在未来且 UTC 年份为1000–9999；manual 必须 null，创建后不能修改 |
+| status | inProgress／completed；完成状态至少有一组力量或一项有氧已完成 |
+| durationMinutes | 整场整数分钟 1–1440 或 null，与有氧时长独立，不能由分项简单相加 |
+| note | 去首尾空白后最多 1000 字，空串归一为 null |
+| items | 0–50 项；每个项目名称 1–80 字，项目与组的 UUID 在整场内不得重复 |
+
+力量项目 `kind=strength`、`mode=weighted|bodyweight|timed`，`sets` 为 1–50 组；每组必须提供 `id`、`weightKg`、`reps`、`durationSeconds`、`completed`。重量 0–1000 kg，最多两位小数；次数为 1–10000 整数，持续秒数为 1–86400 整数，数值可为 null。次数动作的秒数必须 null；计时动作的重量与次数必须 null。完成组中，weighted 要求正重量和次数，bodyweight 要求次数且允许不填额外重量，timed 要求秒数。未完成组可缺值，但非空值仍需符合范围。
+
+有氧项目 `kind=cardio`，字段为 `id`、`name`、`durationMinutes`（1–1440 整数或 null）、`distanceKm`（0–1000、最多两位小数或 null）、`completed`。完成有氧必须填写时长，距离可未知。
+
+`TrainingRecord` 在上述字段基础上增加 `id`、`timeZone`（创建时的服务端应用时区）、`version`、`createdAt` 和 `updatedAt`；不返回用户 ID、requestId 和删除标记。业务日期按开始日归档，不从 createdAt 推导。复制由客户端取本人原记录并新建：新项目／组编号、实际值清空、完成状态清空，源数值单独展示为参考。
+
+### GET /api/v1/training-records/:id
+
+返回 `{ entry }`。未登录 401，非法 UUID 为 400；不存在、已删除或属于其他用户都返回 404。
+
+### PATCH /api/v1/training-records/:id
+
+请求 `{ version: 正整数, training: TrainingInput }`，整次训练的项目、组、顺序与版本原子更新。成功 `{ entry }`，version 增加 1；旧版本返回 409，紧接的一次相同版本／相同内容重试返回已有结果。`mode` 与 `startedAt` 固定；日期、时间、总时长可以更正。状态可以调整，但每次进入 completed 都需满足完成校验。
+
+草稿自动保存须串行提交；保存期间新增的本地改动在当前请求确认后再提交。超时先读取详情：仅当版本恰好推进一次且内容一致时确认刚才成功；版本未变才能重试原请求；其他情况保留本地输入并让用户核对冲突。不能将 GET 任意返回的数据当作本次保存成功。
+
+### DELETE /api/v1/training-records/:id
+
+请求 `{ version: 正整数 }`；成功 `{ ok: true }`。软删除并递增版本，不再出现在列表／详情。重复同一删除请求成功；旧版本冲突 409，不存在或不可访问 404。保留请求编号以拒绝旧 POST 重放。创建、更新、删除与清空先取得同一用户行锁；一键清空会硬删除训练及编号，语义见下节。
+
 ## 个人资料（profile）
 
 每用户一行，字段可空（`null` 表示未填写），允许分次填写资料；PUT 仍按下表提交必填字段，`null` 不等于可以省略。
@@ -631,10 +728,12 @@ curl --request POST "$BASE_URL/api/v1/meal-photos" \
 
 ### DELETE /api/v1/records
 
-一键清空当前用户的**全部饮食记录、餐次照片与身体指标**：同一事务内硬删除，包括此前软删除的测量行与照片标记。个人食物库、每日目标、饮食计划和个人资料不受影响。接口可安全重试，重复调用返回数量 0。清空与照片上传、删除先锁同一用户行，在事务内取得对象 key 并显式删除照片，COS 对象在事务提交后批量清理；对象清理失败只记录日志，不影响清空结果。
+一键清空当前用户的**全部饮食记录、餐次照片、身体指标与训练**：同一事务内硬删除，包含训练草稿及此前软删除行。个人食物库、每日目标、饮食计划和个人资料不受影响。重复调用成功；两次之间没有新写入时返回数量 0。清空与照片、训练写入先锁同一用户行，在事务内取得对象 key 并删除记录，COS 对象在事务提交后批量清理；对象清理失败只记录日志，不影响清空结果。
 
 返回的 `cleared.measurements` / `cleared.mealPhotos` 包括各自已软删除的行，所以可能大于清空前界面可见的指标数。硬删除会清除测量和照片的 `requestId` 占用与删除标记；清空后重放旧新增请求可能重新创建记录，客户端应停止上传、丢弃待重试的旧新增操作并刷新状态。用户行锁只保证事务串行，不会使尚在转码/上传或其他设备保留的旧请求失效；这些请求在清空后提交仍可能创建照片。跨设备阻止恢复需要另外的服务端失效机制。
 
 ```json
-{ "ok": true, "cleared": { "mealEntries": 42, "measurements": 17, "mealPhotos": 8 } }
+{ "ok": true, "cleared": { "mealEntries": 42, "measurements": 17, "mealPhotos": 8, "trainingRecords": 3 } }
 ```
+
+`cleared.trainingRecords` 同样包含删除标记。训练硬清空会释放 requestId，旧新增重试可能重新创建记录；应停止其他设备的训练录入、丢弃旧创建请求。已创建草稿的旧 PATCH 在清空后返回 404，不可自动改用 POST 重建。

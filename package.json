@@ -18,6 +18,8 @@
     "test:mysql": "node scripts/mysql-integration-test.mjs",
     "test:mysql-pool": "node --test scripts/mysql-pool.test.mjs",
     "test:measurements": "node --test scripts/measurements.test.mjs",
+    "test:training": "node --test scripts/training.test.mjs scripts/training-route.test.mjs scripts/training-ui.test.mjs scripts/training-navigation.test.mjs",
+    "test:training-integration": "node scripts/training-integration-test.mjs",
     "test:measurement-integration": "node scripts/measurement-integration-test.mjs",
     "test:test-isolation": "node --test scripts/local-test-app.test.mjs",
     "test:phone-auth": "node --test scripts/phone-number.test.mjs scripts/aliyun-sms.test.mjs scripts/sms-config.test.mjs scripts/sms-rate-limit.test.mjs scripts/login-form.test.mjs",
