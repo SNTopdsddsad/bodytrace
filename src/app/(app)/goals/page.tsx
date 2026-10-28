@@ -3,6 +3,7 @@
  * 有饮食计划生效时给出提示：这里的目标是计划外日期的兜底。
  */
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoalsForm } from "@/components/app/goals-form";
 import { getSession } from "@/lib/api-auth";
@@ -13,7 +14,8 @@ import { CalendarRange, Lightbulb, Target } from "lucide-react";
 
 export default async function GoalsPage() {
   const session = await getSession();
-  const userId = session!.user.id;
+  if (!session) redirect("/login");
+  const userId = session.user.id;
   const [goals, plan] = await Promise.all([getGoals(userId), getPlan(userId)]);
 
   return (

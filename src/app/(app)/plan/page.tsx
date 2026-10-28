@@ -3,6 +3,7 @@
  * 摄入由食物库实时折算；计划没有版本历史，保存会整体覆盖起始日（含）之后所有日期。
  */
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, CalendarRange, Gauge, ListChecks } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
@@ -42,7 +43,8 @@ function itemsForMeal(items: PlanItem[], mealType: MealType) {
 
 export default async function PlanPage() {
   const session = await getSession();
-  const userId = session!.user.id;
+  if (!session) redirect("/login");
+  const userId = session.user.id;
   const today = todayStr();
   const [plan, baseGoals] = await Promise.all([getPlan(userId), getGoals(userId)]);
   const todayIndex = mondayIndex(today);

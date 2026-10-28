@@ -3,6 +3,7 @@
  * 右侧根据已填数据展示 BMI 和目标体重差距。
  */
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, AtSign, Database, Gauge, Scale, Smartphone, UserRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
@@ -29,7 +30,8 @@ function MetricRow({ icon: Icon, label, value, hint }: { icon: typeof Gauge; lab
 
 export default async function ProfilePage() {
   const session = await getSession();
-  const user = session!.user;
+  if (!session) redirect("/login");
+  const user = session.user;
   const [context, recordCounts] = await Promise.all([
     getProfileContext(user.id),
     getRecordCounts(user.id),

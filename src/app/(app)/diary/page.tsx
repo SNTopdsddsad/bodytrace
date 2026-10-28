@@ -8,12 +8,14 @@ import { getSession } from "@/lib/api-auth";
 import { formatDateCn, isValidDateStr, todayStr } from "@/lib/date";
 import { getDaySummary } from "@/services/meals";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export default async function DiaryPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const session = await getSession();
+  if (!session) redirect("/login");
   const params = await searchParams;
   const date = typeof params.date === "string" && isValidDateStr(params.date) ? params.date : todayStr();
-  const { totals, goals, byMeal, goalSource } = await getDaySummary(session!.user.id, date);
+  const { totals, goals, byMeal, goalSource } = await getDaySummary(session.user.id, date);
 
   return (
     <div className="space-y-8">

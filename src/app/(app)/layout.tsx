@@ -5,13 +5,12 @@
  * 每次请求页面时先向后端要 session，拿不到就跳转登录页，
  * 所以未登录用户根本看不到里面的任何内容。
  */
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/api-auth";
 import { SiteNav } from "@/components/app/site-nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession();
   if (!session) redirect("/login");
 
   return (

@@ -1,13 +1,17 @@
+import { cache } from "react";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import type { Session } from "@/lib/auth";
 
-/** API 路由的会话守卫：返回会话或 null（调用方回 401）。 */
-export async function getSession(): Promise<Session | null> {
+/**
+ * 会话守卫：返回会话或 null（API 调用方回 401，页面调用方跳登录）。
+ * 用 React cache 按请求去重：同一请求里布局和页面多次调用只查一次数据库。
+ */
+export const getSession = cache(async (): Promise<Session | null> => {
   const h = await headers();
   const session = await auth.api.getSession({ headers: h });
   return session;
-}
+});
 
 /**
  * 带 CSRF 校验的守卫，给会改数据的方法（POST/PATCH/DELETE）用：

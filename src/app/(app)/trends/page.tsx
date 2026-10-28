@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, CalendarDays, ChartNoAxesCombined } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendsChart } from "@/components/app/trends-chart";
@@ -8,7 +9,8 @@ import { getTrends } from "@/services/trends";
 
 export default async function TrendsPage() {
   const session = await getSession();
-  const trends = await getTrends(session!.user.id, 30);
+  if (!session) redirect("/login");
+  const trends = await getTrends(session.user.id, 30);
   const recorded = trends.filter((day) => day.calories > 0);
   const avg = (pick: (day: (typeof trends)[number]) => number) => recorded.length === 0 ? 0 : Math.round(recorded.reduce((sum, day) => sum + pick(day), 0) / recorded.length);
   const stats = [

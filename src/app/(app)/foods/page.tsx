@@ -1,6 +1,7 @@
 /**
  * 食物库页：服务端取出全量列表，交给客户端组件 FoodsManager 处理交互。
  */
+import { redirect } from "next/navigation";
 import { FoodsManager } from "@/components/app/foods-manager";
 import { getSession } from "@/lib/api-auth";
 import { listFoods } from "@/services/foods";
@@ -8,7 +9,8 @@ import { PageHeader } from "@/components/app/page-header";
 
 export default async function FoodsPage() {
   const session = await getSession();
-  const foods = await listFoods(session!.user.id);
+  if (!session) redirect("/login");
+  const foods = await listFoods(session.user.id);
 
   return (
     <div className="space-y-8">
