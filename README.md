@@ -143,7 +143,7 @@ RAM 最小发送权限为 `dysms:SendSms`（资源 `*`）；使用 STS 临时凭
 | `npm run test:phone-auth` | 无需数据库，验证大陆号码规范、脱敏、官方短信 SDK 配置、失败与超时，不真实发送 |
 | `npm run test:phone-auth-integration` | 独立 Docker MySQL 应用验证手机号登录、自动注册、限额、验证码消费、旧邮箱与账号隔离，不真实发送 |
 | `npm run test:measurements` | 无需数据库，验证三类指标输入、日期、精度、变化计算和缺失日期 |
-| `npm run test:training` | 无需数据库，验证训练规则、服务器校时、导航保护、迟到响应、幂等重试与请求体边界 |
+| `npm run test:training` | 无需数据库，验证训练规则、参考值带入与完成状态、服务器校时、导航保护、迟到响应、幂等重试与请求体边界 |
 | `npm run test:training-integration` | 独立测试应用验证训练读写、幂等、冲突、账号隔离和清空；需要 Docker MySQL 或显式开启的独立测试库 |
 | `npm run test:date` | 无需数据库，验证真实日历日期、闰年、跨月跨年及应用时区的午夜切换 |
 | `npm run test:meal-photo` | 无需数据库和 COS，验证真实 AVIF、WebP 转码、响应丢失核对、固定编号重试、餐次切换取消和保存结果未知 |

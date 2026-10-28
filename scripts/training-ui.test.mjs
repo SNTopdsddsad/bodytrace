@@ -383,3 +383,63 @@ test("结束核对的校时失败保留输入并解锁，重新点击可以取�
   assert.equal(samples, 2);
   ui.unmount();
 });
+
+// 执行项目组件的真实带入回调，隔离基础控件的 React 宿主。
+function fillItemReference(item, reference) {
+  const jsx = (type, props) => ({ type, props });
+  const modules = {
+    "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "fragment" },
+    "lucide-react": { ArrowDown: "ArrowDown", ArrowUp: "ArrowUp", Check: "Check", Plus: "Plus", Trash2: "Trash2" },
+    "@/components/ui/button": { Button: "Button" },
+    "@/components/ui/input": { Input: "Input" },
+    "@/components/ui/label": { Label: "Label" },
+  };
+  const exports = {};
+  vm.runInNewContext(itemSource, { exports, require: name => {
+    assert.ok(Object.hasOwn(modules, name), "未隔离的组件依赖：" + name);
+    return modules[name];
+  } });
+  const changes = [];
+  const tree = exports.TrainingItemEditor({
+    item, reference, index: 0, total: 1, disabled: false, readOnly: false,
+    onChange: next => changes.push(next), onMove() {}, onRemove() {},
+  });
+  const elements = node => !node || typeof node !== "object" ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(elements)];
+  const button = elements(tree).find(node => node.type === "Button" && node.props.children === "带入上次数值");
+  assert.ok(button, "应提供带入上次数值的按钮");
+  button.props.onClick();
+  assert.equal(changes.length, 1, "带入仅触发一次表单更新");
+  return changes[0];
+}
+
+test("带入有氧参考值后须重新确认完成，不能把替换后的时长计入已完成", () => {
+  const item = { id: randomUUID(), kind: "cardio", name: "合成跑步", durationMinutes: "20", distanceKm: "2", completed: true };
+  for (const [durationMinutes, distanceKm, completed, expectedDistance] of [[60, 10, true, "10"], [30, null, false, ""]]) {
+    const reference = { id: randomUUID(), kind: "cardio", name: "上次跑步", durationMinutes, distanceKm, completed };
+    const next = fillItemReference(item, reference);
+    assert.equal(next.id, item.id);
+    assert.equal(next.name, "合成跑步");
+    assert.equal(next.durationMinutes, String(durationMinutes));
+    assert.equal(next.distanceKm, expectedDistance);
+    assert.equal(next.completed, false);
+    assert.equal(training.trainingProgress({ items: [next] }).completedCardio, 0);
+    assert.equal(item.durationMinutes, "20", "不修改传入的本次项目对象");
+    assert.equal(reference.completed, completed, "不修改历史完成状态");
+  }
+});
+
+test("带入力量参考值保留本次组编号，清除已完成状态且不带入历史编号", () => {
+  const item = { id: randomUUID(), kind: "strength", name: "合成卧推", mode: "weighted", sets: [
+    { id: randomUUID(), weightKg: "20", reps: "8", durationSeconds: "", completed: true },
+  ] };
+  const reference = { id: randomUUID(), kind: "strength", name: "历史卧推", mode: "weighted", sets: [
+    { id: randomUUID(), weightKg: 40, reps: 12, durationSeconds: null, completed: true },
+  ] };
+  const next = fillItemReference(item, reference);
+  assert.equal(next.id, item.id);
+  assert.equal(next.sets[0].id, item.sets[0].id);
+  assert.equal(next.sets[0].weightKg, "40");
+  assert.equal(next.sets[0].reps, "12");
+  assert.equal(next.sets[0].completed, false);
+  assert.equal(training.trainingProgress({ items: [next] }).completedSets, 0);
+});
