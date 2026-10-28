@@ -34,6 +34,7 @@ function app({ loggedIn = true, timeZone = "Asia/Shanghai", result = {}, conflic
   class ClockDate extends Date { constructor(value = now) { super(value); } }
   const calls = [];
   const auth = load("../src/lib/api-auth.ts", {
+    "react": { cache: callback => callback },
     "next/headers": { headers: async () => new Headers() },
     "@/lib/auth": { auth: { api: { getSession: async () => loggedIn ? { user: { id: "owner-from-session" } } : null } } },
   }, { process: { env: { BETTER_AUTH_URL: "http://localhost:3001" } } });
