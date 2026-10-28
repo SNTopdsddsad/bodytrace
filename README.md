@@ -134,6 +134,8 @@ RAM 最小发送权限为 `dysms:SendSms`（资源 `*`）；使用 STS 临时凭
 | `npm run db:migrate` | 应用 `drizzle/mysql/` 中尚未执行的迁移，生产使用此命令 |
 | `npm run db:import-reference` | 导入《中国食物成分表》1677 种食物到参考库（数据在 `data/`，可重复执行） |
 | `npm run db:cleanup-photos` | 对比数据库与 COS，报告饮食照片孤儿对象；加 `--apply` 才删除 |
+| `npm run docs:api` | 从服务层 Zod schema 重新生成 `docs/openapi.yaml`（OpenAPI 3.1 接口文档，勿手改）；本地预览 `npx @redocly/cli@1.34.4 preview-docs docs/openapi.yaml` |
+| `npm run test:openapi` | 无需数据库，验证生成文档的请求体必填声明、字段可选性和无请求体接口；修改契约后先执行 `npm run docs:api` |
 | `node scripts/smoke-test.mjs` | 端到端冒烟测试（需先 `npm run start`） |
 | `node scripts/debug-pages.mjs` | 检查五个页面是否正常渲染 |
 | `npm run test:password-reset` | 自行启动独立测试应用，验证有效期、令牌作废、会话失效和伪造 IP 不能绕过限流 |

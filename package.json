@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:date": "node --test scripts/date.test.mjs",
+    "test:openapi": "node --test scripts/openapi.test.mjs",
     "test:meal-photo": "node --test scripts/meal-photo.test.mjs scripts/meal-photo-client.test.mjs scripts/meal-photo-ui.test.mjs scripts/meal-photo-service.test.mjs scripts/meal-photo-route.test.mjs",
     "test:meal-photo-integration": "node scripts/meal-photo-integration-test.mjs",
     "test:request-timeout": "node --test scripts/request-timeout.test.mjs",
@@ -28,7 +29,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:import-reference": "node scripts/import-food-reference.mjs",
-    "db:cleanup-photos": "node scripts/cleanup-meal-photos.mjs"
+    "db:cleanup-photos": "node scripts/cleanup-meal-photos.mjs",
+    "docs:api": "tsx --env-file-if-exists=.env scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.6.0",
@@ -54,6 +56,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -63,6 +66,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "yaml": "^2.9.1"
   }
 }
