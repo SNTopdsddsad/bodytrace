@@ -40,8 +40,8 @@ tags:
     description: 照片独立归属 (userId, date, mealType)，每餐最多 6 张，文件存腾讯云 COS
   - name: 汇总与趋势
     description: 首页 / 日记共用的当日汇总与最近 N 天趋势
-  - name: 目标与计划
-    description: 每日目标与逐天手写的饮食计划；某天生效目标按日期从计划解析，否则回落每日目标
+  - name: 每日目标
+    description: 每个用户一行每日营养目标，未设置时使用默认值
   - name: 身体指标
     description: 体重 kg / 体脂率 % / 血压 mmHg；乐观并发（version）与 requestId 幂等
   - name: 训练记录
@@ -386,99 +386,14 @@ components:
         goalSource:
           type: string
           enum:
-            - plan
             - base
-          description: plan = 计划的当天目标；base = 每日目标兜底
+          description: 固定为 base：目标只取每日目标
       required:
         - date
         - byMeal
         - totals
         - goals
         - goalSource
-    PlanItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        weekday:
-          type: integer
-          minimum: 0
-          maximum: 6
-          description: 0=周一 … 6=周日
-        mealType:
-          type: string
-          enum:
-            - breakfast
-            - lunch
-            - dinner
-            - snack
-        foodId:
-          type:
-            - string
-            - "null"
-          format: uuid
-          description: null 表示食物已删除的失效行
-        name:
-          type: string
-        grams:
-          type: number
-        per100g:
-          allOf:
-            - $ref: "#/components/schemas/Macro"
-            - type:
-                - object
-                - "null"
-              description: 食物库当前每 100g 原始营养，仅在响应中提供
-        calories:
-          type:
-            - number
-            - "null"
-        protein:
-          type:
-            - number
-            - "null"
-        carbs:
-          type:
-            - number
-            - "null"
-        fat:
-          type:
-            - number
-            - "null"
-      required:
-        - id
-        - weekday
-        - mealType
-        - foodId
-        - name
-        - grams
-        - per100g
-        - calories
-        - protein
-        - carbs
-        - fat
-    Plan:
-      type: object
-      properties:
-        startDate:
-          type: string
-        isActive:
-          type: boolean
-        weekdays:
-          type: array
-          items:
-            $ref: "#/components/schemas/Goals"
-          description: 按周一到周日顺序，不含 weekday 序号
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/PlanItem"
-      required:
-        - startDate
-        - isActive
-        - weekdays
-        - items
     Measurement:
       type: object
       properties:
@@ -1716,7 +1631,7 @@ paths:
       tags:
         - 汇总与趋势
       summary: 某天汇总（首页 / 日记共用）
-      description: 按餐次分组的记录 + 全天合计 + 当天生效目标。目标按日期解析：启用中的计划且日期在起始日（含）之后按当天计划目标（goalSource=plan），否则回落每日目标（base）。响应不含 goalDayType（已移除）。
+      description: 按餐次分组的记录 + 全天合计 + 每日目标（goalSource 固定为 base）。
       parameters:
         - schema:
             type: string
@@ -1787,7 +1702,7 @@ paths:
                           type: number
                         goalCalories:
                           type: number
-                          description: 当天生效的热量目标
+                          description: 每日热量目标
                       required:
                         - date
                         - calories
@@ -1808,7 +1723,7 @@ paths:
     get:
       operationId: getDailyGoals
       tags:
-        - 目标与计划
+        - 每日目标
       summary: 查询每日目标
       description: 从未设置过时返回默认值（2000/120/220/60）且不落库。
       responses:
@@ -1832,7 +1747,7 @@ paths:
     put:
       operationId: saveDailyGoals
       tags:
-        - 目标与计划
+        - 每日目标
       summary: 整体保存每日目标
       description: upsert 语义。
       requestBody:
@@ -1881,194 +1796,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
-        "401":
-          description: 未登录
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-  /api/v1/plan:
-    get:
-      operationId: getDietPlan
-      tags:
-        - 目标与计划
-      summary: 查询饮食计划
-      description: "每用户至多一条，没有时返回 { plan: null }。食物项不存营养快照：每次读取按食物库当前每 100g 值实时折算（1 位小数）。食物已删除的行 foodId/per100g/四个营养字段为 null（不是 0），名称与克数保留。计划没有版本或生效区间模型。"
-      responses:
-        "200":
-          description: 当前计划
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  plan:
-                    allOf:
-                      - $ref: "#/components/schemas/Plan"
-                      - type:
-                          - object
-                          - "null"
-                required:
-                  - plan
-        "401":
-          description: 未登录
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-    put:
-      operationId: saveDietPlan
-      tags:
-        - 目标与计划
-      summary: 整体保存饮食计划
-      description: 全量替换七天目标与全部食物项（事务：计划行 upsert → 七天目标先删后插 → 食物项先删后插）。会改写 startDate（含）之后所有日期（含过去日期），没有历史版本。items[].foodId 为 uuid 时必须全部属于当前用户食物库，任一无效整单拒绝 400、不存在部分写入；为 null 表示保留一条已失效行，必须带它在 GET 响应里的 id。同餐顺序由请求数组顺序决定，请保持用户看到的顺序提交；items[].name 不可写，传入会被忽略。成功返回保存后读回的完整计划（带实时折算营养）。
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                startDate:
-                  type: string
-                isActive:
-                  type: boolean
-                weekdays:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      calories:
-                        type: integer
-                        minimum: 500
-                        maximum: 8000
-                      protein:
-                        type: integer
-                        minimum: 0
-                        maximum: 600
-                      carbs:
-                        type: integer
-                        minimum: 0
-                        maximum: 1200
-                      fat:
-                        type: integer
-                        minimum: 0
-                        maximum: 500
-                    required:
-                      - calories
-                      - protein
-                      - carbs
-                      - fat
-                items:
-                  type: array
-                  items:
-                    anyOf:
-                      - type: object
-                        properties:
-                          weekday:
-                            type: integer
-                            minimum: 0
-                            maximum: 6
-                          mealType:
-                            type: string
-                            enum:
-                              - breakfast
-                              - lunch
-                              - dinner
-                              - snack
-                          grams:
-                            type: number
-                            minimum: 1
-                            maximum: 5000
-                          foodId:
-                            type: string
-                            format: uuid
-                          id:
-                            type: string
-                            format: uuid
-                        required:
-                          - weekday
-                          - mealType
-                          - grams
-                          - foodId
-                      - type: object
-                        properties:
-                          weekday:
-                            type: integer
-                            minimum: 0
-                            maximum: 6
-                          mealType:
-                            type: string
-                            enum:
-                              - breakfast
-                              - lunch
-                              - dinner
-                              - snack
-                          grams:
-                            type: number
-                            minimum: 1
-                            maximum: 5000
-                          foodId:
-                            type: "null"
-                          id:
-                            type: string
-                            format: uuid
-                        required:
-                          - weekday
-                          - mealType
-                          - grams
-                          - foodId
-                          - id
-                  maxItems: 400
-              required:
-                - startDate
-                - isActive
-                - weekdays
-                - items
-      responses:
-        "200":
-          description: 保存成功，返回读回的完整计划
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  plan:
-                    $ref: "#/components/schemas/Plan"
-                required:
-                  - plan
-        "400":
-          description: 食物引用无效或格式错误（整单拒绝，旧计划保持原样）
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-        "401":
-          description: 未登录
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-    delete:
-      operationId: deleteDietPlan
-      tags:
-        - 目标与计划
-      summary: 删除饮食计划
-      description: 七天目标与食物项级联清理，之后所有日期回落到每日目标。
-      responses:
-        "200":
-          description: 删除成功
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: boolean
-                    enum:
-                      - true
-                required:
-                  - status
         "401":
           description: 未登录
           content:

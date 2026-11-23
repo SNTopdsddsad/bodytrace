@@ -24,7 +24,6 @@ import { mealCreateSchema, mealPatchSchema } from "@/services/meals";
 import { mealSlotSchema } from "@/services/meal-slot";
 import { foodInputSchema, foodPatchSchema } from "@/services/foods";
 import { goalsSchema } from "@/services/goals";
-import { planSchema } from "@/services/plan";
 import { profileSchema } from "@/services/profile";
 import { measurementSchemas } from "@/lib/measurements";
 import { trainingSchemas } from "@/lib/training";
@@ -159,33 +158,7 @@ const DaySummary = registry.register(
     ),
     totals: Macro,
     goals: Goals,
-    goalSource: z.enum(["plan", "base"]).describe("plan = 计划的当天目标；base = 每日目标兜底"),
-  }),
-);
-
-const PlanItem = registry.register(
-  "PlanItem",
-  z.object({
-    id: uuid,
-    weekday: z.number().int().min(0).max(6).describe("0=周一 … 6=周日"),
-    mealType: z.enum(MEAL_ORDER),
-    foodId: uuid.nullable().describe("null 表示食物已删除的失效行"),
-    name: z.string(),
-    grams: z.number(),
-    per100g: Macro.nullable().describe("食物库当前每 100g 原始营养，仅在响应中提供"),
-    calories: z.number().nullable(),
-    protein: z.number().nullable(),
-    carbs: z.number().nullable(),
-    fat: z.number().nullable(),
-  }),
-);
-const Plan = registry.register(
-  "Plan",
-  z.object({
-    startDate: z.string(),
-    isActive: z.boolean(),
-    weekdays: z.array(Goals).length(7).describe("按周一到周日顺序，不含 weekday 序号"),
-    items: z.array(PlanItem),
+    goalSource: z.literal("base").describe("固定为 base：目标只取每日目标"),
   }),
 );
 
@@ -744,7 +717,7 @@ registry.registerPath({
   tags: ["汇总与趋势"],
   summary: "某天汇总（首页 / 日记共用）",
   description:
-    "按餐次分组的记录 + 全天合计 + 当天生效目标。目标按日期解析：启用中的计划且日期在起始日（含）之后按当天计划目标（goalSource=plan），否则回落每日目标（base）。响应不含 goalDayType（已移除）。",
+    "按餐次分组的记录 + 全天合计 + 每日目标（goalSource 固定为 base）。",
   request: { query: z.object({ date: mealSlotSchema.shape.date.describe(BUSINESS_DATE) }) },
   responses: {
     "200": { description: "当日汇总", content: { "application/json": { schema: DaySummary } } },
@@ -777,7 +750,7 @@ registry.registerPath({
                 protein: z.number(),
                 carbs: z.number(),
                 fat: z.number(),
-                goalCalories: z.number().describe("当天生效的热量目标"),
+                goalCalories: z.number().describe("每日热量目标"),
               }),
             ),
           }),
@@ -788,13 +761,13 @@ registry.registerPath({
   },
 });
 
-/* ───────────────────────────── 目标与计划 ───────────────────────────── */
+/* ───────────────────────────── 每日目标 ───────────────────────────── */
 
 registry.registerPath({
   method: "get",
   path: "/api/v1/goals",
   operationId: "getDailyGoals",
-  tags: ["目标与计划"],
+  tags: ["每日目标"],
   summary: "查询每日目标",
   description: "从未设置过时返回默认值（2000/120/220/60）且不落库。",
   responses: {
@@ -810,7 +783,7 @@ registry.registerPath({
   method: "put",
   path: "/api/v1/goals",
   operationId: "saveDailyGoals",
-  tags: ["目标与计划"],
+  tags: ["每日目标"],
   summary: "整体保存每日目标",
   description: "upsert 语义。",
   request: { body: { required: true, content: { "application/json": { schema: goalsSchema } } } },
@@ -820,65 +793,6 @@ registry.registerPath({
       content: { "application/json": { schema: z.object({ goals: Goals }) } },
     },
     "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
-    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/v1/plan",
-  operationId: "getDietPlan",
-  tags: ["目标与计划"],
-  summary: "查询饮食计划",
-  description:
-    "每用户至多一条，没有时返回 { plan: null }。食物项不存营养快照：每次读取按食物库当前每 100g 值实时折算（1 位小数）。食物已删除的行 foodId/per100g/四个营养字段为 null（不是 0），名称与克数保留。计划没有版本或生效区间模型。",
-  responses: {
-    "200": {
-      description: "当前计划",
-      content: { "application/json": { schema: z.object({ plan: Plan.nullable() }) } },
-    },
-    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "put",
-  path: "/api/v1/plan",
-  operationId: "saveDietPlan",
-  tags: ["目标与计划"],
-  summary: "整体保存饮食计划",
-  description:
-    "全量替换七天目标与全部食物项（事务：计划行 upsert → 七天目标先删后插 → 食物项先删后插）。会改写 startDate（含）之后所有日期（含过去日期），没有历史版本。" +
-    "items[].foodId 为 uuid 时必须全部属于当前用户食物库，任一无效整单拒绝 400、不存在部分写入；为 null 表示保留一条已失效行，必须带它在 GET 响应里的 id。" +
-    "同餐顺序由请求数组顺序决定，请保持用户看到的顺序提交；items[].name 不可写，传入会被忽略。成功返回保存后读回的完整计划（带实时折算营养）。",
-  request: { body: { required: true, content: { "application/json": { schema: planSchema } } } },
-  responses: {
-    "200": {
-      description: "保存成功，返回读回的完整计划",
-      content: { "application/json": { schema: z.object({ plan: Plan }) } },
-    },
-    "400": {
-      description: "食物引用无效或格式错误（整单拒绝，旧计划保持原样）",
-      content: { "application/json": { schema: ApiError } },
-    },
-    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "delete",
-  path: "/api/v1/plan",
-  operationId: "deleteDietPlan",
-  tags: ["目标与计划"],
-  summary: "删除饮食计划",
-  description: "七天目标与食物项级联清理，之后所有日期回落到每日目标。",
-  responses: {
-    "200": {
-      description: "删除成功",
-      content: {
-        "application/json": { schema: z.object({ status: z.literal(true) }) },
-      },
-    },
     "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
   },
 });
@@ -1293,7 +1207,7 @@ const doc = generator.generateDocument({
     { name: "饮食记录", description: "保存写入时刻的食物名称与营养快照；改克数按快照等比缩放" },
     { name: "饮食照片", description: "照片独立归属 (userId, date, mealType)，每餐最多 6 张，文件存腾讯云 COS" },
     { name: "汇总与趋势", description: "首页 / 日记共用的当日汇总与最近 N 天趋势" },
-    { name: "目标与计划", description: "每日目标与逐天手写的饮食计划；某天生效目标按日期从计划解析，否则回落每日目标" },
+    { name: "每日目标", description: "每个用户一行每日营养目标，未设置时使用默认值" },
     { name: "身体指标", description: "体重 kg / 体脂率 % / 血压 mmHg；乐观并发（version）与 requestId 幂等" },
     { name: "训练记录", description: "一次训练含有序力量 / 有氧项目；requestId 幂等、version 乐观并发、服务端校时" },
     { name: "个人资料", description: "性别 / 身高 / 体重 / 目标体重，null 表示未填写" },

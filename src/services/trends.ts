@@ -1,12 +1,10 @@
 /**
  * 趋势服务：最近 N 天每天的营养合计，供图表展示。
- * 有饮食计划时附带每天生效的热量目标，图上画成按天目标线。
+ * 目标线取每日目标的热量，各天相同。
  */
 import { shiftDate, todayStr } from "@/lib/date";
-import { resolveDayGoals } from "@/lib/plan";
 import { getDailyTotals } from "./meals";
 import { getGoals } from "./goals";
-import { getPlan } from "./plan";
 
 export type TrendPoint = {
   date: string;
@@ -14,7 +12,7 @@ export type TrendPoint = {
   protein: number;
   carbs: number;
   fat: number;
-  /** 当天生效的热量目标（计划内日期按当天计划目标，否则每日目标） */
+  /** 每日热量目标 */
   goalCalories: number;
 };
 
@@ -22,10 +20,9 @@ export async function getTrends(userId: string, days = 30): Promise<TrendPoint[]
   const today = todayStr();
   const from = shiftDate(today, -(days - 1));
 
-  const [totals, base, plan] = await Promise.all([
+  const [totals, base] = await Promise.all([
     getDailyTotals(userId, from, today),
     getGoals(userId),
-    getPlan(userId),
   ]);
   const byDate = new Map(totals.map((t) => [t.date, t]));
 
@@ -40,7 +37,7 @@ export async function getTrends(userId: string, days = 30): Promise<TrendPoint[]
       protein: t?.protein ?? 0,
       carbs: t?.carbs ?? 0,
       fat: t?.fat ?? 0,
-      goalCalories: resolveDayGoals(plan, base, d).goals.calories,
+      goalCalories: base.calories,
     });
   }
   return result;

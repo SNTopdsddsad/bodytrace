@@ -275,11 +275,11 @@ export const trainingRecord = mysqlTable("bodytrace_training_record", {
   `),
 ]);
 
-/* ---------------- 饮食计划 ---------------- */
+/* ---------------- 饮食计划（历史表） ---------------- */
 
 /**
- * 饮食计划：每用户至多一条。
- * startDate 之前的日子不受计划影响，仍走 daily_goal 兜底。
+ * 历史表：饮食计划功能已取消，应用代码不再读写这三张表。
+ * 表定义与已有数据保留；不要删除这里的定义，否则会生成删表迁移。
  */
 export const dietPlan = mysqlTable(
   "bodytrace_diet_plan",

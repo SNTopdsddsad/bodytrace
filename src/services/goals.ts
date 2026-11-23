@@ -5,8 +5,6 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { dailyGoal } from "@/db/schema";
-import { resolveDayGoals } from "@/lib/plan";
-import { getPlan } from "./plan";
 
 export const DEFAULT_GOALS = { calories: 2000, protein: 120, carbs: 220, fat: 60 };
 
@@ -25,19 +23,6 @@ export async function getGoals(userId: string): Promise<Goals> {
   if (!row) return { ...DEFAULT_GOALS };
   const { calories, protein, carbs, fat } = row;
   return { calories, protein, carbs, fat };
-}
-
-/**
- * 某天生效的目标：饮食计划启用且日期在起始日之后（含）就按当天计划目标走，
- * 否则回落到每日目标。首页、日记、趋势都按日期取，保证和计划一致。
- */
-export async function getGoalsForDate(
-  userId: string,
-  date: string,
-): Promise<{ goals: Goals; source: "plan" | "base" }> {
-  const [base, plan] = await Promise.all([getGoals(userId), getPlan(userId)]);
-  const resolved = resolveDayGoals(plan, base, date);
-  return { goals: resolved.goals, source: resolved.fromPlan ? "plan" : "base" };
 }
 
 export async function upsertGoals(userId: string, input: z.infer<typeof goalsSchema>) {

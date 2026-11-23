@@ -139,118 +139,23 @@ try {
   await api(a, "/api/v1/goals", "PUT", goals);
   check("目标 upsert 正确更新", (await api(a, "/api/v1/goals")).json.goals.calories === 2200);
 
-  const plan = { startDate: today, isActive: true, weekdays: Array.from({ length: 7 }, () => ({ ...goals })), items: [] };
-  check("未登录不能读取或保存计划", (await api(null, "/api/v1/plan")).status === 401 && (await api(null, "/api/v1/plan", "PUT", plan)).status === 401);
-  const initialPlan = await api(a, "/api/v1/plan", "PUT", plan);
-  assert.equal(initialPlan.status, 200);
-  for (const startDate of ["2026-02-30", "2026-04-31", "1900-02-29"]) {
-    assert.equal((await api(a, "/api/v1/plan", "PUT", { ...plan, startDate })).status, 400);
-  }
-  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, initialPlan.json.plan);
-  check("计划拒绝不存在的起始日，旧计划保持不变", true);
-  const [[before]] = await pool.execute("SELECT id FROM bodytrace_diet_plan WHERE user_id = ?", [a.id]);
-  const per100g = { calories: 46, protein: 3.4, carbs: 4.8, fat: 1.5 };
-  const planFoodResult = await api(a, "/api/v1/foods", "POST", { name: "计划 🥛 合成食物", ...per100g });
-  assert.equal(planFoodResult.status, 201);
-  const planFood = planFoodResult.json.food;
-  plan.items = [
-    { weekday: 0, mealType: "breakfast", foodId: planFood.id, grams: 1 },
-    { weekday: 6, mealType: "dinner", foodId: planFood.id, grams: 100 },
-  ];
-  const savedPlan = await api(a, "/api/v1/plan", "PUT", plan);
-  assert.equal(savedPlan.status, 200);
-  assert.deepEqual(savedPlan.json.plan.items[0], {
-    id: savedPlan.json.plan.items[0].id, ...plan.items[0], name: planFood.name, per100g,
-    calories: 0.5, protein: 0, carbs: 0, fat: 0,
-  });
-  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, savedPlan.json.plan);
-  check("计划保存与读取同时返回原始每 100g 营养和小份量舍入结果", true);
-
-  plan.weekdays = plan.weekdays.map(day => ({ ...day, calories: 2400 }));
-  plan.items[0].grams = 100;
-  const resizedPlan = await api(a, "/api/v1/plan", "PUT", plan);
-  assert.equal(resizedPlan.status, 200);
-  assert.deepEqual(resizedPlan.json.plan.items[0], {
-    id: resizedPlan.json.plan.items[0].id, ...plan.items[0], name: planFood.name, per100g, ...per100g,
-  });
-  check("1g 改回 100g 后营养不丢失精度", true);
-  const [after] = await pool.execute("SELECT id FROM bodytrace_diet_plan WHERE user_id = ?", [a.id]);
-  check("计划 upsert 保留原 ID 且没有重复计划", after.length === 1 && after[0].id === before.id);
-  check("计划七天被正确替换", (await api(a, "/api/v1/plan")).json.plan.weekdays.every(day => day.calories === 2400));
-  const [[itemCount]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_diet_plan_item WHERE plan_id = ?", [before.id]);
-  check("整体替换食物项没有累计旧行", itemCount.count === 2);
-  check("其他账号读不到本人计划", (await api(b, "/api/v1/plan")).json.plan === null);
-  check("其他账号不能用本人的食物创建计划", (await api(b, "/api/v1/plan", "PUT", plan)).status === 400 && (await api(b, "/api/v1/plan")).json.plan === null);
-  const foreignFoodId = (await api(b, "/api/v1/foods")).json.foods[0].id;
-  const invalidPlan = {
-    ...plan,
-    weekdays: plan.weekdays.map(day => ({ ...day, calories: 1800 })),
-    items: [...plan.items, { weekday: 1, mealType: "lunch", foodId: foreignFoodId, grams: 100 }],
-  };
-  assert.equal((await api(a, "/api/v1/plan", "PUT", invalidPlan)).status, 400);
-  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, resizedPlan.json.plan);
-  check("混入他人食物时整单拒绝，旧目标与食物项保持不变", true);
-
-  assert.equal((await api(a, `/api/v1/foods/${planFood.id}`, "PATCH", { protein: 6.8 })).status, 200);
-  const updatedItems = (await api(a, "/api/v1/plan")).json.plan.items;
-  check("食物库改值后计划读取最新营养", updatedItems.every(item => item.protein === 6.8 && item.per100g.protein === 6.8));
-  assert.equal((await api(a, `/api/v1/foods/${planFood.id}`, "DELETE")).status, 200);
-  const deletedFoodPlan = (await api(a, "/api/v1/plan")).json.plan;
-  check("食物删除保留计划项的名称和克数，营养为空", deletedFoodPlan.items.length === 2 && deletedFoodPlan.items.every(item =>
-    item.name === planFood.name && item.grams === 100 && item.foodId === null && item.per100g === null &&
-    item.calories === null && item.protein === null && item.carbs === null && item.fat === null));
-  const missingStaleId = await api(a, "/api/v1/plan", "PUT", {
-    ...plan, items: [{ weekday: 0, mealType: "breakfast", foodId: null, grams: 100 }],
-  });
-  assert.equal(missingStaleId.status, 400);
-  assert.deepEqual(missingStaleId.json, { error: "items.0: 食物项格式不正确；食物已删除的项要带上它在计划里的 id 才能保留" });
-  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, deletedFoodPlan);
-  check("失效计划项缺少 ID 时返回文档约定的错误且不改写旧计划", true);
-  assert.equal((await api(a, "/api/v1/plan", "PUT", plan)).status, 400);
-  assert.deepEqual((await api(a, "/api/v1/plan")).json.plan, deletedFoodPlan);
-  check("引用已删除食物时不改写旧计划", true);
-  const ownFoodId = (await api(a, "/api/v1/foods")).json.foods[0].id;
-  plan.items = [{ weekday: 1, mealType: "lunch", foodId: ownFoodId, grams: 100 }];
-  const repairedPlan = await api(a, "/api/v1/plan", "PUT", plan);
-  check("可移除失效行并换成有效食物", repairedPlan.status === 200 && repairedPlan.json.plan.items.length === 1 && repairedPlan.json.plan.items[0].foodId === ownFoodId);
-
-  // 同一餐内三条不同食物：保存后 GET 顺序必须等于提交数组顺序，且重复保存顺序不变。
-  // created_at 在同一条多行 INSERT 里取值相同，只能靠 position 列固定顺序。
-  const sameMealFoods = [];
-  for (const [name, calories] of [["顺序 A 燕麦", 100], ["顺序 B 鸡蛋", 200], ["顺序 C 牛奶", 300]]) {
-    const createdSameMeal = await api(a, "/api/v1/foods", "POST", {
-      name, calories, protein: 1, carbs: 1, fat: 1, servingGrams: 100,
-    });
-    assert.equal(createdSameMeal.status, 201);
-    sameMealFoods.push(createdSameMeal.json.food);
-  }
-  const submittedItems = sameMealFoods.map(row => ({ weekday: 1, mealType: "lunch", foodId: row.id, grams: 100 }));
-  const submittedOrder = submittedItems.map(item => item.foodId);
-  plan.items = submittedItems;
-  const firstOrderSave = await api(a, "/api/v1/plan", "PUT", plan);
-  assert.equal(firstOrderSave.status, 200);
-  const firstOrder = firstOrderSave.json.plan.items.map(item => item.foodId);
-  const secondOrderSave = await api(a, "/api/v1/plan", "PUT", plan);
-  assert.equal(secondOrderSave.status, 200);
-  const secondOrder = secondOrderSave.json.plan.items.map(item => item.foodId);
-  const rereadOrder = (await api(a, "/api/v1/plan")).json.plan.items.map(item => item.foodId);
-  const [positionRows] = await pool.execute(
-    "SELECT position, name FROM bodytrace_diet_plan_item WHERE plan_id = ? ORDER BY position",
-    [before.id],
+  // 饮食计划已取消：接口移除后，库里即使留有启用中的历史计划，目标也只取每日目标。
+  check("饮食计划接口已移除", (await api(a, "/api/v1/plan")).status === 404);
+  const planId = randomUUID();
+  await pool.execute(
+    "INSERT INTO bodytrace_diet_plan (id, user_id, start_date, is_active) VALUES (?, ?, ?, ?)",
+    [planId, a.id, "2020-01-01", true],
   );
-  console.log("  同餐落库顺序：", positionRows.map(row => `${row.position}=${row.name}`).join(" "));
-  check("同一餐内三条食物的 GET 顺序等于提交顺序，重复保存后顺序不变",
-    JSON.stringify(firstOrder) === JSON.stringify(submittedOrder) &&
-    JSON.stringify(secondOrder) === JSON.stringify(submittedOrder) &&
-    JSON.stringify(rereadOrder) === JSON.stringify(submittedOrder));
-  check("position 按提交数组顺序连续落库",
-    JSON.stringify(positionRows.map(row => row.position)) === JSON.stringify([0, 1, 2]));
-  const summary = (await api(a, `/api/v1/summary?date=${today}`)).json;
-  check("汇总读取计划目标和历史快照", summary.goalSource === "plan" && summary.goals.calories === 2400 && summary.totals.calories === 300);
-  await api(a, "/api/v1/plan", "DELETE");
-  const [[dayCount]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_diet_plan_day WHERE plan_id = ?", [before.id]);
-  const [[remainingItems]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_diet_plan_item WHERE plan_id = ?", [before.id]);
-  check("删除计划级联清理日目标与食物项", (await api(a, "/api/v1/plan")).json.plan === null && dayCount.count === 0 && remainingItems.count === 0);
+  for (let weekday = 0; weekday < 7; weekday++) {
+    await pool.execute(
+      "INSERT INTO bodytrace_diet_plan_day (id, plan_id, weekday, calories, protein, carbs, fat) VALUES (?, ?, ?, 1500, 90, 160, 45)",
+      [randomUUID(), planId, weekday],
+    );
+  }
+  const legacyPlanSummary = (await api(a, `/api/v1/summary?date=${today}`)).json;
+  check("留有历史计划时汇总仍按每日目标", legacyPlanSummary.goalSource === "base" && legacyPlanSummary.goals.calories === 2200 && legacyPlanSummary.totals.calories === 300);
+  const legacyPlanTrends = (await api(a, "/api/v1/trends?days=7")).json.trends;
+  check("趋势目标线不读取历史计划", legacyPlanTrends.length === 7 && legacyPlanTrends.every(point => point.goalCalories === 2200));
 
   check("公共食物参考库搜索正常", (await api(a, `/api/v1/foods/reference?q=${encodeURIComponent("鸡蛋")}`)).json.foods.length > 0);
   for (const path of ["/", "/diary", "/foods", "/trends", "/goals", "/profile"]) {
