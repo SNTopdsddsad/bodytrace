@@ -20,9 +20,6 @@ const requiredBodies = [
   ["post", "/api/v1/measurements"],
   ["patch", "/api/v1/measurements/{id}"],
   ["delete", "/api/v1/measurements/{id}"],
-  ["post", "/api/v1/training-records"],
-  ["patch", "/api/v1/training-records/{id}"],
-  ["delete", "/api/v1/training-records/{id}"],
   ["put", "/api/v1/profile"],
 ];
 
@@ -43,7 +40,5 @@ test("OpenAPI 保留字段必填与可选语义，无请求体的操作仍无需
   for (const operations of Object.values(document.paths)) {
     if (operations.get) assert.equal(operations.get.requestBody, undefined);
   }
-  for (const path of ["/api/v1/records"]) {
-    assert.equal(document.paths[path].delete.requestBody, undefined);
-  }
+  assert.equal(document.paths["/api/v1/records"].delete.requestBody, undefined);
 });

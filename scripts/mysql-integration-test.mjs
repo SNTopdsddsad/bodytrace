@@ -170,8 +170,17 @@ try {
   assert.equal((await api(a, "/api/v1/meals", "POST", { date: today, mealType: "lunch", foodId: presetFoodId, grams: 150 })).status, 201);
   assert.equal((await api(b, "/api/v1/measurements", "POST", { requestId: randomUUID(), measurement: { kind: "bodyFat", date: today, value: "18.5" } })).status, 201);
   check("未登录不能一键清空", (await api(null, "/api/v1/records", "DELETE")).status === 401);
+  const trainingId = randomUUID();
+  await pool.execute(
+    `INSERT INTO bodytrace_training_record
+      (id, user_id, title, date, time_zone, mode, status, items, request_id)
+     VALUES (?, ?, '历史训练', ?, 'Asia/Shanghai', 'manual', 'completed', JSON_ARRAY(), ?)`,
+    [trainingId, a.id, today, randomUUID()],
+  );
   const cleared = (await api(a, "/api/v1/records", "DELETE")).json;
-  check("一键清空返回三类删除数量", cleared.ok === true && cleared.cleared.mealEntries === 1 && cleared.cleared.measurements === 1 && cleared.cleared.mealPhotos === 0);
+  assert.deepEqual(cleared, { ok: true, cleared: { mealEntries: 1, measurements: 1, mealPhotos: 0 } });
+  const [legacyTraining] = await pool.execute("SELECT id FROM bodytrace_training_record WHERE user_id = ? AND id = ?", [a.id, trainingId]);
+  check("清空只返回三类计数且保留历史训练", legacyTraining.length === 1);
   check("清空后当日饮食与全部指标为空", (await api(a, `/api/v1/meals?date=${today}`)).json.entries.length === 0 && (await api(a, "/api/v1/measurements?range=all")).json.entries.length === 0);
   check("清空保留目标与个人资料", (await api(a, "/api/v1/goals")).json.goals.calories === 2200 && (await api(a, "/api/v1/profile")).json.profile.heightCm === 175.5);
   check("清空只影响本人记录", (await api(b, "/api/v1/measurements?range=all")).json.entries.length === 1);

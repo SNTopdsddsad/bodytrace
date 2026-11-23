@@ -23,7 +23,6 @@ import {
   check,
   json,
 } from "drizzle-orm/mysql-core";
-import type { TrainingItem } from "@/lib/training";
 
 /**
  * better-auth 要求的四张认证表。
@@ -241,7 +240,7 @@ export const measurement = mysqlTable("bodytrace_measurement", {
   `),
 ]);
 
-/** 一次训练及有序项目快照。整单更新与版本号在同一事务内提交。 */
+/** 历史训练表，保留既有快照和迁移记录。 */
 export const trainingRecord = mysqlTable("bodytrace_training_record", {
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
   userId: varchar("user_id", { length: 255 }).notNull().references(() => user.id, { onDelete: "cascade" }),
@@ -254,7 +253,7 @@ export const trainingRecord = mysqlTable("bodytrace_training_record", {
   startedAt: datetime("started_at", { mode: "date", fsp: 3 }),
   durationMinutes: double("duration_minutes"),
   note: varchar("note", { length: 2000 }),
-  items: json("items").$type<TrainingItem[]>().notNull(),
+  items: json("items").notNull(),
   requestId: varchar("request_id", { length: 36 }).notNull(),
   version: int("version").notNull().default(1),
   createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),

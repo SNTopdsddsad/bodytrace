@@ -26,7 +26,6 @@ import { foodInputSchema, foodPatchSchema } from "@/services/foods";
 import { goalsSchema } from "@/services/goals";
 import { profileSchema } from "@/services/profile";
 import { measurementSchemas } from "@/lib/measurements";
-import { trainingSchemas } from "@/lib/training";
 
 extendZodWithOpenApi(z);
 
@@ -176,27 +175,6 @@ const Measurement = registry.register(
     period: z.enum(["morning", "evening"]).nullable().describe("血压时段；迁移前旧数据可能为 null"),
     note: z.string().nullable(),
     version: z.number().int().describe("每次修改或删除递增"),
-    createdAt: dateTime,
-    updatedAt: dateTime,
-  }),
-);
-
-const trainingDocs = trainingSchemas(todayStr());
-const TrainingRecord = registry.register(
-  "TrainingRecord",
-  z.object({
-    id: uuid,
-    title: z.string(),
-    date: z.string(),
-    time: z.string().nullable(),
-    mode: z.enum(["live", "manual"]),
-    status: z.enum(["inProgress", "completed"]),
-    startedAt: z.string().nullable(),
-    durationMinutes: z.number().int().nullable(),
-    note: z.string().nullable(),
-    items: trainingDocs.payload.shape.items,
-    timeZone: z.string().describe("创建时的服务端应用时区"),
-    version: z.number().int(),
     createdAt: dateTime,
     updatedAt: dateTime,
   }),
@@ -927,161 +905,6 @@ registry.registerPath({
   },
 });
 
-/* ───────────────────────────── 训练记录 ───────────────────────────── */
-
-const accountHeader = z
-  .string()
-  .optional()
-  .openapi({ description: "网页携带的初始账号标识，服务端仅与当前会话比较（不一致 401）；原生客户端可省略" });
-
-registry.registerPath({
-  method: "get",
-  path: "/api/v1/training-records",
-  operationId: "listTrainingRecords",
-  tags: ["训练记录"],
-  summary: "查询训练记录列表",
-  description:
-    "按业务日期、时间、创建时间、ID 倒序，不含删除记录。kind 为互斥分类：strength 仅纯力量、cardio 仅纯有氧、mixed 含两者；空草稿只在 all 中出现。尚无游标分页。" +
-    "携带 requestId 时改为核对一次新增：本人且未删除返回 { entry }，尚未查到（含编号属于其他账号）返回 { entry: null }，本人但已删除返回 409。",
-  request: {
-    headers: z.object({ "x-bodytrace-user": accountHeader }),
-    query: z.object({
-      range: z.enum(["7", "30", "90", "all"]).optional().default("30"),
-      kind: z.enum(["all", "strength", "cardio", "mixed"]).optional().default("all"),
-      status: z.enum(["all", "inProgress", "completed"]).optional().default("all"),
-      requestId: uuid.optional().describe("提供时改为按编号核对，忽略其余筛选参数"),
-    }),
-  },
-  responses: {
-    "200": {
-      description: "记录列表，或带 requestId 时的核对结果",
-      content: {
-        "application/json": {
-          schema: z.union([
-            z.object({ entries: z.array(TrainingRecord) }),
-            z.object({ entry: TrainingRecord.nullable() }),
-          ]),
-        },
-      },
-    },
-    "400": { description: "参数非法", content: { "application/json": { schema: ApiError } } },
-    "401": { description: "未登录或账号已切换", content: { "application/json": { schema: ApiError } } },
-    "409": { description: "编号对应的记录已删除", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/v1/training-records/clock",
-  operationId: "getTrainingClock",
-  tags: ["训练记录"],
-  summary: "服务端时间校准",
-  description:
-    "返回当前服务端 UTC 时刻，响应 Cache-Control: private, no-store，不读取或创建训练记录。客户端在创建/保存/结束核对前校准，再按单调计时器计算经过时间，避免设备时钟偏差。",
-  request: { headers: z.object({ "x-bodytrace-user": accountHeader }) },
-  responses: {
-    "200": {
-      description: "服务端时刻",
-      content: {
-        "application/json": {
-          schema: z.object({ serverNow: z.string().datetime().openapi({ example: "2026-10-27T12:00:00.000Z" }) }),
-        },
-      },
-    },
-    "401": { description: "未登录或账号已切换", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/v1/training-records",
-  operationId: "createTrainingRecord",
-  tags: ["训练记录"],
-  summary: "新增训练记录",
-  description:
-    "首次创建 201；同编号同内容重试返回同一记录 200；同编号换内容、记录已被修改或已单条删除返回 409。未知结果先 GET ?requestId= 核对，确认未保存才用原编号和原内容重试，不能重新取时刻后更换内容。请求体最大 256 KiB。",
-  request: {
-    headers: z.object({ "x-bodytrace-user": accountHeader }),
-    body: { required: true, content: { "application/json": { schema: trainingDocs.create } } },
-  },
-  responses: {
-    "201": {
-      description: "创建成功",
-      content: { "application/json": { schema: z.object({ entry: TrainingRecord }) } },
-    },
-    "200": {
-      description: "幂等重放，返回同一记录",
-      content: { "application/json": { schema: z.object({ entry: TrainingRecord }) } },
-    },
-    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
-    "401": { description: "未登录或账号已切换", content: { "application/json": { schema: ApiError } } },
-    "409": { description: "幂等或并发冲突", content: { "application/json": { schema: ApiError } } },
-    "413": { description: "请求体超过 256 KiB", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/v1/training-records/{id}",
-  operationId: "getTrainingRecord",
-  tags: ["训练记录"],
-  summary: "训练记录详情",
-  request: {
-    headers: z.object({ "x-bodytrace-user": accountHeader }),
-    params: z.object({ id: uuid.describe("非 UUID 返回 400") }),
-  },
-  responses: {
-    "200": { description: "训练记录", content: { "application/json": { schema: z.object({ entry: TrainingRecord }) } } },
-    "401": { description: "未登录或账号已切换", content: { "application/json": { schema: ApiError } } },
-    "404": { description: "不存在、已删除或属于其他用户", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/v1/training-records/{id}",
-  operationId: "updateTrainingRecord",
-  tags: ["训练记录"],
-  summary: "更新训练记录（乐观并发）",
-  description:
-    "{version, training} 整次训练的项目、组、顺序与版本原子更新；成功后 version +1。旧版本返回 409，紧接的一次相同版本/相同内容重试返回已有结果。mode 与 startedAt 固定不可改；每次进入 completed 都需满足完成校验。草稿自动保存须串行提交；超时先读详情，仅当版本恰好推进一次且内容一致才确认成功。",
-  request: {
-    headers: z.object({ "x-bodytrace-user": accountHeader }),
-    params: z.object({ id: uuid }),
-    body: { required: true, content: { "application/json": { schema: trainingDocs.update } } },
-  },
-  responses: {
-    "200": { description: "更新成功", content: { "application/json": { schema: z.object({ entry: TrainingRecord }) } } },
-    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
-    "401": { description: "未登录或账号已切换", content: { "application/json": { schema: ApiError } } },
-    "404": { description: "不存在", content: { "application/json": { schema: ApiError } } },
-    "409": { description: "版本冲突", content: { "application/json": { schema: ApiError } } },
-    "413": { description: "请求体超过 256 KiB", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
-registry.registerPath({
-  method: "delete",
-  path: "/api/v1/training-records/{id}",
-  operationId: "deleteTrainingRecord",
-  tags: ["训练记录"],
-  summary: "删除训练记录（软删除）",
-  description:
-    "软删除并递增版本，不再出现在列表/详情。重复同一删除请求成功；旧版本 409，不存在 404。保留请求编号以拒绝旧 POST 重放。",
-  request: {
-    headers: z.object({ "x-bodytrace-user": accountHeader }),
-    params: z.object({ id: uuid }),
-    body: { required: true, content: { "application/json": { schema: trainingDocs.remove } } },
-  },
-  responses: {
-    "200": { description: "删除成功", content: { "application/json": { schema: OkResult } } },
-    "400": { description: "非法参数", content: { "application/json": { schema: ApiError } } },
-    "401": { description: "未登录或账号已切换", content: { "application/json": { schema: ApiError } } },
-    "404": { description: "不存在或不可访问", content: { "application/json": { schema: ApiError } } },
-    "409": { description: "版本冲突", content: { "application/json": { schema: ApiError } } },
-  },
-});
-
 /* ───────────────────────────── 个人资料 ───────────────────────────── */
 
 registry.registerPath({
@@ -1132,7 +955,7 @@ registry.registerPath({
   tags: ["数据管理"],
   summary: "一键清空本人全部业务记录",
   description:
-    "同一事务内硬删除全部饮食记录、餐次照片、身体指标与训练（含草稿及此前软删除行）。个人食物库、每日目标、饮食计划和个人资料不受影响。重复调用成功；两次之间没有新写入时数量为 0。cleared 含已软删除的行，可能大于界面可见数量。硬删除会清除幂等编号占用：清空后重放旧新增请求可能重新创建记录，客户端应停止上传并刷新状态。",
+    "同一事务内硬删除全部饮食记录、餐次照片、身体指标（含此前软删除行）。个人食物库、每日目标和个人资料不受影响。重复调用成功；两次之间没有新写入时数量为 0。cleared 含已软删除的行，可能大于界面可见数量。硬删除会清除幂等编号占用：清空后重放旧新增请求可能重新创建记录，客户端应停止上传并刷新状态。",
   responses: {
     "200": {
       description: "清空结果",
@@ -1144,7 +967,6 @@ registry.registerPath({
               mealEntries: z.number().int(),
               measurements: z.number().int(),
               mealPhotos: z.number().int(),
-              trainingRecords: z.number().int(),
             }),
           }),
         },
@@ -1175,7 +997,7 @@ const doc = generator.generateDocument({
     title: "BodyTrace API",
     version: "1.0.0",
     description: [
-      "BodyTrace（体重 / 饮食 / 训练记录）业务接口，供网页客户端与移动 App 共用。",
+      "BodyTrace（饮食与身体指标记录）业务接口，供网页客户端与移动 App 共用。",
       "本文件由 npm run docs:api 从真实校验 schema 生成，请勿手改；契约以代码为准，背景说明见 docs/BodyTrace_API_Reference.md。",
       "",
       "## 通用约定",
@@ -1209,7 +1031,6 @@ const doc = generator.generateDocument({
     { name: "汇总与趋势", description: "首页 / 日记共用的当日汇总与最近 N 天趋势" },
     { name: "每日目标", description: "每个用户一行每日营养目标，未设置时使用默认值" },
     { name: "身体指标", description: "体重 kg / 体脂率 % / 血压 mmHg；乐观并发（version）与 requestId 幂等" },
-    { name: "训练记录", description: "一次训练含有序力量 / 有氧项目；requestId 幂等、version 乐观并发、服务端校时" },
     { name: "个人资料", description: "性别 / 身高 / 体重 / 目标体重，null 表示未填写" },
     { name: "数据管理", description: "一键清空本人全部业务记录" },
   ],

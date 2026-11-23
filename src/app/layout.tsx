@@ -8,7 +8,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BodyTrace · 饮食与健身记录",
-  description: "记录每天的饮食、训练和身体变化",
+  description: "记录每天的饮食和身体变化",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
