@@ -23,6 +23,7 @@ const id = "158205a4-fb05-4e2d-b1dd-d85134cbad28";
 function routes({ loggedIn = true, result = { ok: true, photo: { id }, created: true }, thrown = false } = {}) {
   const calls = [];
   const auth = load("../src/lib/api-auth.ts", {
+    "react": { cache: callback => callback },
     "next/headers": { headers: async () => new Headers() },
     "@/lib/auth": { auth: { api: { getSession: async () => loggedIn ? { user: { id: "owner" } } : null } } },
   }, { process: { env: { BETTER_AUTH_URL: "http://localhost:3001" } } });
