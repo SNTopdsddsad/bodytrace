@@ -13,7 +13,7 @@
 - **每日目标** + **30 天趋势图**（热量柱状 + 蛋白质折线 + 目标参考线）
 - **个人资料**：身高/性别/目标体重，可分次填写；体重来自最新测量，数据齐全时自动计算 BMI（中国成人标准分级）和目标体重差距
 - **身体变化**：持续记录体重、体脂率和血压，支持补录、同日多次测量、备注、修改和删除；血压分晨间/夜间记录，趋势同屏对比。按近 7 / 30 / 90 天或全部回看趋势和历史。最新体重同步到个人资料；原资料体重仅保留作参考，不自动生成历史。
-- **数据管理**：个人资料页一键清空全部饮食记录、餐次照片、身体指标（二次确认后同一事务硬删除）；个人食物库、目标与资料保持不变。
+- **数据管理**：个人资料页一键清空全部饮食记录、餐次照片、身体指标（二次确认后同一事务硬删除）；历史训练、计划与身材照数据保留。
 - **忘记密码**：登录页进入找回流程，使用一次性链接设置新密码；当前暂不发送邮件，本地开发时链接输出到终端。
 - **历史不篡改**：饮食记录存营养快照，改/删食物库不影响旧记录
 
@@ -66,7 +66,7 @@ APP_TIMEZONE=Asia/Shanghai
 ### 3. 建表 + 启动
 
 ```bash
-npm install
+npm ci
 npm run db:migrate  # 在目标 MySQL 上应用已审查的迁移
 npm run dev         # 打开 http://localhost:3000
 ```
@@ -136,7 +136,7 @@ RAM 最小发送权限为 `dysms:SendSms`（资源 `*`）；使用 STS 临时凭
 | `node scripts/smoke-test.mjs` | 端到端冒烟测试（需先 `npm run start`） |
 | `node scripts/debug-pages.mjs` | 检查五个页面是否正常渲染 |
 | `npm run test:password-reset` | 自行启动独立测试应用，验证有效期、令牌作废、会话失效和伪造 IP 不能绕过限流 |
-| `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及七个页面；默认本地库，也支持显式开启的独立云测试库 |
+| `npm run test:mysql` | 自行启动独立测试应用，验证 MySQL 写入、upsert、日期、中文与 emoji、快照、级联删除、账号隔离及六个页面；默认本地库，也支持显式开启的独立云测试库 |
 | `npm run test:test-isolation` | 验证测试不会采用云库配置，拒绝非本地测试连接 |
 | `npm run test:request-timeout` | 无需数据库，验证登录响应体卡住时 15 秒取消请求，以及正常返回和计时器清理 |
 | `npm run test:phone-auth` | 无需数据库，验证大陆号码规范、脱敏、官方短信 SDK 配置、失败与超时，不真实发送 |
@@ -236,6 +236,8 @@ src/
 认证相关（better-auth 提供）：`POST /api/auth/phone-number/send-otp`、`POST /api/auth/phone-number/verify`、原邮箱 `POST /api/auth/sign-in/email`、`POST /api/auth/sign-out`、`GET /api/auth/get-session`。完整契约及保留的邮箱 API 见 API 参考。
 
 ## 部署到自己的服务器
+
+当前线上使用 Go 时，按维护窗口执行切换和回滚。[从 Go 切回 Next.js](docs/Restore_Nextjs_Deployment.md)
 
 最简单的路线（已有云 MySQL）。服务器同样要 Node.js 24 LTS（≥24.22.1，以 `.nvmrc` 为准），先 `node -v` 核对；不要用发行版 apt 的 `nodejs`，用 nvm/fnm 装好再继续。
 

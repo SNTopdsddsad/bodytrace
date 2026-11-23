@@ -20,7 +20,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [开发指南](docs/BodyTrace_Nextjs_MySQL_Development_Guide.md)：架构、数据语义、权限、迁移和后续路线。
 - [产品与界面设计指南](docs/BodyTrace_Product_UI_Design_Guide.md)：产品方向、视觉、交互状态和页面验收。
 - [API 参考](docs/BodyTrace_API_Reference.md)：已实现业务接口按模块分类的契约、参数校验与响应示例。
-- 两份指南包含后续规划。当前已实现体重、体脂率、血压持续记录；训练已支持力量逐组与有氧、自动保存草稿、补录和历史维护；报告、时间线、OCR、助手和 SwiftUI 客户端仍是规划，也不要为无关任务提前添加空接口、占位入口或新目录体系。
+- 两份指南包含后续规划。当前已实现体重、体脂率、血压持续记录；网页与 API 的范围包括饮食、餐次照片、每日目标、趋势和身体指标。训练、饮食计划和身材照已取消；报告、时间线、OCR、助手和 SwiftUI 客户端仍是规划，也不要为无关任务提前添加空接口、占位入口或新目录体系。
 - 开始修改前简要说明用户行为、变更范围和验证方式；遇到会影响范围或数据契约的冲突，说明差异并按当前任务对齐。
 
 ## 当前技术与目录
@@ -37,7 +37,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `src/app/api/v1/` | 网页客户端与未来 App 共用的业务 HTTP API |
 | `src/services/` | 共用业务规则、资源归属、事务和查询；目前 Zod schema 也在这里 |
 | `src/db/` | 表定义、连接配置、连接池和注册预置数据 |
-| `src/lib/` | 认证、API 封装、日期、营养、计划和资料计算等共用工具 |
+| `src/lib/` | 认证、API 封装、日期、营养和资料计算等共用工具 |
 | `src/components/app/` | 业务交互与展示组件 |
 | `src/components/ui/` | shadcn 基础组件，先复用，必要时再修改 |
 | `drizzle/mysql/` | 当前 MySQL SQL 迁移及元数据 |
@@ -67,9 +67,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - 食物库营养值按每 100g 保存；实际摄入按克数折算，热量为 kcal，蛋白质、碳水和脂肪为 g。复用 `src/lib/nutrition.ts` 的换算、舍入和餐次定义。
 - 饮食记录保存写入时的食物名称和营养快照。改食物或删食物不能回写旧记录；改记录克数按该记录已有快照缩放，食物已删除时仍应可操作。
-- 当日目标统一通过 `getGoalsForDate()` 解析：生效的饮食计划按日期对应的周几取目标，否则回落到每日目标。首页、日记和趋势必须保持一致。
-- 计划里的三餐食物只保存食物引用、名称与克数，营养按食物库当前值实时折算，不存快照；食物被删后该行保留名称与克数、营养为空，不能当成 0 计入合计。
-- 当前饮食计划没有历史版本模型，历史目标会按当前配置解析；开发指南中的“保留历史目标”是后续要求。涉及计划版本或历史语义的任务须一并设计数据迁移和验证，不能仅修改文案就声称已经支持。
+- 首页、日记和趋势统一读取 `getGoals(userId)`。汇总的 `goalSource` 固定为 `base`，趋势各天采用当前每日目标。
+- 训练与饮食计划表保留历史数据。清空记录只处理本人的饮食记录、四餐照片和身体指标。照片表的历史 `body` 分组从餐次读取、删除和清空中排除。
 - 业务日期保存为 `YYYY-MM-DD`，今天按 `APP_TIMEZONE`（默认 `Asia/Shanghai`）计算，日期工具集中在 `src/lib/date.ts`。MySQL DATE 保持字符串，事件时间、驱动及数据库会话使用 UTC；不要让服务器本地时区改变饮食日期。
 - 新增饮食记录沿用不能记录未来日期的校验。日期、跨月、跨年和跨午夜行为有变化时覆盖相应样例。
 - 资料中的 `null` 表示未填写，0 表示真实数值；缺少资料时不伪造 BMI 或目标差距。当前饮食趋势的按日补零只表示已记录摄入的汇总，不代表全天记录完整或实际没有摄入。
@@ -126,8 +125,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | `npm run test:password-reset` | 需要本地 MySQL，验证重置令牌、会话失效与认证限流 |
 | `npm run test:mysql-pool` | 需要本地 MySQL，验证空闲回收后重建 UTC 连接，约需 32 秒 |
 | `npm run test:measurements` | 无需数据库，验证身体指标校验、精度、变化计算与趋势缺失值 |
-| `npm run test:training` | 无需数据库，验证训练规则、服务器校时、导航保护、迟到响应与请求体边界 |
-| `npm run test:training-integration` | 需要独立测试 MySQL，验证训练读写、幂等、冲突、账号隔离和清空 |
 | `npm run test:measurement-integration` | 需要本地 MySQL，验证身体指标读写、幂等、版本冲突和账号隔离 |
 
 - 当前测试使用 Node.js 内置测试工具和脚本，尚未安装 Vitest 或 Playwright；没有通用 `npm test`。按现有能力验证，不照规划文档运行不存在的命令。
