@@ -42,3 +42,16 @@ test("OpenAPI 保留字段必填与可选语义，无请求体的操作仍无需
   }
   assert.equal(document.paths["/api/v1/records"].delete.requestBody, undefined);
 });
+
+test("移动客户端契约保留号码约束、密码重置响应和可空字段", () => {
+  for (const operation of ["send-otp", "verify"]) {
+    const schema = document.paths[`/api/auth/phone-number/${operation}`].post.requestBody.content["application/json"].schema;
+    assert.equal(schema.additionalProperties, false);
+    assert.equal(schema.properties.phoneNumber.maxLength, 32);
+  }
+  const responseSchema = (path, method) => document.paths[path][method].responses["200"].content["application/json"].schema;
+  assert.deepEqual(responseSchema("/api/auth/request-password-reset", "post").required, ["status", "message"]);
+  assert.deepEqual(responseSchema("/api/auth/reset-password", "post").required, ["status"]);
+  assert.ok(document.components.schemas.ReferenceFood.properties.category.type.includes("null"));
+  assert.ok(responseSchema("/api/v1/meal-photos", "get").properties.photo.anyOf.some(schema => schema.type === "null"));
+});

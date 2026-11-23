@@ -220,7 +220,9 @@ components:
             - string
             - "null"
         category:
-          type: string
+          type:
+            - string
+            - "null"
         calories:
           type:
             - number
@@ -592,9 +594,11 @@ paths:
               properties:
                 phoneNumber:
                   type: string
+                  maxLength: 32
                   example: "13800138000"
               required:
                 - phoneNumber
+              additionalProperties: false
       responses:
         "200":
           description: 已发送
@@ -637,12 +641,14 @@ paths:
               properties:
                 phoneNumber:
                   type: string
+                  maxLength: 32
                 code:
                   type: string
                   description: 数字字符串
               required:
                 - phoneNumber
                 - code
+              additionalProperties: false
       responses:
         "200":
           description: 返回 {status, token, user} 并设置会话 cookie
@@ -741,7 +747,17 @@ paths:
         "200":
           description: 已受理（是否签发链接取决于环境）
           content:
-            application/json: {}
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  message:
+                    type: string
+                required:
+                  - status
+                  - message
         "400":
           description: 环境未开放（RESET_PASSWORD_DISABLED）或参数非法
           content:
@@ -776,7 +792,14 @@ paths:
         "200":
           description: 密码已重置
           content:
-            application/json: {}
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                required:
+                  - status
         "400":
           description: 令牌无效或过期
           content:
@@ -1388,11 +1411,9 @@ paths:
                 type: object
                 properties:
                   photo:
-                    allOf:
+                    anyOf:
                       - $ref: "#/components/schemas/MealPhoto"
-                      - type:
-                          - object
-                          - "null"
+                      - type: "null"
                 required:
                   - photo
         "400":

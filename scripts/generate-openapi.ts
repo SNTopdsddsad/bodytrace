@@ -102,7 +102,7 @@ const ReferenceFood = registry.register(
     foodCode: z.string(),
     name: z.string(),
     englishName: z.string().nullable(),
-    category: z.string(),
+    category: z.string().nullable(),
     calories: z.number().nullable(),
     protein: z.number().nullable(),
     carbs: z.number().nullable(),
@@ -263,7 +263,7 @@ registry.registerPath({
     body: {
       required: true,
       content: {
-        "application/json": { schema: z.object({ phoneNumber: z.string().openapi({ example: "13800138000" }) }) },
+        "application/json": { schema: z.strictObject({ phoneNumber: z.string().max(32).openapi({ example: "13800138000" }) }) },
       },
     },
   },
@@ -294,7 +294,7 @@ registry.registerPath({
       required: true,
       content: {
         "application/json": {
-          schema: z.object({ phoneNumber: z.string(), code: z.string().describe("数字字符串") }),
+          schema: z.strictObject({ phoneNumber: z.string().max(32), code: z.string().describe("数字字符串") }),
         },
       },
     },
@@ -374,7 +374,7 @@ registry.registerPath({
     },
   },
   responses: {
-    "200": { description: "已受理（是否签发链接取决于环境）", content: JSON_CONTENT },
+    "200": { description: "已受理（是否签发链接取决于环境）", content: { "application/json": { schema: z.object({ status: z.boolean(), message: z.string() }) } } },
     "400": {
       description: "环境未开放（RESET_PASSWORD_DISABLED）或参数非法",
       content: { "application/json": { schema: AuthError } },
@@ -401,7 +401,7 @@ registry.registerPath({
     },
   },
   responses: {
-    "200": { description: "密码已重置", content: JSON_CONTENT },
+    "200": { description: "密码已重置", content: { "application/json": { schema: z.object({ status: z.boolean() }) } } },
     "400": { description: "令牌无效或过期", content: { "application/json": { schema: AuthError } } },
   },
 });
@@ -660,7 +660,7 @@ registry.registerPath({
   responses: {
     "200": {
       description: "核对结果",
-      content: { "application/json": { schema: z.object({ photo: MealPhoto.nullable() }) } },
+      content: { "application/json": { schema: z.object({ photo: z.union([MealPhoto, z.null()]) }) } },
     },
     "400": { description: "编号缺失或非法", content: { "application/json": { schema: ApiError } } },
     "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
