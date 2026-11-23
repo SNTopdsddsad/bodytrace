@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, like, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, like, max, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { food, foodReference, mealEntry } from "@/db/schema";
@@ -20,6 +20,11 @@ export const foodPatchSchema = foodInputSchema.partial().extend({
   fat: foodInputSchema.shape.fat.removeDefault().optional(),
   isFavorite: z.boolean().optional(),
 });
+
+export async function countFoods(userId: string): Promise<number> {
+  const [row] = await db.select({ value: count() }).from(food).where(eq(food.userId, userId));
+  return row?.value ?? 0;
+}
 
 export async function listFoods(userId: string, q?: string, favorite?: boolean) {
   const conditions = [eq(food.userId, userId)];
