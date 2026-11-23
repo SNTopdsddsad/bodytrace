@@ -35,8 +35,8 @@ test("OpenAPI 保留字段必填与可选语义，无请求体的操作仍无需
   const food = document.paths["/api/v1/foods"].post.requestBody.content["application/json"].schema;
   assert.deepEqual(food.required, ["name", "calories"]);
   const photo = document.paths["/api/v1/meal-photos"].post.requestBody.content["multipart/form-data"].schema;
-  assert.ok(photo.required.includes("file"));
-  assert.equal(photo.required.includes("requestId"), false);
+  assert.deepEqual(new Set(photo.required), new Set(["date", "mealType", "file"]));
+  assert.deepEqual(photo.not, { required: ["type"] });
   for (const operations of Object.values(document.paths)) {
     if (operations.get) assert.equal(operations.get.requestBody, undefined);
   }

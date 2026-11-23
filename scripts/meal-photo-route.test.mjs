@@ -56,7 +56,7 @@ test("新照片路由保留真实会话与 Origin 守卫，校验失败不触发
   assert.equal(anonymous.calls.length, 0);
   const app = routes();
   assert.equal((await app.POST(post({}, "https://untrusted.invalid"))).status, 401);
-  for (const fields of [{date:null}, {date:"2026-02-30"}, {date:"9999-01-01"}, {mealType:"invalid"}, {type:"body"}, {type:"body", mealType:null}, {requestId:"invalid"}])
+  for (const fields of [{date:null}, {date:"2026-02-30"}, {date:"9999-01-01"}, {mealType:"invalid"}, {type:""}, {type:"body"}, {type:"body", mealType:null}, {requestId:"invalid"}])
     assert.equal((await app.POST(post(fields))).status, 400);
   assert.equal((await app.POST(post({}, undefined, null))).status, 400);
   assert.equal((await app.POST(post({}, undefined, new Uint8Array()))).status, 400);

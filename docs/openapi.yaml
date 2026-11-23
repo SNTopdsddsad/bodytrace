@@ -1324,6 +1324,9 @@ paths:
                 - date
                 - mealType
                 - file
+              not:
+                required:
+                  - type
       responses:
         "200":
           description: 幂等重放，返回已保存的照片
@@ -1348,7 +1351,7 @@ paths:
                 required:
                   - photo
         "400":
-          description: 日期/餐次/UUID/文件非法，或该餐已满六张
+          description: 表单包含 type 字段、日期/餐次/UUID/文件非法，或该餐已满六张
           content:
             application/json:
               schema:
