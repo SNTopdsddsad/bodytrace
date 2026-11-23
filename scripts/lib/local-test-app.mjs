@@ -70,7 +70,7 @@ async function removeTestProject(project) {
   await unlink(join(project, "node_modules")).catch(error => {
     if (error.code !== "ENOENT") throw error;
   });
-  await rm(target, { recursive: true, force: true });
+  await rm(target, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 });
 }
 
 /** 独立目录、独立进程、自动端口；应用与清理连接共用同一个测试连接串。 */
@@ -190,45 +190,59 @@ export async function sendLoginSms(phoneNumber: string, code: string) {
     await writeFile(configPath, configSource.replace("root: process.cwd(),", `root: ${JSON.stringify(workspace)},`));
     // 不复制 .env、构建产物或用户资料，只共享安装好的依赖。
     await symlink(join(workspace, "node_modules"), join(project, "node_modules"), process.platform === "win32" ? "junction" : "dir");
-    server = fork(join(workspace, "scripts/lib/local-test-server.mjs"), [project, workspace], {
-      cwd: project, env: environment, windowsHide: true, stdio: ["ignore", "pipe", "pipe", "ipc"],
-    });
-    exited = new Promise(resolveExit => server.once("exit", resolveExit));
     let output = "";
-    const collect = chunk => { output = (output + chunk.toString()).slice(-12_000); };
-    server.stdout.on("data", collect);
-    server.stderr.on("data", collect);
+    const startServer = async () => {
+      server = fork(join(workspace, "scripts/lib/local-test-server.mjs"), [project, workspace], {
+        cwd: project, env: environment, windowsHide: true, stdio: ["ignore", "pipe", "pipe", "ipc"],
+      });
+      exited = new Promise(resolveExit => server.once("exit", resolveExit));
+      output = "";
+      const collect = chunk => { output = (output + chunk.toString()).slice(-12_000); };
+      server.stdout.on("data", collect);
+      server.stderr.on("data", collect);
 
-    const ready = await new Promise((resolveReady, rejectReady) => {
-      const finish = (callback, value) => {
-        clearTimeout(timer);
-        server.off("error", onError);
-        server.off("exit", onExit);
-        server.off("message", onMessage);
-        callback(value);
-      };
-      const onError = error => finish(rejectReady, error);
-      const onExit = code => finish(rejectReady, new Error(`独立测试应用提前退出 (${code})\n${output}`));
-      const onMessage = message => {
-        if (message?.type === "ready") {
-          finish(resolveReady, message);
-        } else if (message?.type === "startup-error") {
-          finish(rejectReady, new Error(`独立测试应用启动失败\n${message.message}\n${output}`));
-        }
-      };
-      const timer = setTimeout(() => finish(rejectReady, new Error("独立测试应用启动超时")), 60_000);
-      server.once("error", onError);
-      server.once("exit", onExit);
-      server.on("message", onMessage);
-    });
-    assert.equal(ready.pid, server.pid, "只接受自己启动的 HTTP 监听进程");
-    listenerPid = ready.pid;
-    const base = new URL(ready.base);
-    assert.equal(base.hostname, "127.0.0.1");
-    assert.notEqual(base.port, "3000", "测试不能占用用户的 3000 端口");
-    const response = await fetch(new URL("/login", base), { signal: AbortSignal.timeout(45_000) });
-    assert.equal(response.status, 200, `独立测试应用无法正常加载\n${output}`);
-    console.log(`测试应用 ${base.origin}，监听 PID ${listenerPid}，连接独立测试库。`);
+      const ready = await new Promise((resolveReady, rejectReady) => {
+        const finish = (callback, value) => {
+          clearTimeout(timer);
+          server.off("error", onError);
+          server.off("exit", onExit);
+          server.off("message", onMessage);
+          callback(value);
+        };
+        const onError = error => finish(rejectReady, error);
+        const onExit = code => finish(rejectReady, new Error(`独立测试应用提前退出 (${code})\n${output}`));
+        const onMessage = message => {
+          if (message?.type === "ready") {
+            finish(resolveReady, message);
+          } else if (message?.type === "startup-error") {
+            finish(rejectReady, new Error(`独立测试应用启动失败\n${message.message}\n${output}`));
+          }
+        };
+        const timer = setTimeout(() => finish(rejectReady, new Error("独立测试应用启动超时")), 60_000);
+        server.once("error", onError);
+        server.once("exit", onExit);
+        server.on("message", onMessage);
+      });
+      assert.equal(ready.pid, server.pid, "只接受自己启动的 HTTP 监听进程");
+      listenerPid = ready.pid;
+      const base = new URL(ready.base);
+      assert.equal(base.hostname, "127.0.0.1");
+      assert.notEqual(base.port, "3000", "测试不能占用用户的 3000 端口");
+      const response = await fetch(new URL("/login", base), { signal: AbortSignal.timeout(45_000) });
+      assert.equal(response.status, 200, `独立测试应用无法正常加载\n${output}`);
+      console.log(`测试应用 ${base.origin}，监听 PID ${listenerPid}，连接独立测试库。`);
+      return base;
+    };
+    let base;
+    try {
+      base = await startServer();
+    } catch (error) {
+      // Next 提示安全升级后退出。按框架提示在同一个临时副本重试一次，保留升级检查。
+      if (!output.includes("Retry the same command to continue the original task.")) throw error;
+      await exited;
+      console.warn("Next.js 提示当前版本有安全更新，正在同一测试副本重试。");
+      base = await startServer();
+    }
     return { base: base.origin, pool, stop, smsRateLimitSecret: environment.BETTER_AUTH_SECRET,
       photoStorageDirectory: photoStorageMock ? join(project, ".photo-test") : undefined };
   } catch (error) {
