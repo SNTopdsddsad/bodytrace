@@ -89,11 +89,22 @@ try {
   assert.equal(replacement.json.photo.position, 6, "删除后不复用排序值");
   const aEntry = await entry(a);
   await request(a, `/api/v1/meals/${aEntry}`, "DELETE");
+  const bodyId = randomUUID(), bodyRequest = randomUUID();
+  await pool.execute(
+    `INSERT INTO bodytrace_meal_photo
+      (id, user_id, date, meal_type, request_id, object_key, thumb_key, mime_type, byte_size, width, height, position)
+     VALUES (?, ?, ?, 'body', ?, ?, ?, 'image/webp', 100, 80, 60, 0)`,
+    [bodyId, a.id, date, bodyRequest, `legacy/${bodyId}.webp`, `legacy/${bodyId}-thumb.webp`],
+  );
+  assert.deepEqual((await lookup(a, bodyRequest)).json, { photo: null });
+  assert.equal((await upload(a, "dinner", bodyRequest)).status, 409);
+  assert.equal((await request(a, `/api/v1/meal-photos/${bodyId}`, "DELETE")).status, 404);
   const meals = await request(a, `/api/v1/meals?date=${date}`);
   assert.equal(meals.json.entries.length, 0);
   assert.equal(meals.json.photos.length, 6);
   const summary = await request(a, `/api/v1/summary?date=${date}`);
   assert.equal(summary.json.byMeal.find(group => group.mealType === "breakfast").photos.length, 6);
+  assert.deepEqual(summary.json.byMeal.flatMap(group => group.photos.map(photo => photo.id)), meals.json.photos.map(photo => photo.id));
   assert.equal(summary.json.totals.calories, 0);
   const lunchRequest = randomUUID();
   const lunch = await upload(a, "lunch", lunchRequest);
@@ -101,7 +112,7 @@ try {
   assert.equal((await upload(a, "lunch")).status, 201, "兼容无编号上传");
   const profile = await fetch(base + "/profile", { headers: { Cookie: a.cookie } });
   assert.equal(profile.status, 200);
-  assert.match(await profile.text(), /8.*张照片/);
+  assert.match(await profile.text(), /8 张餐次照片/);
   const [replayDuringDelete, removed] = await Promise.all([
     upload(a, "lunch", lunchRequest),
     request(a, `/api/v1/meal-photos/${lunch.json.photo.id}`, "DELETE"),
@@ -114,13 +125,15 @@ try {
   assert.equal(cleared.json.cleared.mealPhotos, 9, "清空计数包含删除标记");
   assert.equal(await objectCount(), 2, "只保留另一个用户的对象");
   const [[remaining]] = await pool.execute("SELECT COUNT(*) AS total FROM bodytrace_meal_photo WHERE user_id = ?", [a.id]);
-  assert.equal(remaining.total, 0);
+  assert.equal(remaining.total, 1);
+  const [[legacy]] = await pool.execute("SELECT id, deleted_at FROM bodytrace_meal_photo WHERE user_id = ?", [a.id]);
+  assert.deepEqual([legacy.id, legacy.deleted_at], [bodyId, null]);
   assert.equal((await request(a, "/api/v1/records", "DELETE")).json.cleared.mealPhotos, 0);
   assert.equal((await upload(a, "breakfast", requestId)).status, 201, "硬清空释放编号，旧请求可以重新创建（已约定的边界）");
 
   // 并发清空/上传允许上传排在清空之后，但不得误删仍有引用的对象或漏清已删除对象。
   await Promise.all([upload(a, "dinner", randomUUID()), request(a, "/api/v1/records", "DELETE")]);
-  const [live] = await pool.execute("SELECT object_key, thumb_key FROM bodytrace_meal_photo WHERE deleted_at IS NULL AND user_id IN (?, ?)", [a.id, b.id]);
+  const [live] = await pool.execute("SELECT object_key, thumb_key FROM bodytrace_meal_photo WHERE deleted_at IS NULL AND meal_type <> 'body' AND user_id IN (?, ?)", [a.id, b.id]);
   assert.equal(await objectCount(), live.length * 2);
   await request(a, "/api/v1/records", "DELETE");
   assert.equal(await objectCount(), 2);

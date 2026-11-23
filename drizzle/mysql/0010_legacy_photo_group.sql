@@ -1,0 +1,1 @@
+ALTER TABLE `bodytrace_meal_photo` MODIFY COLUMN `meal_type` enum('breakfast','lunch','dinner','snack','body') NOT NULL;

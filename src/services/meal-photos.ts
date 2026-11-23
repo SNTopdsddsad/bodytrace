@@ -7,7 +7,7 @@
  * 失败不会让已经完成的删除接口返回错误（由清理脚本兜底）。
  */
 import { createHash } from "node:crypto";
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { mealPhoto, user } from "@/db/schema";
 import {
@@ -22,7 +22,7 @@ import { processMealPhoto, MealPhotoImageError } from "@/lib/meal-photo-image";
 import type { ProcessedMealPhoto } from "@/lib/meal-photo-image";
 import { MEAL_PHOTO_MAX, MEAL_PHOTO_MAX_BYTES } from "@/lib/meal-photo";
 import type { MealPhotoDto, MealSlot } from "@/lib/meal-photo";
-import type { MealType } from "@/lib/nutrition";
+import { MEAL_ORDER, type MealType } from "@/lib/nutrition";
 import { mealSlotSchema } from "./meal-slot";
 
 export type { MealPhotoDto } from "@/lib/meal-photo";
@@ -38,6 +38,7 @@ export type AddMealPhotoResult =
 type PhotoRow = typeof mealPhoto.$inferSelect;
 
 async function toPhotoDto(row: PhotoRow): Promise<MealPhotoDto> {
+  if (row.mealType === "body") throw new Error("历史身材照无法作为餐次照片读取");
   const [url, thumbUrl] = await Promise.all([
     getMealPhotoUrl(row.objectKey),
     getMealPhotoUrl(row.thumbKey),
@@ -67,15 +68,15 @@ export async function getPhotosForDay(
   const rows = await db
     .select()
     .from(mealPhoto)
-    .where(and(eq(mealPhoto.userId, userId), eq(mealPhoto.date, date), isNull(mealPhoto.deletedAt)))
+    .where(and(eq(mealPhoto.userId, userId), eq(mealPhoto.date, date), inArray(mealPhoto.mealType, MEAL_ORDER), isNull(mealPhoto.deletedAt)))
     .orderBy(asc(mealPhoto.mealType), asc(mealPhoto.position));
 
   for (const row of rows) {
     try {
       const dto = await toPhotoDto(row);
-      const list = result.get(row.mealType) ?? [];
+      const list = result.get(dto.mealType) ?? [];
       list.push(dto);
-      result.set(row.mealType, list);
+      result.set(dto.mealType, list);
     } catch (error) {
       console.error("[BodyTrace] 无法生成饮食照片地址", error);
     }
@@ -120,7 +121,7 @@ async function findRequest(userId: string, requestId: string) {
 export async function getMealPhotoRequest(userId: string, requestId: string) {
   try {
     const row = await findRequest(userId, requestId);
-    if (!row) return { ok: true, photo: null } as const;
+    if (!row || row.mealType === "body") return { ok: true, photo: null } as const;
     validateReplay(row);
     return { ok: true, photo: await toPhotoDto(row) } as const;
   } catch (error) {
@@ -271,6 +272,7 @@ export async function removeMealPhoto(
       .where(
         and(
           eq(mealPhoto.id, photoId),
+          inArray(mealPhoto.mealType, MEAL_ORDER),
           eq(mealPhoto.userId, userId),
           isNull(mealPhoto.deletedAt),
         ),
@@ -284,6 +286,7 @@ export async function removeMealPhoto(
       .where(
         and(
           eq(mealPhoto.id, photoId),
+          inArray(mealPhoto.mealType, MEAL_ORDER),
           eq(mealPhoto.userId, userId),
           isNull(mealPhoto.deletedAt),
         ),

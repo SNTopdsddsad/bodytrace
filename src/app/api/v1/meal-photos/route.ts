@@ -44,6 +44,9 @@ export async function POST(request: Request) {
   if (!form) {
     return Response.json({ error: "请求格式应为 multipart/form-data" }, { status: 400 });
   }
+  if (form.has("type")) {
+    return Response.json({ error: "请按餐次上传饮食照片" }, { status: 400 });
+  }
   const file = form.get("file");
   const parsed = uploadSchema.safeParse({
     date: form.get("date"), mealType: form.get("mealType"),

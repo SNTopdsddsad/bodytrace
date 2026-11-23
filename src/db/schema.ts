@@ -146,7 +146,7 @@ export const mealEntry = mysqlTable(
 
 /**
  * 饮食照片归属用户、日期与餐次，每餐最多 6 张有效照片。
- * 与食物记录独立；清空记录或删除账号时删除，COS 对象提交后清理。
+ * 与食物记录独立。照片表兼容历史身材照分组，清空记录仅处理餐次照片。
  */
 export const mealPhoto = mysqlTable(
   "bodytrace_meal_photo",
@@ -156,7 +156,7 @@ export const mealPhoto = mysqlTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     date: date("date", { mode: "string" }).notNull(),
-    mealType: mysqlEnum("meal_type", mealTypes).notNull(),
+    mealType: mysqlEnum("meal_type", [...mealTypes, "body"]).notNull(),
     /** 同一用户的请求编号只能用于同一餐和同一份上传文件。 */
     requestId: varchar("request_id", { length: 36 }),
     contentHash: varchar("content_hash", { length: 64 }),

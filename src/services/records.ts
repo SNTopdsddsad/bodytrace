@@ -4,7 +4,8 @@
  * 清空只删除“用户记录的数据”，食物库、目标、计划和个人资料等配置不动；
  * 三类数据的删除放在同一事务里，避免清一半失败留下不一致状态。
  */
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
+import { MEAL_ORDER } from "@/lib/nutrition";
 import { db } from "@/db";
 import { mealEntry, mealPhoto, measurement, user } from "@/db/schema";
 import { deletePhotoObjectsBestEffort } from "./meal-photos";
@@ -20,7 +21,7 @@ export async function getRecordCounts(userId: string): Promise<RecordCounts> {
       .from(measurement)
       .where(and(eq(measurement.userId, userId), isNull(measurement.deletedAt))),
     db.select({ value: count() }).from(mealPhoto)
-      .where(and(eq(mealPhoto.userId, userId), isNull(mealPhoto.deletedAt))),
+      .where(and(eq(mealPhoto.userId, userId), inArray(mealPhoto.mealType, MEAL_ORDER), isNull(mealPhoto.deletedAt))),
   ]);
   return { mealEntries: meals[0]?.value ?? 0, measurements: measurements[0]?.value ?? 0, mealPhotos: photos[0]?.value ?? 0 };
 }
@@ -35,9 +36,10 @@ export async function clearAllRecords(userId: string): Promise<RecordCounts> {
     const [owner] = await tx.select({ id: user.id }).from(user)
       .where(eq(user.id, userId)).for("update");
     if (!owner) return { cleared: { mealEntries: 0, measurements: 0, mealPhotos: 0 }, photoKeys: [] };
+    const mealPhotosForUser = and(eq(mealPhoto.userId, userId), inArray(mealPhoto.mealType, MEAL_ORDER));
     const photoKeys = await tx.select({ objectKey: mealPhoto.objectKey, thumbKey: mealPhoto.thumbKey })
-      .from(mealPhoto).where(eq(mealPhoto.userId, userId)).for("update");
-    const [photosResult] = await tx.delete(mealPhoto).where(eq(mealPhoto.userId, userId));
+      .from(mealPhoto).where(mealPhotosForUser).for("update");
+    const [photosResult] = await tx.delete(mealPhoto).where(mealPhotosForUser);
     const [mealsResult] = await tx.delete(mealEntry).where(eq(mealEntry.userId, userId));
     const [measurementsResult] = await tx.delete(measurement).where(eq(measurement.userId, userId));
     return {

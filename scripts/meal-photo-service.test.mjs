@@ -57,6 +57,7 @@ function service(photos = [row], urlForKey = async key => `https://photos.invali
       if (name === "./meal-slot") return slotExports;
       if (name === "@/db") return { db };
       if (name === "@/db/schema") return { user, mealPhoto };
+      if (name === "@/lib/nutrition") return { MEAL_ORDER };
       if (name === "@/lib/meal-photo") return { MEAL_PHOTO_MAX, MEAL_PHOTO_MAX_BYTES };
       if (name === "@/lib/cos") return { getMealPhotoUrl: urlForKey,
         isPhotoStorageConfigured: unexpected, buildMealPhotoKeys: unexpected, putMealPhotoObjects: unexpected };
@@ -150,6 +151,7 @@ function uncertainService(reads) {
     if (name === "@/db") return { db };
     if (name === "@/db/schema") return { mealPhoto: table(Object.keys(row)), user: table(["id"]) };
     if (name === "./meal-slot") return slotExports;
+    if (name === "@/lib/nutrition") return { MEAL_ORDER };
     if (name === "@/lib/meal-photo") return { MEAL_PHOTO_MAX, MEAL_PHOTO_MAX_BYTES };
     if (name === "@/lib/meal-photo-image") return { processMealPhoto: async () => ({ main:Buffer.from("main"),thumb:Buffer.from("thumb"),width:80,height:60,mimeType:"image/webp",byteSize:9 }) };
     if (name === "@/lib/cos") return {

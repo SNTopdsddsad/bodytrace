@@ -26,6 +26,7 @@ export async function checkMealPhotoMigration(pool) {
     }
     for (const row of seed) await pool.execute(`INSERT INTO \`${photo}\` (id,user_id,entry_id,object_key,thumb_key,position,request_id,content_hash,deleted_at,mime_type,byte_size,width,height,created_at) VALUES (?,?,?,?,?,?,?,?,?,'image/webp',100,80,60,'2026-01-01 00:00:00')`, row);
     await runMigration("0008_calm_xorn.sql");
+    await runMigration("0010_legacy_photo_group.sql");
     const [rows] = await pool.query(`SELECT *, DATE_FORMAT(date,'%Y-%m-%d') AS date_string FROM \`${photo}\` ORDER BY user_id, position`);
     assert.equal(rows.length, 9);
     assert.deepEqual(rows.filter(r => r.user_id === "a").map(r => r.position), [0,1,2,3,4,5,6,7]);
@@ -52,6 +53,7 @@ export async function checkMealPhotoMigration(pool) {
     await runMigration("0006_chilly_expediter.sql");
     await runMigration("0007_flippant_green_goblin.sql");
     await runMigration("0008_calm_xorn.sql");
+    await runMigration("0010_legacy_photo_group.sql");
     const [[empty]] = await pool.query(`SELECT COUNT(*) AS n FROM \`${photo}\``);
     assert.equal(empty.n, 0, "空表可连续升级");
   } finally {
