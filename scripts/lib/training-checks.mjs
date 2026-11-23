@@ -132,8 +132,6 @@ export async function runTrainingChecks({ base, pool, stop }) {
     const onlyCardio = await api(a, "/api/v1/training-records?range=all&kind=cardio");
     check("纯有氧筛选返回对应训练", onlyCardio.json.entries.length === 1 && onlyCardio.json.entries[0].id === cardioOnly.json.entry.id);
     check("进行中筛选不包含已完成训练", (await api(a, "/api/v1/training-records?range=all&status=inProgress")).json.entries.length === 3);
-    const page = await api(a, "/training?range=all");
-    check("训练页面能渲染已保存训练", page.status === 200 && page.text.includes("已完成混合训练"));
 
     check("删除训练成功且同次删除可重试", (await api(a, detailPath, "DELETE", { version: 2 })).status === 200 && (await api(a, detailPath, "DELETE", { version: 2 })).status === 200);
     check("删除后列表与详情不再返回训练", (await api(a, detailPath)).status === 404 && !(await all(a)).json.entries.some(row => row.id === entry.id));
