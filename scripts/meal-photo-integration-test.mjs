@@ -17,6 +17,9 @@ async function request(owner, path, method = "GET", body) {
     ...(body === undefined ? {} : { body: form ? body : JSON.stringify(body) }),
     signal: AbortSignal.timeout(45_000),
   });
+  if (path.startsWith("/api/v1/meal-photos")) {
+    assert.equal(response.headers.get("cache-control"), "private, no-store", `${method} ${path} (${response.status})`);
+  }
   const json = await response.json();
   return { status: response.status, json, response };
 }

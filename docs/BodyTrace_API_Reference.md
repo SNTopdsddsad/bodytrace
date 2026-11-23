@@ -248,6 +248,8 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 
 ### 饮食照片接口
 
+上传、按请求编号核对和删除的响应均带 `Cache-Control: private, no-store`，包括错误响应。
+
 照片属于 `(userId, date, mealType)`，一餐可以只有照片。三个接口均需登录；POST / DELETE 沿用 Origin 检查，`userId` 只来自服务端会话。旧 `/api/v1/meals/:id/photos` 及其删除子路由已移除。
 
 | 方法 | 路径 | 用途 |
