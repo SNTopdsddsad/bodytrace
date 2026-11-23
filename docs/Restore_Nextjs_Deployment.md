@@ -1,12 +1,12 @@
 # 从 Go 切回 Next.js
 
-在维护窗口将网页、认证和业务 API 切换到同一域名下的 Next.js 服务。先在独立预发环境用受控备份演练迁移与回滚。
+网页统一使用 `https://www.aigcwe.com`，与当前 Go 部署的 `BETTER_AUTH_URL` 一致。`aigcwe.com` 保留旧 App 的 API 地址。先在独立预发环境用受控备份演练迁移与回滚。
 
 ## 准备发布目录和数据库
 
 1. 记录当前 Go 镜像摘要、Compose 项目及服务名、发布环境文件、两个业务域名的 Caddy 配置和实际监听端口。保留能启动旧版本的文件。备份数据库和 Caddy 配置，验证数据库备份可以恢复。
 2. 在服务器独立发布目录检出选定的 Next.js 提交。核对 Node 24 LTS（至少 24.22.1）、npm 和 PM2，在该机执行 `npm ci`、`npm run lint` 和 `npm run build`。发布前核对框架提示的安全更新。
-3. 按 `.env.example` 核对数据库、公开 HTTPS 应用地址、认证签名密钥、时区、COS 桶、对象前缀和短信配置。确认 Node 进程可读 TLS 所需的 CA 文件。保留原有会话签名和照片地址。端口 3307 是本地开发配置，生产服务使用核实的数据库地址。
+3. 将 Next.js 的 `BETTER_AUTH_URL` 设为 `https://www.aigcwe.com`。按 `.env.example` 核对数据库、认证签名密钥、时区、COS 桶、对象前缀和短信配置。确认 Node 进程可读 TLS 所需的 CA 文件。保留原有会话签名和照片地址。端口 3307 是本地开发配置，生产服务使用核实的数据库地址。
 4. 读取 `SELECT id, hash, created_at FROM __drizzle_migrations ORDER BY created_at`，逐项比对 `drizzle/mysql/meta/_journal.json` 的时间戳和对应 SQL 的 SHA-256。通过 `SHOW CREATE TABLE bodytrace_meal_photo` 检查枚举顺序和索引。Go 版可能已在枚举末尾追加 `body`。若账本只到 `0008`，本次迁移还会运行 `0009` 建立历史训练表，随后 `0010` 将照片分组登记为五个值。若账本与实际结构有出入，先在预发副本查明原因。
 5. 通知 App 维护者关闭身材照入口。`GET /api/v1/body-photos` 会返回 404，带 `type=body` 的上传会返回 400。历史身材照保留，普通餐次照片继续可用。
 
@@ -16,13 +16,24 @@
 2. 等在途上传、写请求与清理任务结束，再从原发布目录停止已核实的 Go API 服务。仓库的 Compose 部署使用 `docker compose --env-file .env.release stop --timeout 90 api`。确认旧上游已停止接单。
 3. 在 Next.js 发布目录加载核对过的生产环境，执行一次 `npm run db:migrate`。检查新增迁移记录、照片枚举和历史训练表。若执行失败，保持维护并核对已生效的 DDL。MySQL 可能已提交其中一部分。
 4. 启动单个 Node 上游。若旧 PM2 条目绑定了旧解释器，核对该应用后重新创建条目。可使用 `pm2 start npm --name bodytrace -- run start -- --hostname 127.0.0.1 --port 3000`，通过 `pm2 describe bodytrace` 核对工作目录和解释器。
-5. 在维护规则之后，将网页、`/_next/*`、`/api/auth/*` 和 `/api/v1/*` 统一反代到 `127.0.0.1:3000`。移除旧版按 API 分流和其余路径返回 404 的规则，保留其他站点。保持 Host、HTTPS 协议和上传超时。启用 `AUTH_TRUSTED_IP_HEADER` 时，由受控代理覆盖同名头。校验、重载 Caddy，再次证明公网仍返回 503。
+5. 两个域名共用现有 Caddy `route`。保留最前面的维护 503 和公网探针 404，将以下规则放在它们之后、反向代理之前。备用域名的网页请求会携带原路径和查询参数跳到主域名。
+
+   ```caddyfile
+   @alternatePage {
+       host aigcwe.com
+       not path /api /api/*
+   }
+   redir @alternatePage https://www.aigcwe.com{uri} 307
+   ```
+
+6. 把后面的旧 `reverse_proxy @api 127.0.0.1:3100` 改为 `reverse_proxy 127.0.0.1:3000`，删除末尾的兜底 `respond 404`。这样主域名提供网页、静态资源和 API，两个域名的 `/api/*` 都直接到达同一上游。保留原代理的 Host、协议、上传超时和禁用写入重试的配置。由受控代理覆盖 `AUTH_TRUSTED_IP_HEADER` 指定的头，原样传递客户端的 `Origin`。校验、重载 Caddy，再次确认两个域名均返回维护 503。
 
 ## 验收和放行
 
 - 维护期间直连新上游核对登录页、静态资源和受保护接口的 401。使用合成账号、正确的 Host 和公开 Origin 核对会话、饮食和每日目标，分别验证浏览器 cookie 和 App 的 Bearer 调用。
 - 使用合成记录验证餐次照片、身体指标和趋势，核对照片接口的 `Cache-Control: private, no-store`。确认训练、计划和身材照接口返回 404。
-- 确认只有 Next.js 接受业务写入，移除维护标志。分别验证两个域名的网页与 App 读写，记录切换时刻、应用提交和迁移位置。
+- 确认只有 Next.js 接受业务写入后移除维护标志。用 `curl -sS -D - -o /dev/null 'https://aigcwe.com/diary?date=2026-11-22'` 检查首个响应为 307，且 `Location` 为 `https://www.aigcwe.com/diary?date=2026-11-22`。从该入口在浏览器登录合成账号，保存每日目标并刷新核对。
+- 用旧 App 配置的原 API 域名和 Bearer 会话读取并保存合成账号的每日目标。两个域名的匿名 `GET /api/v1/goals` 都应直接返回 401，已登录的 `GET` 和 `PUT` 应直接返回 200；检查首个响应状态以识别意外重定向。记录切换时刻、应用提交和迁移位置。
 
 ## 回滚
 
