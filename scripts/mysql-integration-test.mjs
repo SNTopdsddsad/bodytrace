@@ -253,7 +253,7 @@ try {
   check("删除计划级联清理日目标与食物项", (await api(a, "/api/v1/plan")).json.plan === null && dayCount.count === 0 && remainingItems.count === 0);
 
   check("公共食物参考库搜索正常", (await api(a, `/api/v1/foods/reference?q=${encodeURIComponent("鸡蛋")}`)).json.foods.length > 0);
-  for (const path of ["/", "/diary", "/foods", "/trends", "/goals", "/plan", "/profile"]) {
+  for (const path of ["/", "/diary", "/foods", "/trends", "/goals", "/profile"]) {
     check(`${path} 页面正常渲染`, (await api(a, path)).status === 200);
   }
   check("删除记录成功", (await api(a, `/api/v1/meals/${entry.id}`, "DELETE")).status === 200);

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BookOpen, CalendarRange, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
+import { Activity, BookOpen, ChartNoAxesCombined, ChevronRight, LayoutDashboard, Leaf, LogOut, Target, UserRound, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -18,7 +18,6 @@ const LINKS = [
 
 /** 侧边栏的次要入口：不占移动端底部导航的五个位置。 */
 const SIDEBAR_LINKS = [
-  { href: "/plan", label: "饮食计划", icon: CalendarRange },
   { href: "/measurements", label: "身体变化", icon: Activity },
   { href: "/profile", label: "个人资料", icon: UserRound },
 ] as const;
@@ -81,9 +80,6 @@ export function SiteNav({ userName }: { userName: string }) {
       <header className="flex h-20 items-center justify-between border-b bg-card px-5 lg:hidden">
         <Link href="/" aria-label="BodyTrace 首页"><Brand /></Link>
         <div className="flex items-center gap-2">
-          <Link href="/plan" aria-label="饮食计划" aria-current={isActive("/plan") ? "page" : undefined} className="flex size-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <CalendarRange className="size-5" strokeWidth={1.8} aria-hidden />
-          </Link>
           <Link href="/profile" className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-muted" aria-label="查看个人资料">
             <span className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-primary">{userName.slice(0, 1).toUpperCase()}</span>
             <span className="max-w-24 truncate text-xs text-muted-foreground">{userName}</span>
