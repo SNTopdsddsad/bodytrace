@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import vm from "node:vm";
 import ts from "typescript";
+import { require as requireTs } from "tsx/cjs/api";
 
 const food = { id: "food-a", name: "合成食物", calories: 100, protein: 10, carbs: 10, fat: 1, servingGrams: 100 };
 const imageFile = new File(["synthetic"], "photo.webp", { type: "image/webp" });
@@ -65,6 +66,9 @@ function createUi({ component = "FoodPicker", create, upload, prepare } = {}) {
         }
         return { foods: [food] };
       } };
+      if (name === "@/lib/reference-food-client") return {
+        useReferenceFoodSearch: () => ({ foods: [], searching: false, error: undefined }),
+      };
       if (name === "@/lib/meal-photo") return { MEAL_PHOTO_MAX: 6, MEAL_PHOTO_ACCEPT: "image/webp" };
       if (name === "@/lib/meal-photo-client") return {
         prepareMealPhoto: async file => {
@@ -180,4 +184,15 @@ test("餐次照片失败重试保留相同文件与编号，预览 URL 即使上
   assert.equal(ui.prepareCalls, 1);
   assert.equal(ui.revoked.length, 1);
   ui.unmount();
+});
+
+test("参考食物仅复用来源编号和四项营养都相符的个人副本", () => {
+  const { findReferenceCopy, referenceFoodValues } = requireTs("../src/lib/reference-food-client.ts", import.meta.url);
+  const ref = { foodCode: "001", name: "同名食物", calories: 60, protein: 2, carbs: 3, fat: 4 };
+  const copy = { ...referenceFoodValues(ref), id: "copy" };
+  const privateFood = { ...copy, brand: null, calories: 450 };
+  const otherReference = { ...referenceFoodValues({ ...ref, foodCode: "002" }) };
+  const editedCopy = { ...copy, protein: 8 };
+  assert.equal(findReferenceCopy([privateFood, otherReference, editedCopy], ref), undefined);
+  assert.equal(findReferenceCopy([privateFood, editedCopy, copy], ref), copy);
 });

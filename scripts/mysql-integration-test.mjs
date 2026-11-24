@@ -103,6 +103,36 @@ try {
   const resized = await api(a, `/api/v1/meals/${entry.id}`, "PATCH", { grams: 300 });
   check("删除食物保留快照并可改克数", resized.json.entry.foodId === null && resized.json.entry.calories === 300 && resized.json.entry.protein === 30);
 
+  // 同一份食物经过小份量舍入后，改回原克数应得到原始营养值。
+  const basis = { calories: 118, protein: 24.6, carbs: 0.6, fat: 1.9 };
+  const markedFood = (await api(b, "/api/v1/foods", "POST", { name: "份量往返测试", ...basis })).json.food;
+  const marked = (await api(b, "/api/v1/meals", "POST", {
+    date: today, mealType: "lunch", foodId: markedFood.id, grams: 1,
+  })).json.entry;
+  assert(!("nutritionBasis" in marked));
+  assert.equal((await api(b, `/api/v1/foods/${markedFood.id}`, "DELETE")).status, 200);
+  const resize = async (id, grams) => {
+    const result = await api(b, `/api/v1/meals/${id}`, "PATCH", { grams });
+    assert.equal(result.status, 200);
+    assert(!("nutritionBasis" in result.json.entry));
+    return result.json.entry;
+  };
+  for (const grams of [100, 12.5, 1, 100]) {
+    const changed = await resize(marked.id, grams);
+    assert.equal(changed.grams, grams);
+    if (grams === 100) {
+      for (const [key, value] of Object.entries(basis)) assert.equal(changed[key], value);
+    }
+  }
+  check("从首次记录的 1g 恢复每 100g 营养基准，删食物和多次改份量仍可往返", true);
+  // 模拟迁移前无基准、原食物已删除的行。
+  await pool.execute("UPDATE bodytrace_meal_entry SET nutrition_basis = NULL WHERE id = ? AND user_id = ?", [marked.id, b.id]);
+  await resize(marked.id, 1);
+  const restored = await resize(marked.id, 100);
+  for (const [key, value] of Object.entries(basis)) assert.equal(restored[key], value);
+  check("旧记录首次编辑时保留现存快照", true);
+  assert.equal((await api(b, `/api/v1/meals/${marked.id}`, "DELETE")).status, 200);
+
   // 用单独的合成账号构造超过 200 条重复记录，不影响其他快照与清空数量的断言。
   const recentOwner = await signup();
   const recentFoods = (await api(recentOwner, "/api/v1/foods")).json.foods
@@ -156,6 +186,15 @@ try {
   check("留有历史计划时汇总仍按每日目标", legacyPlanSummary.goalSource === "base" && legacyPlanSummary.goals.calories === 2200 && legacyPlanSummary.totals.calories === 300);
   const legacyPlanTrends = (await api(a, "/api/v1/trends?days=7")).json.trends;
   check("趋势目标线不读取历史计划", legacyPlanTrends.length === 7 && legacyPlanTrends.every(point => point.goalCalories === 2200));
+
+  const zeroFood = await api(b, "/api/v1/foods", "POST", { name: "合成零热量食物", calories: 0 });
+  assert.equal(zeroFood.status, 201);
+  assert.equal((await api(b, "/api/v1/meals", "POST", {
+    date: today, mealType: "lunch", foodId: zeroFood.json.food.id, grams: 37.5,
+  })).status, 201);
+  const zeroDays = (await api(b, "/api/v1/trends?days=7")).json.trends;
+  check("有零热量餐次与没有餐次的日期分别标记", zeroDays.at(-1).hasMealEntries === true &&
+    zeroDays.at(-1).calories === 0 && zeroDays.at(-2).hasMealEntries === false && zeroDays.at(-2).calories === 0);
 
   check("公共食物参考库搜索正常", (await api(a, `/api/v1/foods/reference?q=${encodeURIComponent("鸡蛋")}`)).json.foods.length > 0);
   for (const path of ["/", "/diary", "/foods", "/trends", "/goals", "/profile"]) {

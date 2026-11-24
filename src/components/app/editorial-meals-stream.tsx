@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ImagePlus, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import NumberFlow from "@number-flow/react";
+import { Camera, ImagePlus, Loader2, Pencil, Plus, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import type { Food, MealEntry } from "@/db/schema";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,9 @@ import { api } from "@/lib/api-client";
 import { MEAL_PHOTO_ACCEPT, MEAL_PHOTO_MAX, type MealPhotoDto } from "@/lib/meal-photo";
 import { prepareMealPhoto, uploadMealPhoto } from "@/lib/meal-photo-client";
 import { round1, type MealType } from "@/lib/nutrition";
+import { InlineConfirmButton } from "./inline-confirm-button";
 import { MEAL_STYLES } from "./meal-styles";
+import { SOFT_SPRING, TAB_SPRING, TAP_SPRING } from "./motion-provider";
 
 type MealGroup = {
   mealType: MealType;
@@ -28,6 +31,10 @@ type MealGroup = {
 };
 
 type PendingPhoto = { requestId: string; original: File; prepared?: File };
+
+function validGrams(grams: number) {
+  return Number.isFinite(grams) && grams >= 1 && grams <= 5000;
+}
 
 function MealCard({
   date,
@@ -77,15 +84,16 @@ function MealCard({
   const MealIcon = style.icon;
   const remainingPhotos = Math.max(0, MEAL_PHOTO_MAX - meal.photos.length);
   const canAddPhoto = canRecord && !uploading && failedPhotos.length === 0 && remainingPhotos > 0;
+  const showPhotoStrip =
+    meal.photos.length > 0 || dragging || uploading || failedPhotos.length > 0 || Boolean(photoError);
 
   async function updateEntryGrams(entryId: string, grams: number) {
-    if (!canRecord || busyEntryId) return;
-    const clamped = Math.max(1, Math.min(5000, Math.round(grams)));
+    if (!canRecord || busyEntryId || !validGrams(grams)) return;
     setBusyEntryId(entryId);
     try {
       await api(`/api/v1/meals/${entryId}`, {
         method: "PATCH",
-        body: JSON.stringify({ grams: clamped }),
+        body: JSON.stringify({ grams }),
       });
       setEditingId(null);
       router.refresh();
@@ -98,11 +106,10 @@ function MealCard({
 
   async function deleteEntry(entry: MealEntry) {
     if (!canRecord || busyEntryId) return;
-    if (!window.confirm(`确定删除「${entry.name} ${entry.grams}g」吗？`)) return;
     setBusyEntryId(entry.id);
     try {
       await api(`/api/v1/meals/${entry.id}`, { method: "DELETE" });
-      toast.success("已删除饮食记录");
+      toast.success(`已删除「${entry.name}」`);
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "删除失败");
@@ -172,7 +179,6 @@ function MealCard({
 
   async function removePhoto(photoId: string) {
     if (deletingPhotoId) return;
-    if (!window.confirm("确定删除这张餐照吗？")) return;
     setDeletingPhotoId(photoId);
     setPhotoError("");
     try {
@@ -188,8 +194,10 @@ function MealCard({
   }
 
   return (
-    <section
+    <motion.section
       id={`meal-${meal.mealType}`}
+      animate={{ scale: dragging ? 1.01 : 1 }}
+      transition={TAP_SPRING}
       onDragOver={(e) => {
         if (!canAddPhoto) return;
         e.preventDefault();
@@ -201,14 +209,44 @@ function MealCard({
         setDragging(false);
         if (canAddPhoto) handleChooseFiles(e.dataTransfer.files);
       }}
-      className={`space-y-3 rounded-2xl border bg-card p-4 shadow-xs transition-colors ${
+      className={`space-y-2.5 rounded-2xl border bg-card p-4 shadow-[0_2px_12px_-8px_#233e2e26] transition-colors ${
         dragging
           ? "border-primary ring-2 ring-primary/20"
           : isTargetMeal
-            ? "border-primary/45"
+            ? "border-primary/45 ring-1 ring-primary/10"
             : "border-border"
       }`}
     >
+      {/* 隐藏文件选择控件 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={MEAL_PHOTO_ACCEPT}
+        multiple
+        disabled={!canAddPhoto}
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={`${meal.label}照片文件`}
+        onChange={(e) => {
+          handleChooseFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        disabled={!canAddPhoto}
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={`${meal.label}拍照文件`}
+        onChange={(e) => {
+          handleChooseFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
       {/* 餐次标题栏 */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -219,295 +257,343 @@ function MealCard({
             <h3 className="text-sm font-bold">{meal.label}</h3>
             <p className="text-[11px] text-muted-foreground">
               {meal.entries.length > 0 ? `${meal.entries.length} 项食物` : "暂无食物"}
-              {meal.photos.length > 0 ? ` · ${meal.photos.length} 张照片` : ""}
+              {meal.photos.length > 0 ? ` · ${meal.photos.length} 张餐照` : ""}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-bold tabular-nums">{mealCal} kcal</span>
-          <button
+        <div className="flex items-center gap-1.5">
+          <span className="mr-1 font-mono text-sm font-bold tabular-nums">
+            <NumberFlow value={mealCal} /> kcal
+          </span>
+
+          {/* 无照片时收进标题栏的轻量传照入口 */}
+          {canAddPhoto && !showPhotoStrip && (
+            <motion.button
+              type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.92 }}
+              transition={TAP_SPRING}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex size-7 items-center justify-center rounded-lg border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-primary"
+              title={`为${meal.label}上传餐照（也可直接拖入图片）`}
+              aria-label={`为${meal.label}上传餐照`}
+            >
+              <ImagePlus className="size-3.5" aria-hidden />
+            </motion.button>
+          )}
+
+          <motion.button
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.94 }}
+            transition={TAP_SPRING}
             disabled={!canRecord}
             onClick={() => onPickMeal(meal.mealType)}
             className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-45 ${
               isTargetMeal
                 ? "border-primary bg-primary text-primary-foreground"
-                : "bg-background hover:border-primary"
+                : "bg-background hover:border-primary/40 hover:bg-secondary/70"
             }`}
           >
             <Plus className="size-3.5" aria-hidden />
             记食物
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      {/* 横向圆角微缩相册条 */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {meal.photos.map((photo, idx) => (
-            <div
-              key={photo.id}
-              className="group relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border bg-background"
-            >
-              <button
-                type="button"
-                onClick={() => setViewerOpen(true)}
-                className="size-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`查看${meal.label}第 ${idx + 1} 张照片`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.thumbUrl}
-                  alt={`${meal.label}照片 ${idx + 1}`}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  className="size-full object-cover"
-                />
-              </button>
-              <button
-                type="button"
-                disabled={deletingPhotoId !== null}
-                onClick={() => void removePhoto(photo.id)}
-                className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/65 text-white opacity-90 transition hover:bg-destructive sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                title="删除餐照"
-                aria-label={`删除${meal.label}第 ${idx + 1} 张照片`}
-              >
-                <X className="size-3" aria-hidden />
-              </button>
+      {/* 横向圆角微缩相册条：仅在已有餐照、拖拽图片、上传中或出错时弹性展开 */}
+      <AnimatePresence initial={false}>
+        {showPhotoStrip && (
+          <motion.div
+            key="photo-strip"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={SOFT_SPRING}
+            className="overflow-hidden"
+          >
+            <div className="space-y-1.5 pt-0.5">
+              {dragging && meal.photos.length === 0 ? (
+                <div className="flex h-16 items-center justify-center gap-2 rounded-xl border border-dashed border-primary bg-secondary/50 text-xs font-medium text-primary">
+                  <ImagePlus className="size-4" aria-hidden />
+                  <span>松手即可上传到{meal.label}（还可添加 {remainingPhotos} 张）</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <AnimatePresence initial={false}>
+                    {meal.photos.map((photo, idx) => (
+                      <motion.div
+                        key={photo.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.88 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.85 }}
+                        transition={SOFT_SPRING}
+                        className="group relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border bg-background"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setViewerOpen(true)}
+                          className="size-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`查看${meal.label}第 ${idx + 1} 张照片`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.thumbUrl}
+                            alt={`${meal.label}照片 ${idx + 1}`}
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </button>
+                        <div className="absolute right-1 top-1">
+                          <InlineConfirmButton
+                            disabled={deletingPhotoId !== null}
+                            onConfirm={() => removePhoto(photo.id)}
+                            ariaLabel={`删除${meal.label}第 ${idx + 1} 张照片`}
+                            confirmText="删"
+                            icon={<X className="size-3" aria-hidden />}
+                            className="flex size-5 items-center justify-center rounded-full bg-black/65 p-0 text-white opacity-90 hover:bg-destructive hover:text-white sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                            confirmClassName="rounded-full px-1.5 py-0.5 text-[10px]"
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  {canAddPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed bg-background px-3 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                    >
+                      <span className="inline-flex items-center gap-1 font-medium">
+                        {uploading ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <ImagePlus className="size-3.5" aria-hidden />
+                        )}
+                        传餐照 ({meal.photos.length}/{MEAL_PHOTO_MAX})
+                      </span>
+                      <span className="text-[11px] opacity-75">点击或拖入</span>
+                    </button>
+                  )}
+
+                  {canAddPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex h-16 w-12 shrink-0 items-center justify-center rounded-xl border border-dashed bg-background text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:hidden"
+                      aria-label={`为${meal.label}拍照`}
+                    >
+                      <Camera className="size-4" aria-hidden />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {uploading && (
+                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground" aria-live="polite">
+                  <Loader2 className="size-3 animate-spin" aria-hidden />
+                  正在压缩并上传餐照…
+                </p>
+              )}
+
+              {photoError && (
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span role="alert" className="text-destructive">
+                    {photoError}
+                  </span>
+                  {failedPhotos.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={!canRecord || uploading}
+                        onClick={() => void uploadPhotoItems(failedPhotos)}
+                        className="font-medium text-primary underline underline-offset-2"
+                      >
+                        重试未上传的照片
+                      </button>
+                      <button
+                        type="button"
+                        disabled={uploading}
+                        onClick={() => {
+                          setFailedPhotos([]);
+                          setPhotoError("");
+                        }}
+                        className="text-muted-foreground underline underline-offset-2"
+                      >
+                        放弃
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
-
-          {canAddPhoto && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed bg-background px-3 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-            >
-              <span className="inline-flex items-center gap-1 font-medium">
-                {uploading ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                ) : (
-                  <ImagePlus className="size-3.5" aria-hidden />
-                )}
-                传餐照 ({meal.photos.length}/{MEAL_PHOTO_MAX})
-              </span>
-              <span className="text-[11px] opacity-75">点击或拖入图片</span>
-            </button>
-          )}
-
-          {canAddPhoto && (
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              className="flex h-16 w-12 shrink-0 items-center justify-center rounded-xl border border-dashed bg-background text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:hidden"
-              aria-label={`为${meal.label}拍照`}
-            >
-              <Camera className="size-4" aria-hidden />
-            </button>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={MEAL_PHOTO_ACCEPT}
-            multiple
-            disabled={!canAddPhoto}
-            className="sr-only"
-            tabIndex={-1}
-            aria-label={`${meal.label}照片文件`}
-            onChange={(e) => {
-              handleChooseFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            disabled={!canAddPhoto}
-            className="sr-only"
-            tabIndex={-1}
-            aria-label={`${meal.label}拍照文件`}
-            onChange={(e) => {
-              handleChooseFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </div>
-
-        {uploading && (
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground" aria-live="polite">
-            <Loader2 className="size-3 animate-spin" aria-hidden />
-            正在压缩并上传餐照…
-          </p>
+          </motion.div>
         )}
-
-        {photoError && (
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span role="alert" className="text-destructive">
-              {photoError}
-            </span>
-            {failedPhotos.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  disabled={!canRecord || uploading}
-                  onClick={() => void uploadPhotoItems(failedPhotos)}
-                  className="font-medium text-primary underline underline-offset-2"
-                >
-                  重试未上传的照片
-                </button>
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => {
-                    setFailedPhotos([]);
-                    setPhotoError("");
-                  }}
-                  className="text-muted-foreground underline underline-offset-2"
-                >
-                  放弃
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      </AnimatePresence>
 
       {/* 食物条目列表 */}
       <div className="space-y-2">
         {meal.entries.length === 0 ? (
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.99 }}
+            transition={TAP_SPRING}
             disabled={!canRecord}
             onClick={() => onPickMeal(meal.mealType)}
-            className="w-full rounded-xl border border-dashed py-4 text-center text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:pointer-events-none"
+            className="w-full rounded-xl border border-dashed px-3 py-2.5 text-center text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-background hover:text-foreground disabled:pointer-events-none"
           >
-            本餐暂无食物记录，点「+ 记食物」或从右侧「食物百宝箱」一键添加
-          </button>
+            点「+ 记食物」或从右侧食物百宝箱一键添加 · 图片可直接拖入本卡
+          </motion.button>
         ) : (
-          meal.entries.map((entry) => {
-            const baseGrams =
-              (entry.foodId ? foodServingMap.get(entry.foodId) : undefined) ?? 100;
-            const multipliers = [
-              { label: "0.5x", grams: Math.max(1, Math.round(baseGrams * 0.5)) },
-              { label: "1x", grams: Math.max(1, Math.round(baseGrams)) },
-              { label: "1.5x", grams: Math.max(1, Math.round(baseGrams * 1.5)) },
-            ];
-            const isEditing = editingId === entry.id;
-            const isBusy = busyEntryId === entry.id;
+          <AnimatePresence initial={false}>
+            {meal.entries.map((entry) => {
+              const baseGrams =
+                (entry.foodId ? foodServingMap.get(entry.foodId) : undefined) ?? 100;
+              const multipliers = [
+                { label: "0.5x", grams: baseGrams * 0.5 },
+                { label: "1x", grams: baseGrams },
+                { label: "1.5x", grams: baseGrams * 1.5 },
+              ];
+              const isEditing = editingId === entry.id;
+              const isBusy = busyEntryId === entry.id;
 
-            return (
-              <div
-                key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border bg-background p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-xs font-semibold">{entry.name}</span>
-                    <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-primary">
-                      {Math.round(entry.calories)} kcal
-                    </span>
-                  </div>
-
-                  <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
-                    {isEditing ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={5000}
-                          autoFocus
-                          aria-label={`${entry.name}克数`}
-                          value={editGrams}
-                          disabled={isBusy}
-                          onChange={(ev) => setEditGrams(ev.target.value)}
-                          onKeyDown={(ev) => {
-                            if (ev.key === "Enter") {
-                              ev.preventDefault();
-                              void updateEntryGrams(entry.id, Number(editGrams));
-                            } else if (ev.key === "Escape") {
-                              setEditingId(null);
-                            }
-                          }}
-                          className="h-6 w-20 bg-card px-1.5 py-0 text-xs font-mono"
-                        />
-                        <button
-                          type="button"
-                          disabled={isBusy || Number(editGrams) < 1 || Number(editGrams) > 5000}
-                          onClick={() => void updateEntryGrams(entry.id, Number(editGrams))}
-                          className="rounded bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground disabled:opacity-50"
-                        >
-                          确定
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => setEditingId(null)}
-                          className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
-                        >
-                          取消
-                        </button>
+              return (
+                <motion.div
+                  key={entry.id}
+                  layout
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{
+                    opacity: 0,
+                    scale: 0.96,
+                    height: 0,
+                    marginTop: 0,
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                  }}
+                  transition={SOFT_SPRING}
+                  className="flex flex-wrap items-center justify-between gap-2.5 overflow-hidden rounded-xl border bg-background p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-xs font-semibold">{entry.name}</span>
+                      <span className="shrink-0 font-mono text-xs font-bold tabular-nums text-primary">
+                        <NumberFlow value={Math.round(entry.calories)} /> kcal
                       </span>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={!canRecord || isBusy}
-                        onClick={() => {
-                          setEditingId(entry.id);
-                          setEditGrams(String(entry.grams));
-                        }}
-                        className="inline-flex items-center gap-1 rounded border bg-card px-1.5 py-0.5 font-semibold text-foreground transition-colors hover:border-primary disabled:opacity-50"
-                        title="点击直接输入精确克数 (1~5000g)"
-                      >
-                        <span>{entry.grams}g</span>
-                        <Pencil className="size-2.5" aria-hidden />
-                      </button>
-                    )}
+                    </div>
 
-                    <span>
-                      · P:{round1(entry.protein)}g C:{round1(entry.carbs)}g F:{round1(entry.fat)}g
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
+                      {isEditing ? (
+                        <form
+                          className="inline-flex items-center gap-1"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void updateEntryGrams(entry.id, Number(editGrams));
+                          }}
+                        >
+                          <Input
+                            type="number"
+                            min={1}
+                            max={5000}
+                            required
+                            step="any"
+                            autoFocus
+                            aria-label={`${entry.name}克数`}
+                            value={editGrams}
+                            disabled={isBusy}
+                            onChange={(ev) => setEditGrams(ev.target.value)}
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Escape") {
+                                setEditingId(null);
+                              }
+                            }}
+                            className="h-6 w-20 bg-card px-1.5 py-0 text-xs font-mono"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isBusy || !validGrams(Number(editGrams))}
+                            className="rounded bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            确定
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => setEditingId(null)}
+                            className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                          >
+                            取消
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!canRecord || isBusy}
+                          onClick={() => {
+                            setEditingId(entry.id);
+                            setEditGrams(String(entry.grams));
+                          }}
+                          className="inline-flex items-center gap-1 rounded border bg-card px-1.5 py-0.5 font-semibold text-foreground transition-colors hover:border-primary disabled:opacity-50"
+                          title="点击直接输入精确克数 (1~5000g)"
+                        >
+                          <span>{entry.grams}g</span>
+                          <Pencil className="size-2.5" aria-hidden />
+                        </button>
+                      )}
+
+                      <span>
+                        · P:{round1(entry.protein)}g C:{round1(entry.carbs)}g F:{round1(entry.fat)}g
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {/* 0.5x / 1x / 1.5x 倍率胶囊 + 删除 */}
-                <div className="flex shrink-0 items-center gap-1">
-                  {multipliers.map((btn) => {
-                    const active = entry.grams === btn.grams;
-                    return (
-                      <button
-                        key={btn.label}
-                        type="button"
-                        disabled={!canRecord || isBusy}
-                        onClick={() => void updateEntryGrams(entry.id, btn.grams)}
-                        title={`切换为 ${btn.grams}g`}
-                        className={`rounded-lg border px-2 py-1 font-mono text-xs transition-colors disabled:opacity-45 ${
-                          active
-                            ? "border-primary bg-primary font-bold text-primary-foreground"
-                            : "bg-card text-muted-foreground hover:border-primary hover:text-foreground"
-                        }`}
-                      >
-                        {btn.label}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    disabled={!canRecord || isBusy}
-                    onClick={() => void deleteEntry(entry)}
-                    className="ml-0.5 rounded p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-45"
-                    title="删除该条饮食记录"
-                    aria-label={`删除${entry.name}`}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                  </button>
-                </div>
-              </div>
-            );
-          })
+                  {/* 0.5x / 1x / 1.5x 倍率胶囊 + 行内二次确认删除 */}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {multipliers.map((btn) => {
+                      const active = entry.grams === btn.grams;
+                      return (
+                        <motion.button
+                          key={btn.label}
+                          type="button"
+                          whileTap={{ scale: 0.92 }}
+                          transition={TAP_SPRING}
+                          disabled={!canRecord || isBusy || !validGrams(btn.grams)}
+                          onClick={() => void updateEntryGrams(entry.id, btn.grams)}
+                          title={`切换为 ${btn.grams}g`}
+                          className={`relative rounded-lg border px-2 py-1 font-mono text-xs transition-colors disabled:opacity-45 ${
+                            active
+                              ? "border-primary font-bold text-primary-foreground"
+                              : "bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                          }`}
+                        >
+                          {active && (
+                            <motion.span
+                              layoutId={`meal-mult-${entry.id}`}
+                              transition={TAB_SPRING}
+                              className="absolute inset-0 rounded-[7px] bg-primary"
+                              aria-hidden
+                            />
+                          )}
+                          <span className="relative z-10">{btn.label}</span>
+                        </motion.button>
+                      );
+                    })}
+                    <InlineConfirmButton
+                      disabled={!canRecord || isBusy}
+                      onConfirm={() => deleteEntry(entry)}
+                      ariaLabel={`删除${entry.name}`}
+                      confirmText="确认删除"
+                      className="ml-0.5"
+                    />
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         )}
       </div>
 
@@ -538,16 +624,13 @@ function MealCard({
                     <span className="font-mono text-xs tabular-nums text-muted-foreground">
                       #{idx + 1} · {photo.width}×{photo.height}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-9 text-destructive hover:text-destructive"
+                    <InlineConfirmButton
                       disabled={deletingPhotoId !== null}
-                      onClick={() => void removePhoto(photo.id)}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden />
-                      删除
-                    </Button>
+                      onConfirm={() => removePhoto(photo.id)}
+                      ariaLabel={`删除${meal.label}第 ${idx + 1} 张照片`}
+                      confirmText="确认删除"
+                      className="px-2 py-1 text-destructive"
+                    />
                   </div>
                 </li>
               ))}
@@ -555,7 +638,7 @@ function MealCard({
           )}
         </DialogContent>
       </Dialog>
-    </section>
+    </motion.section>
   );
 }
 
@@ -582,22 +665,20 @@ export function EditorialMealsStream({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3 shadow-xs">
+    <div className="space-y-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3 shadow-[0_2px_12px_-8px_#233e2e26]">
         <div>
-          <h2 className="text-sm font-bold">四餐饮食手账 (早 / 午 / 晚 / 加餐)</h2>
+          <h2 className="text-sm font-bold">四餐饮食手账</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            点 <span className="font-mono text-foreground">0.5x/1x/1.5x</span> 秒切份量，或
-            <span className="font-medium text-foreground">点击克数</span>
-            精确输入；照片支持直接拖入卡片
+            点 <span className="font-mono text-primary">0.5x/1x/1.5x</span> 快切份量，或点克数精调；照片可拖入餐卡
           </p>
         </div>
-        <span className="rounded-lg border bg-background px-2 py-1 font-mono text-xs text-muted-foreground">
-          {canRecord ? "快照等比缩放" : "未来日期不可记录"}
+        <span className="rounded-lg border border-primary/15 bg-secondary/75 px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+          {canRecord ? "修改份量自动重算" : "未来日期不可记录"}
         </span>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         {byMeal.map((meal) => (
           <MealCard
             key={`${date}:${meal.mealType}`}

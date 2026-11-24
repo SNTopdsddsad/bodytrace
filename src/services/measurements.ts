@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { measurement, userProfile } from "@/db/schema";
 import { shiftDate, todayStr } from "@/lib/date";
 import { MEASUREMENT_KINDS } from "@/lib/measurements";
-import type { Measurement, MeasurementDashboard, MeasurementInput, MeasurementKind, MeasurementRange } from "@/lib/measurements";
+import type { BloodPressureHistory, MeasurementPeriod, Measurement, MeasurementDashboard, MeasurementInput, MeasurementKind, MeasurementRange } from "@/lib/measurements";
 
 type Row = typeof measurement.$inferSelect;
 const order = [desc(measurement.date), desc(measurement.time), desc(measurement.createdAt), desc(measurement.id)];
@@ -42,6 +42,18 @@ export async function getLatestMeasurement(userId: string, kind: MeasurementKind
 export async function getMeasurement(userId: string, id: string) {
   const [row] = await db.select().from(measurement).where(and(owned(userId), eq(measurement.id, id)));
   return row ? dto(row) : null;
+}
+
+/** 首页晨间和夜间各取最近两条，独立于趋势的时间范围。 */
+export async function getRecentBloodPressure(userId: string): Promise<BloodPressureHistory> {
+  const recent = async (period: MeasurementPeriod) => {
+    const rows = await db.select().from(measurement)
+      .where(and(owned(userId), eq(measurement.kind, "bloodPressure"), eq(measurement.period, period)))
+      .orderBy(...order).limit(2);
+    return rows.map(dto);
+  };
+  const [morning, evening] = await Promise.all([recent("morning"), recent("evening")]);
+  return { morning, evening };
 }
 
 export async function getMeasurementDashboard(userId: string, range: MeasurementRange): Promise<MeasurementDashboard> {

@@ -1,0 +1,1 @@
+ALTER TABLE `bodytrace_meal_entry` ADD `nutrition_basis` json;

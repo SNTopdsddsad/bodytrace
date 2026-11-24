@@ -16,14 +16,14 @@ export function addMacro(a: MacroLike, b: MacroLike): MacroLike {
 
 export const ZERO_MACRO: MacroLike = { calories: 0, protein: 0, carbs: 0, fat: 0 };
 
-/** 每 100g 值 × 克数 → 实际摄入。 */
-export function scaleMacro(per100g: MacroLike, grams: number): MacroLike {
-  const k = grams / 100;
+/** 按营养基准的克数折算摄入，食物库基准为每 100g。 */
+export function scaleMacro(basis: MacroLike, grams: number, basisGrams = 100): MacroLike {
+  const k = grams / basisGrams;
   return {
-    calories: round1(per100g.calories * k),
-    protein: round1(per100g.protein * k),
-    carbs: round1(per100g.carbs * k),
-    fat: round1(per100g.fat * k),
+    calories: round1(basis.calories * k),
+    protein: round1(basis.protein * k),
+    carbs: round1(basis.carbs * k),
+    fat: round1(basis.fat * k),
   };
 }
 

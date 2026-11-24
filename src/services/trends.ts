@@ -12,6 +12,7 @@ export type TrendPoint = {
   protein: number;
   carbs: number;
   fat: number;
+  hasMealEntries: boolean;
   /** 每日热量目标 */
   goalCalories: number;
 };
@@ -33,6 +34,7 @@ export async function getTrends(userId: string, days = 30): Promise<TrendPoint[]
     const t = byDate.get(d);
     result.push({
       date: d,
+      hasMealEntries: byDate.has(d),
       calories: t?.calories ?? 0,
       protein: t?.protein ?? 0,
       carbs: t?.carbs ?? 0,

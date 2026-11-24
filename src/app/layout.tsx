@@ -4,7 +4,9 @@
  */
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/app/theme-provider";
 import "./globals.css";
+import "./theme.css";
 
 export const metadata: Metadata = {
   title: "BodyTrace · 饮食与健身记录",
@@ -13,11 +15,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="zh-CN" className="h-full antialiased">
+    <html lang="zh-CN" suppressHydrationWarning className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        {children}
-        {/* sonner 的 Toaster：页面里调用 toast() 时，提示气泡从这里弹出来 */}
-        <Toaster richColors position="top-center" />
+        <ThemeProvider>
+          {children}
+          {/* sonner 的 Toaster：页面里调用 toast() 时，提示气泡从这里弹出来 */}
+          <Toaster richColors position="top-center" />
+        </ThemeProvider>
       </body>
     </html>
   );

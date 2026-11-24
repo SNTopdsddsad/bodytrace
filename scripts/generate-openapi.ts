@@ -572,7 +572,7 @@ registry.registerPath({
   operationId: "updateMealEntry",
   tags: ["饮食记录"],
   summary: "修改克数",
-  description: "营养值按新旧克数比例重算；食物已删除的记录仍可操作。",
+  description: "营养值从记录的固定基准按克数折算。支持小数克数及原食物已删除的记录。",
   request: {
     params: z.object({ id: uuid }),
     body: { required: true, content: { "application/json": { schema: mealPatchSchema } } },
@@ -728,6 +728,7 @@ registry.registerPath({
                 protein: z.number(),
                 carbs: z.number(),
                 fat: z.number(),
+                hasMealEntries: z.boolean().describe("当天是否至少有一条饮食记录，包含零热量食物"),
                 goalCalories: z.number().describe("每日热量目标"),
               }),
             ),

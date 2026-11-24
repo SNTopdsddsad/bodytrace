@@ -1,0 +1,86 @@
+/* Warm Bento Editorial：奶油米白画布 + 纯白浮卡 + 森林松绿主色
+ * 拆分为纯 CSS 主题令牌文件（不含 Tailwind 指令），避免开发模式下
+ * @tailwindcss/turbopack 增量缓存导致主题变量修改不热更新。
+ */
+
+:root {
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --background: #f6f7f2;
+  --foreground: #25382d;
+  --card: #ffffff;
+  --card-foreground: #25382d;
+  --popover: #ffffff;
+  --popover-foreground: #25382d;
+  --primary: #315b43;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf0e5;
+  --secondary-foreground: #315b43;
+  --muted: #f0f2ec;
+  --muted-foreground: #626e61;
+  --accent: #eaf0e5;
+  --accent-foreground: #315b43;
+  --destructive: #c24b3f;
+  --border: #e4e8dc;
+  --input: #d7dfd1;
+  --ring: #5a7f5c;
+  --chart-1: #4f7b58;
+  --chart-2: #4f869c;
+  --chart-3: #d19a47;
+  --chart-4: #c27866;
+  --chart-5: #8a78a4;
+  /* 品牌反白面板（auth 侧栏、能量卡）的固定配色，不随明暗主题切换 */
+  --brand-deep: #315b43;
+  --brand-light: #c2dc9b;
+  --brand-pale: #d2e6bf;
+  --brand-cream: #eaf0e5;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #25382d;
+  --sidebar-primary: #315b43;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf0e5;
+  --sidebar-accent-foreground: #315b43;
+  --sidebar-border: #e4e8dc;
+  --sidebar-ring: #5a7f5c;
+}
+
+.dark {
+  --background: #18211c;
+  --foreground: #eef2e9;
+  --card: #202c24;
+  --card-foreground: #eef2e9;
+  --popover: #202c24;
+  --popover-foreground: #eef2e9;
+  --primary: #b0cc9a;
+  --primary-foreground: #1c3022;
+  --secondary: #2a3a2d;
+  --secondary-foreground: #c8ddba;
+  --muted: #29342c;
+  --muted-foreground: #a3b09f;
+  --accent: #304434;
+  --accent-foreground: #eef2e9;
+  --destructive: #ef998c;
+  --border: #344037;
+  --input: #405145;
+  --ring: #b0cc9a;
+  --chart-1: #a4c58a;
+  --chart-2: #83b4c8;
+  --chart-3: #daba80;
+  --chart-4: #d69c8b;
+  --chart-5: #b4a2ce;
+  --sidebar: #202c24;
+  --sidebar-foreground: #eef2e9;
+  --sidebar-primary: #b0cc9a;
+  --sidebar-primary-foreground: #1c3022;
+  --sidebar-accent: #304434;
+  --sidebar-accent-foreground: #eef2e9;
+  --sidebar-border: #344037;
+  --sidebar-ring: #b0cc9a;
+}
+
+::selection {
+  background: #d8e6cd;
+  color: #25382d;
+}

@@ -4,6 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 颜色与语义变量定义在同目录 theme.css（在 layout.tsx 中紧随本文件引入） */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -48,88 +49,10 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --background: #ffffff;
-  --foreground: #111111;
-  --card: #ffffff;
-  --card-foreground: #111111;
-  --popover: #ffffff;
-  --popover-foreground: #111111;
-  --primary: #111111;
-  --primary-foreground: #ffffff;
-  --secondary: #f5f5f5;
-  --secondary-foreground: #111111;
-  --muted: #f5f5f5;
-  --muted-foreground: #6f6f6f;
-  --accent: #f5f5f5;
-  --accent-foreground: #111111;
-  --destructive: #dc2626;
-  --border: #e8e8e8;
-  --input: #d4d4d4;
-  --ring: #111111;
-  --chart-1: #171717;
-  --chart-2: #404040;
-  --chart-3: #737373;
-  --chart-4: #a3a3a3;
-  --chart-5: #d4d4d4;
-  /* 品牌对比面板（auth 侧栏、今日能量卡）的固定配色，不随明暗主题切换 */
-  --brand-deep: #111111;
-  --brand-light: #e5e5e5;
-  --brand-pale: #a3a3a3;
-  --brand-cream: #ffffff;
-  --radius: 0.75rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #111111;
-  --sidebar-primary: #111111;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5f5f5;
-  --sidebar-accent-foreground: #111111;
-  --sidebar-border: #e8e8e8;
-  --sidebar-ring: #111111;
-}
-
-.dark {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
-  --card: #141414;
-  --card-foreground: #fafafa;
-  --popover: #141414;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #0a0a0a;
-  --secondary: #262626;
-  --secondary-foreground: #e5e5e5;
-  --muted: #262626;
-  --muted-foreground: #a3a3a3;
-  --accent: #1f1f1f;
-  --accent-foreground: #fafafa;
-  --destructive: #f87171;
-  --border: #262626;
-  --input: #404040;
-  --ring: #d4d4d4;
-  --chart-1: #fafafa;
-  --chart-2: #d4d4d4;
-  --chart-3: #a3a3a3;
-  --chart-4: #737373;
-  --chart-5: #525252;
-  --sidebar: #141414;
-  --sidebar-foreground: #fafafa;
-  --sidebar-primary: #fafafa;
-  --sidebar-primary-foreground: #0a0a0a;
-  --sidebar-accent: #1f1f1f;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #262626;
-  --sidebar-ring: #d4d4d4;
-}
-
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { @apply font-sans; }
   body { @apply bg-background text-foreground; }
-  ::selection { background: #111111; color: #ffffff; }
   button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
 }
 

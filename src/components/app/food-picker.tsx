@@ -19,21 +19,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { findReferenceCopy, referenceFoodValues, useReferenceFoodSearch, type ReferenceFood } from "@/lib/reference-food-client";
 import { api, ApiError } from "@/lib/api-client";
 import type { MealType } from "@/lib/nutrition";
-
-/** 参考库条目（《中国食物成分表》公共只读数据） */
-type ReferenceFood = {
-  id: number;
-  foodCode: string;
-  name: string;
-  englishName: string | null;
-  category: string | null;
-  calories: number | null;
-  protein: number | null;
-  carbs: number | null;
-  fat: number | null;
-};
 
 type Props = {
   date: string;
@@ -54,7 +42,7 @@ function FoodRow({ food, onPick }: { food: Food; onPick: (f: Food) => void }) {
       <div>
         <div className="flex items-center gap-1.5 font-medium">
           {food.isFavorite && (
-            <Star className="size-3.5 fill-foreground text-foreground" aria-hidden />
+            <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
           )}
           {food.name}
         </div>
@@ -99,8 +87,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
 
   // 参考库（《中国食物成分表》）的搜索状态
   const [refQ, setRefQ] = useState("");
-  const [refResults, setRefResults] = useState<ReferenceFood[]>([]);
-  const [refSearching, setRefSearching] = useState(false);
+  const { foods: visibleRefResults, searching: refSearching, error: searchError, retry: retrySearch } = useReferenceFoodSearch(refQ);
   const [importing, setImporting] = useState(false);
 
   /** 弹窗每次打开时拉取“最近吃过”和“收藏” */
@@ -145,7 +132,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
     if (uncertainRef.current) router.refresh();
   }
 
-  /** 从参考库选中：库里已有同名食物就直接复用，否则抄录一条新的 */
+  /** 从参考库选中：复用同来源、同营养的副本，否则抄录一条新的 */
   async function pickReference(r: ReferenceFood) {
     setImporting(true);
     try {
@@ -153,7 +140,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
         `/api/v1/foods?q=${encodeURIComponent(r.name)}`,
       );
       if (!active.current) return;
-      const existing = foods.find((f) => f.name === r.name);
+      const existing = findReferenceCopy(foods, r);
       if (existing) {
         toast.success(`「${r.name}」已在你的食物库，直接选用`);
         pick(existing);
@@ -162,15 +149,7 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
 
       const { food } = await api<{ food: Food }>("/api/v1/foods", {
         method: "POST",
-        body: JSON.stringify({
-          name: r.name,
-          brand: null,
-          calories: r.calories ?? 0,
-          protein: r.protein ?? 0,
-          carbs: r.carbs ?? 0,
-          fat: r.fat ?? 0,
-          servingGrams: null,
-        }),
+        body: JSON.stringify(referenceFoodValues(r)),
       });
       if (!active.current) return;
       toast.success(`「${r.name}」已加入你的食物库`);
@@ -181,25 +160,6 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
       if (active.current) setImporting(false);
     }
   }
-
-  /** 参考库搜索，同样 300ms 防抖 */
-  const refTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => {
-    if (refQ.trim() === "") return;
-    clearTimeout(refTimer.current);
-    refTimer.current = setTimeout(async () => {
-      setRefSearching(true);
-      try {
-        const d = await api<{ foods: ReferenceFood[] }>(
-          `/api/v1/foods/reference?q=${encodeURIComponent(refQ.trim())}`,
-        );
-        if (active.current) setRefResults(d.foods);
-      } finally {
-        if (active.current) setRefSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(refTimer.current);
-  }, [refQ]);
 
   async function handleSave() {
     if (!active.current || !picked || savingRef.current || uncertainRef.current) return;
@@ -232,7 +192,6 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
 
   // 搜索词清空时列表立即视为空：渲染期派生，代替在 effect 里清状态
   const visibleResults = q.trim() === "" ? [] : results;
-  const visibleRefResults = refQ.trim() === "" ? [] : refResults;
 
   // 第二步的实时预览：每100g值 × 克数/100
   const preview = picked
@@ -326,10 +285,13 @@ function FoodPickerForm({ date, mealType, mealLabel, open, onOpenChange }: Props
                 value={refQ}
                 onChange={(e) => setRefQ(e.target.value)}
               />
+              {searchError && (
+                <p role="alert" className="text-xs text-destructive">{searchError} <button type="button" onClick={retrySearch} className="underline">重试</button></p>
+              )}
               {refSearching && (
                 <p className="py-4 text-center text-sm text-muted-foreground">搜索中…</p>
               )}
-              {!refSearching && refQ.trim() !== "" && refResults.length === 0 && (
+              {!refSearching && !searchError && refQ.trim() !== "" && visibleRefResults.length === 0 && (
                 <p className="py-6 text-center text-sm text-muted-foreground">参考库里也没有</p>
               )}
               {visibleRefResults.map((r) => (

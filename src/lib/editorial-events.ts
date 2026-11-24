@@ -40,8 +40,8 @@ export function buildWeekStripDays(selectedDate: string, today: string): {
   showsToday: boolean;
 } {
   const clamped = selectedDate > today ? today : selectedDate;
-  const minWindowEnd = shiftDate(clamped, 1);
-  const windowEnd = minWindowEnd > today ? today : minWindowEnd < shiftDate(today, -3) ? shiftDate(clamped, 3) > today ? today : shiftDate(clamped, 3) : today;
+  const lastDay = shiftDate(clamped, 3);
+  const windowEnd = lastDay > today ? today : lastDay;
 
   const days: WeekStripDay[] = [];
   for (let offset = -3; offset <= 0; offset++) {

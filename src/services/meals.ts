@@ -4,7 +4,7 @@
  * “服务层”是专门放业务逻辑的地方：页面（展示）和 API（给 app 调）都调用
  * 这里的函数，保证两边行为完全一致，规则只写一遍。
  */
-import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { food, mealEntry } from "@/db/schema";
@@ -15,6 +15,12 @@ import type { MealEntry } from "@/db/schema";
 import type { MealPhotoDto } from "@/lib/meal-photo";
 import { getPhotosForDay } from "./meal-photos";
 import { mealSlotSchema } from "./meal-slot";
+
+const { nutritionBasis, ...entryColumns } = getTableColumns(mealEntry);
+
+function snapshot({ calories, protein, carbs, fat }: MacroLike, grams: number) {
+  return { calories, protein, carbs, fat, grams };
+}
 
 /** API 入参校验：zod 会先验证数据形状，不合法直接报错，脏数据进不了数据库。 */
 export const mealCreateSchema = mealSlotSchema.extend({
@@ -49,6 +55,7 @@ export async function addEntry(
         foodId: f.id,
         name: f.name,
         grams: input.grams,
+        nutritionBasis: snapshot(f, 100),
         // 存写入时刻的快照：以后食物库改了/删了，历史记录不变
         calories: macro.calories,
         protein: macro.protein,
@@ -56,13 +63,13 @@ export async function addEntry(
         fat: macro.fat,
       })
       .$returningId();
-    const [row] = await tx.select().from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+    const [row] = await tx.select(entryColumns).from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
     return row;
   });
   return row ?? null;
 }
 
-/** 修改某条记录的克数：营养值按新旧克数比例缩放（对已删食物的记录同样有效）。 */
+/** 修改某条记录的克数：营养值从固定基准折算（对已删食物的记录同样有效）。 */
 export async function updateEntryGrams(
   userId: string,
   id: string,
@@ -70,24 +77,23 @@ export async function updateEntryGrams(
 ): Promise<MealEntry | null> {
   const row = await db.transaction(async (tx) => {
     const [entry] = await tx
-      .select()
+      .select({ ...entryColumns, nutritionBasis })
       .from(mealEntry)
       .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)))
       .for("update");
     if (!entry) return null;
 
-    const k = grams / entry.grams;
+    // 旧记录首次修改时固定已有的克数和营养值，食物可能早已变更或删除。
+    const basis = entry.nutritionBasis ?? snapshot(entry, entry.grams);
     await tx
       .update(mealEntry)
       .set({
         grams,
-        calories: round1(entry.calories * k),
-        protein: round1(entry.protein * k),
-        carbs: round1(entry.carbs * k),
-        fat: round1(entry.fat * k),
+        nutritionBasis: basis,
+        ...scaleMacro(basis, grams, basis.grams),
       })
       .where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
-    const [row] = await tx.select().from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
+    const [row] = await tx.select(entryColumns).from(mealEntry).where(and(eq(mealEntry.id, id), eq(mealEntry.userId, userId)));
     return row ?? null;
   });
   return row;
@@ -105,7 +111,7 @@ export async function getDayEntries(
   date: string,
 ): Promise<MealEntry[]> {
   const entries = await db
-    .select()
+    .select(entryColumns)
     .from(mealEntry)
     .where(and(eq(mealEntry.userId, userId), eq(mealEntry.date, date)))
     .orderBy(asc(mealEntry.createdAt));

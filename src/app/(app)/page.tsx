@@ -2,12 +2,31 @@ import { redirect } from "next/navigation";
 import { EditorialJournal } from "@/components/app/editorial-journal";
 import { getSession } from "@/lib/api-auth";
 import { isValidDateStr, todayStr } from "@/lib/date";
+import type { MealType } from "@/lib/nutrition";
 import { listFoods, listRecentFoods } from "@/services/foods";
 import { getDaySummary } from "@/services/meals";
-import { getMeasurementDashboard } from "@/services/measurements";
+import { getMeasurementDashboard, getRecentBloodPressure } from "@/services/measurements";
 import { getProfile } from "@/services/profile";
 import { getRecordCounts } from "@/services/records";
 import { getTrends } from "@/services/trends";
+
+function inferDefaultMeal(): MealType {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: process.env.APP_TIMEZONE ?? "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 12);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const mins = hour * 60 + minute;
+
+  if (mins < 10 * 60 + 30) return "breakfast";
+  if (mins < 14 * 60 + 30) return "lunch";
+  if (mins < 17 * 60) return "snack";
+  if (mins < 21 * 60) return "dinner";
+  return "snack";
+}
 
 export default async function HomePage({
   searchParams,
@@ -37,6 +56,7 @@ export default async function HomePage({
     recentFoods,
     myFoods,
     measurementData,
+    recentBloodPressure,
     trends,
     profile,
     recordCounts,
@@ -45,6 +65,7 @@ export default async function HomePage({
     listRecentFoods(userId, 12),
     listFoods(userId),
     getMeasurementDashboard(userId, "30"),
+    getRecentBloodPressure(userId),
     getTrends(userId, 30),
     getProfile(userId),
     getRecordCounts(userId),
@@ -52,13 +73,14 @@ export default async function HomePage({
 
   return (
     <EditorialJournal
-      key={`${date}:${initialModal ?? ""}`}
+      key={initialModal ?? "journal"}
       date={date}
       today={today}
+      defaultMeal={inferDefaultMeal()}
       daySummary={daySummary}
       recentFoods={recentFoods}
       myFoods={myFoods}
-      measurementData={measurementData}
+      measurementData={{ ...measurementData, recentBloodPressure }}
       trends={trends}
       profile={profile}
       recordCounts={recordCounts}

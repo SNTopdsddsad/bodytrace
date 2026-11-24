@@ -3,8 +3,12 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronDown, ChevronUp, LoaderCircle, Pencil, Plus, Scale, Trash2 } from "lucide-react";
+import NumberFlow from "@number-flow/react";
+import { ArrowRight, ChevronDown, LoaderCircle, Pencil, Plus, Scale } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
+import { InlineConfirmButton } from "./inline-confirm-button";
+import { SOFT_SPRING, TAP_SPRING } from "./motion-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,9 +32,12 @@ import {
   measurementValue,
   type Measurement,
   type MeasurementDashboard,
+  type MeasurementInput,
+  type BloodPressureHistory,
   type MeasurementKind,
   type MeasurementPeriod,
 } from "@/lib/measurements";
+import { buildWeightTrendSvg } from "@/lib/weight-trend";
 import { withRequestTimeout } from "@/lib/request-timeout";
 
 function currentTimeInTz(timeZone: string): string {
@@ -53,39 +60,12 @@ function defaultPeriodInTz(timeZone: string): MeasurementPeriod {
   return hour < 12 ? "morning" : "evening";
 }
 
-function buildWeightSparkline(entries: Measurement[]) {
-  const weights = entries
-    .filter((m) => m.kind === "weight" && m.value != null)
-    .slice(0, 7)
-    .reverse();
-
-  if (weights.length < 2) return null;
-
-  const vals = weights.map((w) => Number(w.value));
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
-  const span = max - min || 1;
-
-  const points = vals.map((v, idx) => {
-    const x = 8 + (idx / (vals.length - 1)) * 184;
-    const y = 30 - ((v - min) / span) * 22;
-    return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)), v };
-  });
-
-  return {
-    first: vals[0],
-    last: vals[vals.length - 1],
-    polyline: points.map((p) => `${p.x},${p.y}`).join(" "),
-    lastPoint: points[points.length - 1],
-  };
-}
-
 export function EditorialMeasurementsCard({
   data,
   selectedDate,
   onOpenSettings,
 }: {
-  data: MeasurementDashboard;
+  data: MeasurementDashboard & { recentBloodPressure: BloodPressureHistory };
   selectedDate: string;
   onOpenSettings: () => void;
 }) {
@@ -93,7 +73,8 @@ export function EditorialMeasurementsCard({
   const effectiveDate = selectedDate <= data.today ? selectedDate : data.today;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [quickFormOpen, setQuickFormOpen] = useState(false);
+  const [draftDate, setDraftDate] = useState<string | null>(null);
+  const quickFormOpen = draftDate !== null;
   const [bpPeriod, setBpPeriod] = useState<MeasurementPeriod>(() =>
     data.latest.bloodPressure?.period ?? defaultPeriodInTz(data.timeZone),
   );
@@ -105,11 +86,12 @@ export function EditorialMeasurementsCard({
   const [newSystolic, setNewSystolic] = useState("");
   const [newDiastolic, setNewDiastolic] = useState("");
   const [formError, setFormError] = useState("");
-  const [uncertain, setUncertain] = useState(false);
-  const requestIdRef = useRef<string>("");
-
-  // 快捷微调体重状态
-  const quickReqRef = useRef<{ id: string; value: string } | null>(null);
+  // 结果未知时保留实际发出的整份请求，包含首次录入的日期和时间。
+  const [pendingCreate, setPendingCreate] = useState<{
+    body: { requestId: string; measurement: MeasurementInput };
+    fromForm: boolean;
+  } | null>(null);
+  const uncertain = pendingCreate !== null;
 
   // 编辑 / 删除已有记录（乐观锁 version）
   const [editing, setEditing] = useState<Measurement | null>(null);
@@ -145,95 +127,84 @@ export function EditorialMeasurementsCard({
       : null;
 
   // 按所选时段（晨间/夜间）查找最新血压及同时段上一次血压
-  const periodBpEntries = data.entries.filter(
-    (m) => m.kind === "bloodPressure" && m.period === bpPeriod,
-  );
-  const periodLatestBp = periodBpEntries[0] ?? null;
-  const periodPrevBp = periodBpEntries[1] ?? null;
+  const [periodLatestBp, periodPrevBp] = data.recentBloodPressure[bpPeriod];
 
-  const sparkline = buildWeightSparkline(data.entries);
+  const sparkline = buildWeightTrendSvg(data.entries.filter(entry => entry.kind === "weight").slice(0, 7), null, 200, 36);
   const recentSeven = data.entries.slice(0, 7);
 
-  async function submitCreate(payloadRaw: unknown, activeRequestId: string, onSuccess?: () => void) {
+  async function sendCreate(request: { requestId: string; measurement: MeasurementInput }, fromForm: boolean) {
     if (busyRef.current) return;
-    const parsed = measurementSchemas(data.today).payload.safeParse(payloadRaw);
-    if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "请核对输入格式");
-      return;
-    }
-
     busyRef.current = true;
     setBusy(true);
     setFormError("");
     try {
       await withRequestTimeout((signal) =>
-        api<{ entry: Measurement }>("/api/v1/measurements", {
-          method: "POST",
-          signal,
-          body: JSON.stringify({ requestId: activeRequestId, measurement: parsed.data }),
+        api("/api/v1/measurements", {
+          method: "POST", signal, body: JSON.stringify(request),
         }),
       );
-      requestIdRef.current = "";
-      quickReqRef.current = null;
-      setUncertain(false);
+      setPendingCreate(null);
+      if (fromForm) {
+        setDraftDate(null);
+        setNewValue("");
+        setNewSystolic("");
+        setNewDiastolic("");
+      }
       toast.success("身体指标已保存");
-      onSuccess?.();
       router.refresh();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        requestIdRef.current = "";
-        quickReqRef.current = null;
-        setUncertain(false);
-        toast.error(err.message);
-        router.refresh();
-        return;
-      }
-      const isUnknown = !(err instanceof ApiError) || err.status >= 500;
-      setUncertain(isUnknown);
-      const msg = err instanceof Error ? err.message : "保存未完成，请核对后重试";
-      setFormError(msg);
-      toast.error(msg);
+      const unknown = !(err instanceof ApiError) || err.status >= 500;
+      setPendingCreate(unknown ? { body: request, fromForm } : null);
+      const message = err instanceof Error ? err.message : "保存未完成";
+      setFormError(message);
+      toast.error(message);
+      if (err instanceof ApiError && err.status === 409) router.refresh();
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   }
 
-  async function handleQuickWeight(delta: number) {
-    if (currentWeightNum == null || busyRef.current) return;
-    const nextVal = Math.max(0.01, Math.min(500, currentWeightNum + delta)).toFixed(2);
-    if (!quickReqRef.current || quickReqRef.current.value !== nextVal) {
-      quickReqRef.current = { id: crypto.randomUUID(), value: nextVal };
+  async function submitCreate(input: unknown, fromForm: boolean) {
+    if (busyRef.current || pendingCreate) return;
+    const parsed = measurementSchemas(data.today).payload.safeParse(input);
+    if (!parsed.success) {
+      setFormError(parsed.error.issues[0]?.message ?? "请核对输入格式");
+      return;
     }
-    await submitCreate(
-      {
-        kind: "weight",
-        date: effectiveDate,
-        time: currentTimeInTz(data.timeZone),
-        value: nextVal,
-        note: null,
-      },
-      quickReqRef.current.id,
-    );
+    await sendCreate({ requestId: crypto.randomUUID(), measurement: parsed.data }, fromForm);
+  }
+
+  async function handleQuickWeight(delta: number) {
+    if (currentWeightNum == null) return;
+    await submitCreate({
+      kind: "weight",
+      date: effectiveDate,
+      time: currentTimeInTz(data.timeZone),
+      value: Math.max(0.01, Math.min(500, currentWeightNum + delta)).toFixed(2),
+      note: null,
+    }, false);
   }
 
   function toggleQuickForm() {
     if (!quickFormOpen) {
-      if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
       setFormError("");
       setNewValue(currentWeightNum != null && newKind === "weight" ? currentWeightNum.toFixed(2) : "");
+      setNewSystolic("");
+      setNewDiastolic("");
+      setNewPeriod(defaultPeriodInTz(data.timeZone));
     }
-    setQuickFormOpen((v) => !v);
+    setDraftDate(quickFormOpen ? null : effectiveDate);
   }
 
   async function handleInlineSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
+    if (uncertain || !draftDate) return;
     const payload =
       newKind === "bloodPressure"
         ? {
             kind: "bloodPressure",
-            date: effectiveDate,
+            date: draftDate,
             time: currentTimeInTz(data.timeZone),
             period: newPeriod,
             systolic: Number(newSystolic),
@@ -242,18 +213,13 @@ export function EditorialMeasurementsCard({
           }
         : {
             kind: newKind,
-            date: effectiveDate,
+            date: draftDate,
             time: currentTimeInTz(data.timeZone),
             value: newValue.trim(),
             note: null,
           };
 
-    await submitCreate(payload, requestIdRef.current, () => {
-      setQuickFormOpen(false);
-      setNewValue("");
-      setNewSystolic("");
-      setNewDiastolic("");
-    });
+    await submitCreate(payload, true);
   }
 
   function startEdit(entry: Measurement) {
@@ -326,13 +292,6 @@ export function EditorialMeasurementsCard({
 
   async function deleteEntry(entry: Measurement) {
     if (busyRef.current) return;
-    if (
-      !window.confirm(
-        `确定删除「${MEASUREMENT_LABELS[entry.kind]} ${measurementValue(entry)} ${measurementUnit(entry.kind)} (${entry.date})」吗？`,
-      )
-    ) {
-      return;
-    }
 
     busyRef.current = true;
     setBusy(true);
@@ -362,20 +321,20 @@ export function EditorialMeasurementsCard({
   return (
     <section
       aria-labelledby="editorial-measurements-title"
-      className="space-y-3.5 rounded-2xl border bg-card p-5 shadow-xs"
+      className="space-y-3.5 rounded-2xl border bg-card p-5 shadow-[0_2px_12px_-8px_#233e2e26]"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 id="editorial-measurements-title" className="flex items-center gap-1.5 text-sm font-bold">
-            <Scale className="size-4" aria-hidden />
+            <Scale className="size-4 text-primary" aria-hidden />
             <span>身体指标追踪</span>
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            最新 vs 上次 · 乐观锁 version
+            持续记录体重、体脂与血压
           </p>
         </div>
         {latestWeight && (
-          <span className="rounded-full border bg-background px-2 py-0.5 font-mono text-xs text-foreground">
+          <span className="rounded-full border border-primary/15 bg-secondary px-2 py-0.5 font-mono text-xs font-medium text-secondary-foreground">
             {weightDiffText ?? "首次记录"}
           </span>
         )}
@@ -389,7 +348,14 @@ export function EditorialMeasurementsCard({
               {latestWeight ? "最新测量体重" : data.legacyWeightKg != null ? "旧资料参考体重" : "最新体重"}
             </div>
             <div className="mt-0.5 font-mono text-2xl font-bold tabular-nums">
-              {currentWeightNum != null ? currentWeightNum.toFixed(2) : "—"}
+              {currentWeightNum != null ? (
+                <NumberFlow
+                  value={currentWeightNum}
+                  format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }}
+                />
+              ) : (
+                "—"
+              )}
               {currentWeightNum != null && (
                 <span className="ml-1 text-xs font-normal text-muted-foreground">kg</span>
               )}
@@ -430,41 +396,66 @@ export function EditorialMeasurementsCard({
       {/* 快捷记录按钮组 */}
       <div className="space-y-2">
         <div className="flex items-center gap-1.5 text-xs">
-          <button
+          <motion.button
             type="button"
-            disabled={busy || currentWeightNum == null}
+            whileTap={{ scale: 0.94 }}
+            transition={TAP_SPRING}
+            disabled={busy || uncertain || currentWeightNum == null}
             onClick={() => handleQuickWeight(-0.15)}
             className="flex-1 rounded-lg border bg-background py-1.5 font-mono transition-colors hover:border-primary disabled:opacity-45"
             title={currentWeightNum == null ? "请先记录一次体重" : "基于当前体重 -0.15 kg 快速记录"}
           >
             -0.15 kg
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
-            disabled={busy || currentWeightNum == null}
+            whileTap={{ scale: 0.94 }}
+            transition={TAP_SPRING}
+            disabled={busy || uncertain || currentWeightNum == null}
             onClick={() => handleQuickWeight(0.15)}
             className="flex-1 rounded-lg border bg-background py-1.5 font-mono transition-colors hover:border-primary disabled:opacity-45"
             title={currentWeightNum == null ? "请先记录一次体重" : "基于当前体重 +0.15 kg 快速记录"}
           >
             +0.15 kg
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={TAP_SPRING}
+            disabled={busy || uncertain}
             onClick={toggleQuickForm}
             aria-expanded={quickFormOpen}
             className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             <Plus className="size-3.5" aria-hidden />
             记指标
-          </button>
+          </motion.button>
         </div>
 
+        {pendingCreate && (
+          <div role="alert" className="space-y-1 rounded-xl border p-2 text-xs">
+            <p>{pendingCreate.body.measurement.date} 的{MEASUREMENT_LABELS[pendingCreate.body.measurement.kind]}保存结果待确认。</p>
+            <Button type="button" size="sm" disabled={busy} onClick={() => void sendCreate(pendingCreate.body, pendingCreate.fromForm)}>
+              核对并重试原记录
+            </Button>
+          </div>
+        )}
+
         {/* 展开式新增测量小表单 */}
+        <AnimatePresence initial={false}>
         {quickFormOpen && (
-          <form
+          <motion.form
+            key="quick-measure-form"
+            initial={{ opacity: 0, height: 0, y: -6 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -6 }}
+            transition={SOFT_SPRING}
             onSubmit={handleInlineSubmit}
-            className="space-y-2.5 rounded-xl border bg-background p-3 text-xs"
+            className="overflow-hidden"
           >
+          <div className="space-y-2.5 rounded-xl border bg-background p-3 text-xs">
+            <p className="font-medium">记录日期 {draftDate}</p>
             <div className="flex items-center justify-between gap-2">
               <label className="sr-only" htmlFor="quick-m-kind">
                 指标类型
@@ -477,8 +468,6 @@ export function EditorialMeasurementsCard({
                   const next = e.target.value as MeasurementKind;
                   setNewKind(next);
                   setFormError("");
-                  requestIdRef.current = crypto.randomUUID();
-                  setUncertain(false);
                 }}
                 className="flex-1 rounded-lg border bg-card px-2 py-1.5 font-medium"
               >
@@ -551,7 +540,7 @@ export function EditorialMeasurementsCard({
             ) : (
               <div>
                 <Label htmlFor="quick-m-val" className="text-[11px] text-muted-foreground">
-                  {MEASUREMENT_LABELS[newKind]} ({measurementUnit(newKind)}) · 记录日期 {effectiveDate}
+                  {MEASUREMENT_LABELS[newKind]} ({measurementUnit(newKind)})
                 </Label>
                 <Input
                   id="quick-m-val"
@@ -581,22 +570,23 @@ export function EditorialMeasurementsCard({
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs"
-                disabled={busy}
+                disabled={busy || uncertain}
                 onClick={() => {
-                  setQuickFormOpen(false);
+                  setDraftDate(null);
                   setFormError("");
-                  setUncertain(false);
                 }}
               >
                 收起
               </Button>
-              <Button type="submit" size="sm" className="h-7 text-xs" disabled={busy}>
+              <Button type="submit" size="sm" className="h-7 text-xs" disabled={busy || uncertain}>
                 {busy && <LoaderCircle className="size-3 animate-spin" aria-hidden />}
-                {uncertain ? "核对并重试" : "保存"}
+                保存
               </Button>
             </div>
-          </form>
+          </div>
+          </motion.form>
         )}
+        </AnimatePresence>
 
         {/* 血压同时段对比行 */}
         <div className="flex items-center justify-between gap-2 rounded-xl border bg-background p-2.5 text-xs">
@@ -607,29 +597,40 @@ export function EditorialMeasurementsCard({
                 {bpPeriod === "morning" ? "🌅 晨间" : "🌙 夜间"}
               </span>
             </div>
-            <div className="mt-0.5 truncate font-mono text-muted-foreground">
-              {periodLatestBp ? (
-                <>
-                  <strong className="text-foreground">
-                    {periodLatestBp.systolic} / {periodLatestBp.diastolic}
-                  </strong>{" "}
-                  mmHg
-                  {periodPrevBp
-                    ? ` · 同时段上次 ${periodPrevBp.systolic}/${periodPrevBp.diastolic}`
-                    : " · 首次"}
-                </>
-              ) : (
-                `暂无${MEASUREMENT_PERIOD_LABELS[bpPeriod]}血压记录`
-              )}
-            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={bpPeriod}
+                initial={{ opacity: 0, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -3 }}
+                transition={{ duration: 0.16 }}
+                className="mt-0.5 truncate font-mono text-muted-foreground"
+              >
+                {periodLatestBp ? (
+                  <>
+                    <strong className="text-foreground">
+                      {periodLatestBp.systolic} / {periodLatestBp.diastolic}
+                    </strong>{" "}
+                    mmHg
+                    {periodPrevBp
+                      ? ` · 同时段上次 ${periodPrevBp.systolic}/${periodPrevBp.diastolic}`
+                      : " · 首次"}
+                  </>
+                ) : (
+                  `暂无${MEASUREMENT_PERIOD_LABELS[bpPeriod]}血压记录`
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.94 }}
+            transition={TAP_SPRING}
             onClick={() => setBpPeriod((p) => (p === "morning" ? "evening" : "morning"))}
             className="shrink-0 whitespace-nowrap rounded-lg border bg-card px-2 py-1 text-[11px] font-medium transition-colors hover:border-primary"
           >
             🌅/🌙 切换
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -643,52 +644,60 @@ export function EditorialMeasurementsCard({
         >
           <span>最近 7 次测量折线与明细 ({recentSeven.length})</span>
           <span className="inline-flex items-center gap-1 font-mono">
-            {drawerOpen ? (
-              <>
-                收起 <ChevronUp className="size-3.5" aria-hidden />
-              </>
-            ) : (
-              <>
-                展开 <ChevronDown className="size-3.5" aria-hidden />
-              </>
-            )}
+            <span>{drawerOpen ? "收起" : "展开"}</span>
+            <motion.span
+              animate={{ rotate: drawerOpen ? 180 : 0 }}
+              transition={SOFT_SPRING}
+              className="inline-flex"
+            >
+              <ChevronDown className="size-3.5" aria-hidden />
+            </motion.span>
           </span>
         </button>
 
+        <AnimatePresence initial={false}>
         {drawerOpen && (
+          <motion.div
+            key="measure-drawer"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={SOFT_SPRING}
+            className="overflow-hidden"
+          >
           <div className="mt-2.5 space-y-2.5">
             {/* 迷你 SVG 体重折线图 */}
             <div className="rounded-xl border bg-background p-2.5">
-              {sparkline ? (
+              {sparkline.svg ? (
                 <>
                   <div className="mb-1 flex justify-between font-mono text-xs text-muted-foreground">
                     <span>近期体重走势</span>
                     <span>
-                      {sparkline.first.toFixed(2)} →{" "}
-                      <strong className="text-foreground">{sparkline.last.toFixed(2)}</strong> kg
+                      {sparkline.ordered[0][1].toFixed(2)} →{" "}
+                      <strong className="text-foreground">{sparkline.ordered[sparkline.ordered.length - 1][1].toFixed(2)}</strong> kg
                     </span>
                   </div>
                   <svg className="h-10 w-full overflow-visible" viewBox="0 0 200 36" aria-hidden>
-                    <polyline
+                    <motion.path
+                      initial={{ pathLength: 0, opacity: 0.35 }}
+                      animate={{ pathLength: 1, opacity: 1 }}
+                      transition={{ duration: 0.65, ease: "easeOut" }}
                       fill="none"
                       stroke="currentColor"
                       className="text-primary"
                       strokeWidth="2.2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      points={sparkline.polyline}
+                      d={sparkline.svg.path}
                     />
-                    <circle
-                      cx={sparkline.lastPoint.x}
-                      cy={sparkline.lastPoint.y}
-                      r="3.5"
-                      className="fill-primary"
-                    />
+                    {sparkline.svg.points.map(point => (
+                      <circle key={point.date} cx={point.x} cy={point.y} r="2.5" className="fill-primary" />
+                    ))}
                   </svg>
                 </>
               ) : (
                 <p className="py-1 text-center text-xs text-muted-foreground">
-                  记录至少 2 次体重后展示近期走势折线
+                  至少记录两个日期的体重后可查看近期走势
                 </p>
               )}
             </div>
@@ -713,7 +722,7 @@ export function EditorialMeasurementsCard({
                         </div>
                         <div className="truncate font-mono text-[11px] text-muted-foreground">
                           {m.date} {m.time ?? ""}
-                          {periodText ? ` · ${periodText}` : ""} · v{m.version}
+                          {periodText ? ` · ${periodText}` : ""}
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
@@ -727,16 +736,13 @@ export function EditorialMeasurementsCard({
                         >
                           <Pencil className="size-3" aria-hidden />
                         </button>
-                        <button
-                          type="button"
+                        <InlineConfirmButton
                           disabled={busy}
-                          onClick={() => deleteEntry(m)}
-                          className="rounded border bg-card p-1 text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
-                          title="软删除测量记录"
-                          aria-label={`删除 ${MEASUREMENT_LABELS[m.kind]} ${m.date}`}
-                        >
-                          <Trash2 className="size-3" aria-hidden />
-                        </button>
+                          onConfirm={() => deleteEntry(m)}
+                          ariaLabel={`删除 ${MEASUREMENT_LABELS[m.kind]} ${m.date}`}
+                          confirmText="确认删除"
+                          className="rounded border bg-card p-1 hover:border-destructive"
+                        />
                       </div>
                     </div>
                   );
@@ -752,7 +758,9 @@ export function EditorialMeasurementsCard({
               <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* 编辑测量记录弹窗（保留乐观锁 version） */}
@@ -763,7 +771,7 @@ export function EditorialMeasurementsCard({
               修改{editing ? MEASUREMENT_LABELS[editing.kind] : "测量"}记录
             </DialogTitle>
             <DialogDescription>
-              当前版本 v{editing?.version} · 若其他设备已修改将提示刷新核对。
+              修改后将同步更新趋势与最新指标展示。
             </DialogDescription>
           </DialogHeader>
           {editing && (

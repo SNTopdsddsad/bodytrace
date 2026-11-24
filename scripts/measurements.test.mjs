@@ -1,3 +1,4 @@
+import { require as requireTs } from "tsx/cjs/api";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { measurementSchemas, measurementChart, bloodPressureChart, measurementChange, isMeasurementDate } from "../src/lib/measurements.ts";
@@ -77,4 +78,17 @@ test("血压趋势按晨间/夜间分别取每日最近一条，未标记不进�
     { date: "2026-10-12", morningSystolic: 121, morningDiastolic: 79, eveningSystolic: null, eveningDiastolic: null },
   ]);
   assert.deepEqual(bloodPressureChart([pressure("only", "2026-10-12", null, 120, 80, null)]), []);
+});
+
+test("体重折线按实际日期间隔定位并在缺测日另起一段", () => {
+  const { buildWeightTrendSvg } = requireTs("../src/lib/weight-trend.ts", import.meta.url);
+  const entries = [
+    { kind: "weight", date: "2026-11-23", value: "68" },
+    { kind: "weight", date: "2026-11-02", value: "69" },
+    { kind: "weight", date: "2026-11-01", value: "70" },
+  ];
+  const { svg } = buildWeightTrendSvg(entries, null);
+  assert.deepEqual(svg.path.match(/[ML]/g), ["M", "L", "M"]);
+  const [first, second, last] = svg.points;
+  assert.ok(Math.abs((last.x - second.x) / (second.x - first.x) - 21) < 0.001);
 });

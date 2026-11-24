@@ -78,6 +78,13 @@
       "when": 1795429382265,
       "tag": "0010_legacy_photo_group",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1795484507690,
+      "tag": "0011_meal_nutrition_basis",
+      "breakpoints": true
     }
   ]
 }

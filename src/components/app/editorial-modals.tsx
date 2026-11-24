@@ -7,16 +7,17 @@ import {
   ArrowRight,
   ChartNoAxesCombined,
   Database,
-  Loader2,
   Pencil,
   Plus,
   Search,
   Settings2,
   Star,
-  Trash2,
   Utensils,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
+import { InlineConfirmButton } from "./inline-confirm-button";
+import { SOFT_SPRING, TAB_SPRING, TAP_SPRING } from "./motion-provider";
 import type { Food } from "@/db/schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
+import { buildWeightTrendSvg } from "@/lib/weight-trend";
 import type { MeasurementDashboard } from "@/lib/measurements";
 import { GENDER_LABELS, type BodyProfile, type Gender } from "@/lib/profile";
 import type { Goals } from "@/services/goals";
@@ -39,41 +41,6 @@ import { ClearRecordsButton } from "./clear-records-button";
 type ActiveModal = "trends" | "library" | "settings" | null;
 
 const GENDERS = Object.keys(GENDER_LABELS) as Gender[];
-
-function buildWeightTrendSvg(data: MeasurementDashboard) {
-  const daily = new Map<string, number>();
-  for (const entry of data.entries) {
-    if (entry.kind === "weight" && entry.value != null && !daily.has(entry.date)) {
-      daily.set(entry.date, Number(entry.value));
-    }
-  }
-  const ordered = [...daily.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  if (ordered.length < 2) return { ordered, svg: null };
-
-  const values = ordered.map(([, v]) => v);
-  const target = data.targetWeightKg;
-  const allVals = target != null ? [...values, target] : values;
-  const min = Math.min(...allVals);
-  const max = Math.max(...allVals);
-  const span = max - min || 1;
-  const mapY = (v: number) => Number((78 - ((v - min) / span) * 64).toFixed(1));
-
-  const points = ordered.map(([date, val], idx) => ({
-    date,
-    val,
-    x: Number((10 + (idx / (ordered.length - 1)) * 240).toFixed(1)),
-    y: mapY(val),
-  }));
-
-  return {
-    ordered,
-    svg: {
-      points,
-      polyline: points.map((p) => `${p.x},${p.y}`).join(" "),
-      targetY: target != null ? mapY(target) : null,
-    },
-  };
-}
 
 export function EditorialModals({
   activeModal,
@@ -114,7 +81,6 @@ export function EditorialModals({
         goals={goals}
         profile={profile}
         recordCounts={recordCounts}
-        onSaved={onClose}
       />
     </>
   );
@@ -139,7 +105,7 @@ function TrendsModal({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const slice = trends.slice(-days);
-  const recordedSlice = slice.filter((p) => p.calories > 0);
+  const recordedSlice = slice.filter((p) => p.hasMealEntries);
   const avgCalories =
     recordedSlice.length > 0
       ? Math.round(recordedSlice.reduce((s, p) => s + p.calories, 0) / recordedSlice.length)
@@ -154,7 +120,7 @@ function TrendsModal({
 
   const inspected = hoveredIdx != null ? slice[hoveredIdx] ?? null : slice[slice.length - 1] ?? null;
 
-  const weightTrend = useMemo(() => buildWeightTrendSvg(measurementData), [measurementData]);
+  const weightTrend = useMemo(() => buildWeightTrendSvg(measurementData.entries, measurementData.targetWeightKg), [measurementData]);
 
   const fatEntries = measurementData.entries
     .filter((m) => m.kind === "bodyFat" && m.value != null)
@@ -178,11 +144,11 @@ function TrendsModal({
         <DialogHeader className="border-b pb-4">
           <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
             <div>
-              <span className="inline-block rounded-full border bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                MAGAZINE OVERLAY · 01
+              <span className="inline-block rounded-full border border-primary/15 bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                近 30 天数据回顾
               </span>
               <DialogTitle className="mt-1.5 flex items-center gap-2 text-lg font-bold">
-                <ChartNoAxesCombined className="size-5" aria-hidden />
+                <ChartNoAxesCombined className="size-5 text-primary" aria-hidden />
                 营养摄入趋势 &amp; 身体指标复盘
               </DialogTitle>
               <DialogDescription className="mt-1">
@@ -208,7 +174,7 @@ function TrendsModal({
                 <h3 className="text-sm font-bold">每日热量与营养素</h3>
                 <p className="text-xs text-muted-foreground">
                   虚线为每日基础目标 ({goals.calories} kcal) · 有记录 {recordedSlice.length} 天
-                  {avgCalories > 0 ? ` · 日均 ${avgCalories} kcal` : ""}
+                  {recordedSlice.length > 0 ? ` · 日均 ${avgCalories} kcal` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-1 rounded-xl border bg-card p-1 text-xs">
@@ -221,13 +187,21 @@ function TrendsModal({
                       setHoveredIdx(null);
                     }}
                     aria-pressed={days === d}
-                    className={`rounded-lg px-2.5 py-1 font-mono transition-colors ${
+                    className={`relative rounded-lg px-2.5 py-1 font-mono transition-colors ${
                       days === d
-                        ? "bg-primary font-semibold text-primary-foreground"
+                        ? "font-semibold text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {d}天
+                    {days === d && (
+                      <motion.span
+                        layoutId="trends-range-pill"
+                        transition={TAB_SPRING}
+                        className="absolute inset-0 rounded-lg bg-primary"
+                        aria-hidden
+                      />
+                    )}
+                    <span className="relative z-10">{d}天</span>
                   </button>
                 ))}
               </div>
@@ -253,7 +227,7 @@ function TrendsModal({
                   const isActive = hoveredIdx === idx;
                   return (
                     <button
-                      key={point.date}
+                      key={`${days}:${point.date}`}
                       type="button"
                       onMouseEnter={() => setHoveredIdx(idx)}
                       onFocus={() => setHoveredIdx(idx)}
@@ -261,19 +235,28 @@ function TrendsModal({
                       aria-label={`${point.date} ${Math.round(point.calories)} 千卡`}
                     >
                       <div className="flex h-36 w-full items-end">
-                        <div
-                          className={`w-full rounded-t-md transition-all ${
-                            point.calories === 0
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${hPct}%` }}
+                          transition={{
+                            ...SOFT_SPRING,
+                            delay: Math.min(idx * 0.012, 0.22),
+                          }}
+                          className={`w-full rounded-t-md transition-colors ${
+                            !point.hasMealEntries
                               ? "border border-dashed border-border bg-transparent"
-                              : isActive
-                                ? "bg-primary"
-                                : "bg-chart-1/85 group-hover:bg-primary"
+                              : point.calories > goals.calories
+                                ? isActive
+                                  ? "bg-chart-3"
+                                  : "bg-chart-3/85 group-hover:bg-chart-3"
+                                : isActive
+                                  ? "bg-primary"
+                                  : "bg-chart-1/85 group-hover:bg-primary"
                           }`}
-                          style={{ height: `${hPct}%` }}
                         />
                       </div>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {days <= 14 ? point.date.slice(8) : idx % 5 === 0 || idx === slice.length - 1 ? point.date.slice(5) : ""}
+                      <span className="h-3.5 whitespace-nowrap font-mono text-[10px] leading-none text-muted-foreground">
+                        {days <= 14 ? point.date.slice(8) : idx % 6 === 0 || idx === slice.length - 1 ? point.date.slice(5) : ""}
                       </span>
                     </button>
                   );
@@ -283,7 +266,7 @@ function TrendsModal({
 
             {inspected && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 font-mono text-xs">
-                {inspected.calories === 0 ? (
+                {!inspected.hasMealEntries ? (
                   <span>
                     {inspected.date}：暂无饮食记录 (0 kcal)
                   </span>
@@ -313,7 +296,7 @@ function TrendsModal({
                 </Link>
               </div>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                每天取最晚一条权重记录，缺失日期不补零。
+                每天取最后一条体重记录，缺测日断开折线。
               </p>
             </div>
 
@@ -337,22 +320,34 @@ function TrendsModal({
                         x2="260"
                         y2={weightTrend.svg.targetY}
                         stroke="currentColor"
-                        className="text-muted-foreground"
+                        className="text-chart-3"
                         strokeDasharray="4 4"
-                        strokeWidth="1"
+                        strokeWidth="1.2"
                       />
                     )}
-                    <polyline
+                    <motion.path
+                      initial={{ pathLength: 0, opacity: 0.35 }}
+                      animate={{ pathLength: 1, opacity: 1 }}
+                      transition={{ duration: 0.7, ease: "easeOut" }}
                       fill="none"
                       stroke="currentColor"
                       className="text-primary"
                       strokeWidth="2.4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      points={weightTrend.svg.polyline}
+                      d={weightTrend.svg.path}
                     />
-                    {weightTrend.svg.points.map((p) => (
-                      <circle key={p.date} cx={p.x} cy={p.y} r="3" className="fill-primary" />
+                    {weightTrend.svg.points.map((p, idx) => (
+                      <motion.circle
+                        key={p.date}
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.25 + idx * 0.03, ...TAP_SPRING }}
+                        cx={p.x}
+                        cy={p.y}
+                        r="3"
+                        className="fill-primary"
+                      />
                     ))}
                   </svg>
                   <div className="flex justify-between font-mono text-[11px] text-muted-foreground">
@@ -505,11 +500,10 @@ function LibraryModal({
   }
 
   async function deleteFoodItem(f: Food) {
-    if (!window.confirm(`确定删除「${f.name}」吗？历史饮食记录的营养快照不受影响。`)) return;
     setBusyId(f.id);
     try {
       await api(`/api/v1/foods/${f.id}`, { method: "DELETE" });
-      toast.success("已删除食物");
+      toast.success(`已删除「${f.name}」`);
       if (editing?.id === f.id) setEditing(null);
       router.refresh();
     } catch (err) {
@@ -525,11 +519,11 @@ function LibraryModal({
         <DialogHeader className="border-b pb-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
             <div>
-              <span className="inline-block rounded-full border bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                MAGAZINE OVERLAY · 02
+              <span className="inline-block rounded-full border border-primary/15 bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                常用食材管理
               </span>
               <DialogTitle className="mt-1.5 flex items-center gap-2 text-lg font-bold">
-                <Utensils className="size-5" aria-hidden />
+                <Utensils className="size-5 text-primary" aria-hidden />
                 我的个人食物库 ({myFoods.length})
               </DialogTitle>
               <DialogDescription className="mt-1">
@@ -578,11 +572,18 @@ function LibraryModal({
           </div>
         </div>
 
+        <AnimatePresence initial={false}>
         {(creating || editing) && (
-          <form
+          <motion.form
+            key={editing ? `edit-${editing.id}` : "create-food"}
+            initial={{ opacity: 0, height: 0, y: -6 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -6 }}
+            transition={SOFT_SPRING}
             onSubmit={handleSaveFood}
-            className="space-y-3 rounded-2xl border border-primary bg-background p-4 text-xs"
+            className="overflow-hidden"
           >
+          <div className="space-y-3 rounded-2xl border border-primary bg-background p-4 text-xs">
             <div className="flex items-center justify-between font-semibold">
               <span>{editing ? `编辑「${editing.name}」` : "新增个人食物 (每 100g 营养值)"}</span>
               <button
@@ -678,8 +679,10 @@ function LibraryModal({
                 {busyId ? "保存中…" : "保存食物"}
               </Button>
             </div>
-          </form>
+          </div>
+          </motion.form>
         )}
+        </AnimatePresence>
 
         <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
           {filtered.length === 0 ? (
@@ -687,9 +690,15 @@ function LibraryModal({
               没有匹配的食物。
             </p>
           ) : (
-            filtered.map((f) => (
-              <div
+            <AnimatePresence initial={false}>
+            {filtered.map((f) => (
+              <motion.div
                 key={f.id}
+                layout
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={SOFT_SPRING}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-background p-3 text-xs"
               >
                 <div className="min-w-0 flex-1">
@@ -715,7 +724,7 @@ function LibraryModal({
                   >
                     <Star
                       className={`size-3.5 ${
-                        f.isFavorite ? "fill-foreground text-foreground" : "text-muted-foreground"
+                        f.isFavorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
                       }`}
                       aria-hidden
                     />
@@ -730,18 +739,17 @@ function LibraryModal({
                   >
                     <Pencil className="size-3.5" aria-hidden />
                   </button>
-                  <button
-                    type="button"
+                  <InlineConfirmButton
                     disabled={busyId === f.id}
-                    onClick={() => void deleteFoodItem(f)}
-                    className="inline-flex items-center gap-1 rounded-lg border bg-card px-2 py-1 text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
-                    aria-label={`删除 ${f.name}`}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                  </button>
+                    onConfirm={() => deleteFoodItem(f)}
+                    ariaLabel={`删除 ${f.name}`}
+                    confirmText="确认删除"
+                    className="inline-flex items-center gap-1 rounded-lg border bg-card px-2 py-1 hover:border-destructive"
+                  />
                 </div>
-              </div>
-            ))
+              </motion.div>
+            ))}
+            </AnimatePresence>
           )}
         </div>
       </DialogContent>
@@ -757,27 +765,24 @@ function SettingsModal({
   goals,
   profile,
   recordCounts,
-  onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   goals: Goals;
   profile: BodyProfile | null;
   recordCounts: RecordCounts;
-  onSaved: () => void;
 }) {
-  const settingsKey = `${goals.calories}-${goals.protein}-${goals.carbs}-${goals.fat}-${profile?.gender ?? ""}-${profile?.heightCm ?? ""}-${profile?.targetWeightKg ?? ""}`;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90svh] overflow-y-auto rounded-3xl p-6 sm:max-w-4xl">
         <DialogHeader className="border-b pb-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
             <div>
-              <span className="inline-block rounded-full border bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                MAGAZINE OVERLAY · 03
+              <span className="inline-block rounded-full border border-primary/15 bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                目标与账户数据
               </span>
               <DialogTitle className="mt-1.5 flex items-center gap-2 text-lg font-bold">
-                <Settings2 className="size-5" aria-hidden />
+                <Settings2 className="size-5 text-primary" aria-hidden />
                 个人资料、基础目标与数据安全
               </DialogTitle>
             </div>
@@ -802,11 +807,9 @@ function SettingsModal({
 
         {open && (
           <SettingsModalBody
-            key={settingsKey}
             goals={goals}
             profile={profile}
             recordCounts={recordCounts}
-            onSaved={onSaved}
           />
         )}
       </DialogContent>
@@ -818,12 +821,10 @@ function SettingsModalBody({
   goals,
   profile,
   recordCounts,
-  onSaved,
 }: {
   goals: Goals;
   profile: BodyProfile | null;
   recordCounts: RecordCounts;
-  onSaved: () => void;
 }) {
   const router = useRouter();
   const [cal, setCal] = useState(String(goals.calories));
@@ -835,41 +836,32 @@ function SettingsModalBody({
   const [heightCm, setHeightCm] = useState(profile?.heightCm?.toString() ?? "");
   const [targetWeightKg, setTargetWeightKg] = useState(profile?.targetWeightKg?.toString() ?? "");
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"goals" | "profile" | null>(null);
   const busyRef = useRef(false);
+  const [error, setError] = useState({ goals: "", profile: "" });
 
-  async function handleSaveAll(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveSection(event: React.FormEvent, section: "goals" | "profile") {
+    event.preventDefault();
     if (busyRef.current) return;
     busyRef.current = true;
-    setBusy(true);
-
+    setBusy(section);
+    setError(previous => ({ ...previous, [section]: "" }));
     try {
-      await api("/api/v1/goals", {
-        method: "PUT",
-        body: JSON.stringify({
-          calories: Number(cal),
-          protein: Number(pro),
-          carbs: Number(carb),
-          fat: Number(fat),
-        }),
-      });
-      await api("/api/v1/profile", {
-        method: "PUT",
-        body: JSON.stringify({
-          gender,
-          heightCm: heightCm.trim() === "" ? null : Number(heightCm),
-          targetWeightKg: targetWeightKg.trim() === "" ? null : Number(targetWeightKg),
-        }),
-      });
-      toast.success("每日目标与个人资料已更新");
+      const body = section === "goals"
+        ? { calories: Number(cal), protein: Number(pro), carbs: Number(carb), fat: Number(fat) }
+        : {
+            gender,
+            heightCm: heightCm.trim() === "" ? null : Number(heightCm),
+            targetWeightKg: targetWeightKg.trim() === "" ? null : Number(targetWeightKg),
+          };
+      await api(`/api/v1/${section}`, { method: "PUT", body: JSON.stringify(body) });
+      toast.success(section === "goals" ? "每日目标已保存" : "个人资料已保存");
       router.refresh();
-      onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "保存失败，请核对数值范围");
+      setError(previous => ({ ...previous, [section]: err instanceof Error ? err.message : "保存失败，请重试" }));
     } finally {
       busyRef.current = false;
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -879,133 +871,135 @@ function SettingsModalBody({
   return (
     <div className="grid gap-5 md:grid-cols-2">
       {/* 左：每日目标 + 个人资料 */}
-      <form
-        onSubmit={handleSaveAll}
-        className="space-y-4 rounded-2xl border bg-background p-5 text-xs"
-      >
-        <h3 className="text-sm font-bold">每日营养基础目标</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="modal-goal-cal">热量 (500–8000 kcal)</Label>
-            <Input
-              id="modal-goal-cal"
-              type="number"
-              min={500}
-              max={8000}
-              required
-              value={cal}
-              onChange={(e) => setCal(e.target.value)}
-              className="bg-card font-mono"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="modal-goal-pro">蛋白质 (0–600 g)</Label>
-            <Input
-              id="modal-goal-pro"
-              type="number"
-              min={0}
-              max={600}
-              required
-              value={pro}
-              onChange={(e) => setPro(e.target.value)}
-              className="bg-card font-mono"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="modal-goal-carb">碳水 (0–1200 g)</Label>
-            <Input
-              id="modal-goal-carb"
-              type="number"
-              min={0}
-              max={1200}
-              required
-              value={carb}
-              onChange={(e) => setCarb(e.target.value)}
-              className="bg-card font-mono"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="modal-goal-fat">脂肪 (0–500 g)</Label>
-            <Input
-              id="modal-goal-fat"
-              type="number"
-              min={0}
-              max={500}
-              required
-              value={fat}
-              onChange={(e) => setFat(e.target.value)}
-              className="bg-card font-mono"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-3 border-t pt-3">
-          <h3 className="text-sm font-bold">个人资料（可留空）</h3>
-          <div className="space-y-1.5">
-            <span className="text-muted-foreground">性别（再次点击取消）</span>
-            <div className="flex gap-1 rounded-xl border bg-card p-1">
-              {GENDERS.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={gender === g}
-                  onClick={() => setGender(gender === g ? null : g)}
-                  className={`flex-1 rounded-lg py-1.5 font-medium transition-colors ${
-                    gender === g
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {GENDER_LABELS[g]}
-                </button>
-              ))}
+      <div className="space-y-4 rounded-2xl border bg-background p-5 text-xs">
+        <form onSubmit={(event) => saveSection(event, "goals")}>
+          <fieldset disabled={busy !== null} className="space-y-3">
+            <h3 className="text-sm font-bold">每日营养基础目标</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="modal-goal-cal">热量 (500–8000 kcal)</Label>
+                <Input
+                  id="modal-goal-cal"
+                  type="number"
+                  min={500}
+                  max={8000}
+                  required
+                  value={cal}
+                  onChange={(e) => setCal(e.target.value)}
+                  className="bg-card font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="modal-goal-pro">蛋白质 (0–600 g)</Label>
+                <Input
+                  id="modal-goal-pro"
+                  type="number"
+                  min={0}
+                  max={600}
+                  required
+                  value={pro}
+                  onChange={(e) => setPro(e.target.value)}
+                  className="bg-card font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="modal-goal-carb">碳水 (0–1200 g)</Label>
+                <Input
+                  id="modal-goal-carb"
+                  type="number"
+                  min={0}
+                  max={1200}
+                  required
+                  value={carb}
+                  onChange={(e) => setCarb(e.target.value)}
+                  className="bg-card font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="modal-goal-fat">脂肪 (0–500 g)</Label>
+                <Input
+                  id="modal-goal-fat"
+                  type="number"
+                  min={0}
+                  max={500}
+                  required
+                  value={fat}
+                  onChange={(e) => setFat(e.target.value)}
+                  className="bg-card font-mono"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="modal-profile-height">身高 (cm)</Label>
-              <Input
-                id="modal-profile-height"
-                type="number"
-                min={50}
-                max={280}
-                step="0.5"
-                placeholder="可留空"
-                value={heightCm}
-                onChange={(e) => setHeightCm(e.target.value)}
-                className="bg-card font-mono"
-              />
+            {error.goals && <p role="alert" className="text-destructive">{error.goals}</p>}
+            <Button type="submit" className="w-full">{busy === "goals" ? "正在保存…" : "保存每日目标"}</Button>
+          </fieldset>
+        </form>
+        <form onSubmit={(event) => saveSection(event, "profile")}>
+          <fieldset disabled={busy !== null} className="space-y-3 border-t pt-3">
+            <h3 className="text-sm font-bold">个人资料（可留空）</h3>
+            <div className="space-y-1.5">
+              <span className="text-muted-foreground">性别（再次点击取消）</span>
+              <div className="flex gap-1 rounded-xl border bg-card p-1">
+                {GENDERS.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    aria-pressed={gender === g}
+                    onClick={() => setGender(gender === g ? null : g)}
+                    className={`flex-1 rounded-lg py-1.5 font-medium transition-colors ${
+                      gender === g
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {GENDER_LABELS[g]}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="modal-profile-target-w">目标体重 (kg)</Label>
-              <Input
-                id="modal-profile-target-w"
-                type="number"
-                min={20}
-                max={500}
-                step="0.1"
-                placeholder="可留空"
-                value={targetWeightKg}
-                onChange={(e) => setTargetWeightKg(e.target.value)}
-                className="bg-card font-mono"
-              />
-            </div>
-          </div>
-        </div>
 
-        <Button type="submit" className="w-full" disabled={busy}>
-          {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {busy ? "正在保存…" : "保存目标与个人资料并更新手账"}
-        </Button>
-      </form>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="modal-profile-height">身高 (cm)</Label>
+                <Input
+                  id="modal-profile-height"
+                  type="number"
+                  min={50}
+                  max={280}
+                  step="0.5"
+                  placeholder="可留空"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                  className="bg-card font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="modal-profile-target-w">目标体重 (kg)</Label>
+                <Input
+                  id="modal-profile-target-w"
+                  type="number"
+                  min={20}
+                  max={500}
+                  step="0.1"
+                  placeholder="可留空"
+                  value={targetWeightKg}
+                  onChange={(e) => setTargetWeightKg(e.target.value)}
+                  className="bg-card font-mono"
+                />
+              </div>
+            </div>
+            {error.profile && <p role="alert" className="text-destructive">{error.profile}</p>}
+            <Button type="submit" className="w-full">{busy === "profile" ? "正在保存…" : "保存个人资料"}</Button>
+          </fieldset>
+        </form>
+      </div>
 
       {/* 右：一键清空数据 */}
       <div className="flex flex-col justify-between rounded-2xl border bg-background p-5 text-xs">
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-1.5 font-mono text-destructive">
+          <div className="inline-flex items-center gap-1.5 font-medium text-destructive">
             <Database className="size-3.5" aria-hidden />
-            <span>DELETE /api/v1/records</span>
+            <span>危险操作 · 清空后无法恢复</span>
           </div>
           <h3 className="text-sm font-bold text-destructive">
             清空饮食、照片与身体指标记录

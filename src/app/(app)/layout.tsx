@@ -10,6 +10,7 @@ import { getSession } from "@/lib/api-auth";
 import { shiftDate, todayStr } from "@/lib/date";
 import { countFoods } from "@/services/foods";
 import { getDailyTotals } from "@/services/meals";
+import { AppMotionProvider } from "@/components/app/motion-provider";
 import { SiteNav } from "@/components/app/site-nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,24 +24,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   return (
-    <div className="min-h-svh flex-1 bg-background text-foreground">
-      <SiteNav
-        user={{
-          name: session.user.name,
-          email: session.user.email,
-          phoneNumber: session.user.phoneNumber ?? null,
-          phoneNumberVerified: session.user.phoneNumberVerified ?? false,
-        }}
-        today={today}
-        foodsCount={foodsCount}
-        recentDays={recentTotals.map((t) => ({ date: t.date, calories: t.calories }))}
-      />
-      <main
-        id="main-content"
-        className="mx-auto w-full min-w-0 max-w-[1520px] px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:pb-10"
-      >
-        {children}
-      </main>
-    </div>
+    <AppMotionProvider>
+      <div className="min-h-svh flex-1 bg-background text-foreground">
+        <SiteNav
+          user={{
+            name: session.user.name,
+            email: session.user.email,
+            phoneNumber: session.user.phoneNumber ?? null,
+            phoneNumberVerified: session.user.phoneNumberVerified ?? false,
+          }}
+          today={today}
+          foodsCount={foodsCount}
+          recentDays={recentTotals.map((t) => ({ date: t.date, calories: t.calories }))}
+        >
+          {children}
+        </SiteNav>
+      </div>
+    </AppMotionProvider>
   );
 }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { require as requireTs } from "tsx/cjs/api";
 import { isValidDateStr, shiftDate, todayStr } from "../src/lib/date.ts";
 
 test("业务日期拒绝自动进位的日期，接受真实闰日与月末", () => {
@@ -35,4 +36,11 @@ test("今天按应用时区在午夜切换，不受服务器本地时区影响",
   assert.equal(todayStr(), "2026-12-31");
   delete process.env.APP_TIMEZONE;
   assert.equal(todayStr(), "2027-01-01");
+});
+
+test("四天周历覆盖所选日期且窗口不越过今天", () => {
+  const { buildWeekStripDays } = requireTs("../src/lib/editorial-events.ts", import.meta.url);
+  const dates = (date, today) => buildWeekStripDays(date, today).days.map(day => day.date);
+  assert.deepEqual(dates("2026-11-19", "2026-11-23"), ["2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22"]);
+  assert.deepEqual(dates("2026-12-31", "2027-01-02"), ["2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02"]);
 });

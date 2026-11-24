@@ -178,7 +178,7 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 
 ## 饮食记录与汇总
 
-记录保存写入时刻的食物名称与营养快照；修改克数按记录内已有快照等比缩放，与食物库当前状态无关。餐次固定为 `breakfast` / `lunch` / `dinner` / `snack`。照片独立归属用户、日期和餐次，每餐最多上传 6 张有效照片；照片文件存腾讯云 COS，数据库只保存对象 key 与尺寸等元数据。
+记录保存写入时刻的食物名称与营养快照；修改克数始终从写入时的每 100g 营养值折算，结果保留一位小数。旧记录首次改克数时，以该条记录现存的克数和营养值固定基准。餐次固定为 `breakfast` / `lunch` / `dinner` / `snack`。照片独立归属用户、日期和餐次，每餐最多上传 6 张有效照片；照片文件存腾讯云 COS，数据库只保存对象 key 与尺寸等元数据。
 
 ### GET /api/v1/meals?date=YYYY-MM-DD
 
@@ -240,7 +240,7 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 
 ### PATCH /api/v1/meals/:id
 
-修改克数，营养值按新旧克数比例重算。请求 `{ "grams": 300 }`（1–5000）。成功返回 `{ entry }`（不含 `photos`），不存在返回 404。
+修改克数，营养值始终从该记录的固定基准折算。请求 `{ "grams": 12.5 }`（1–5000，支持小数）。成功返回 `{ entry }`（不含 `photos`），不存在返回 404。
 
 ### DELETE /api/v1/meals/:id
 
@@ -356,14 +356,14 @@ curl --request POST "$BASE_URL/api/v1/meal-photos" \
 
 ### GET /api/v1/trends?days=30
 
-最近 N 天每天的营养合计与每日热量目标（`goalCalories` 各天相同）。`days` 为 7–180 的整数，非法时回落 30。无记录的日期补 0（仅表示当天没有已记录的摄入，不代表完整记录）。
+最近 N 天每天的营养合计与每日热量目标（`goalCalories` 各天相同）。`days` 为 7–180 的整数，非法时回落 30。`hasMealEntries` 表示当天是否有饮食条目，零热量食物也计为已记录。无记录的日期补 0（仅表示当天没有已记录的摄入，不代表完整记录）。
 
 ```json
 {
   "days": 30,
   "trends": [
-    { "date": "2026-09-19", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "goalCalories": 2200 },
-    { "date": "2026-09-20", "calories": 1980.5, "protein": 132.4, "carbs": 210.1, "fat": 58.3, "goalCalories": 2200 }
+    { "date": "2026-09-19", "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "hasMealEntries": false, "goalCalories": 2200 },
+    { "date": "2026-09-20", "calories": 1980.5, "protein": 132.4, "carbs": 210.1, "fat": 58.3, "hasMealEntries": true, "goalCalories": 2200 }
   ]
 }
 ```

@@ -31,6 +31,8 @@ export type Measurement = {
   updatedAt: string;
 };
 
+export type BloodPressureHistory = Record<MeasurementPeriod, Measurement[]>;
+
 export type MeasurementDashboard = {
   range: MeasurementRange;
   entries: Measurement[];

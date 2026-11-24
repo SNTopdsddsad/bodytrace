@@ -6,6 +6,7 @@
  * - 代码里查询结果的类型也自动推导出来，写错字段名会直接报编译错误
  */
 import { randomUUID } from "node:crypto";
+import type { MacroLike } from "@/lib/nutrition";
 import { sql } from "drizzle-orm";
 import {
   mysqlTable,
@@ -135,6 +136,7 @@ export const mealEntry = mysqlTable(
     foodId: varchar("food_id", { length: 36 }).references(() => food.id, { onDelete: "set null" }),
     name: varchar("name", { length: 255 }).notNull(),
     grams: double("grams").notNull(),
+    nutritionBasis: json("nutrition_basis").$type<MacroLike & { grams: number }>(),
     calories: double("calories").notNull(),
     protein: double("protein").notNull().default(0),
     carbs: double("carbs").notNull().default(0),
@@ -366,7 +368,7 @@ export const foodReference = mysqlTable(
 );
 
 export type Food = typeof food.$inferSelect;
-export type MealEntry = typeof mealEntry.$inferSelect;
+export type MealEntry = Omit<typeof mealEntry.$inferSelect, "nutritionBasis">;
 export type DailyGoal = typeof dailyGoal.$inferSelect;
 export type DietPlanItem = typeof dietPlanItem.$inferSelect;
 export type UserProfile = typeof userProfile.$inferSelect;

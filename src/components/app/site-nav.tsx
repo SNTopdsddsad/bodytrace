@@ -1,22 +1,27 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
+  BookOpen,
   CalendarDays,
   ChartNoAxesCombined,
   ChevronLeft,
   ChevronRight,
   Lock,
   LogOut,
+  Monitor,
+  Moon,
   Settings2,
+  Sun,
   UserRound,
   Utensils,
-  BookOpen,
 } from "lucide-react";
+import { motion } from "motion/react";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +41,7 @@ import {
 } from "@/lib/editorial-events";
 import { maskPhoneNumber } from "@/lib/phone-number";
 import { Brand } from "./brand";
+import { TAB_SPRING, TAP_SPRING } from "./motion-provider";
 
 export type NavUser = {
   name: string;
@@ -52,13 +58,19 @@ export type RecentDaySummary = {
 function WeekStrip({
   today,
   recentDays,
+  scope,
+  isPending,
+  navigate,
 }: {
   today: string;
   recentDays: RecentDaySummary[];
+  scope: "desktop" | "mobile";
+  isPending: boolean;
+  navigate: (href: string) => void;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
+
   const rawDate = searchParams.get("date");
   const selectedDate = rawDate && isValidDateStr(rawDate) ? rawDate : today;
   const targetBase = pathname === "/diary" ? "/diary" : "/";
@@ -68,25 +80,30 @@ function WeekStrip({
   const recentWindowStart = shiftDate(today, -14);
 
   function goDate(next: string) {
-    if (!isValidDateStr(next) || next > today) return;
-    router.push(next === today && targetBase === "/" ? "/" : `${targetBase}?date=${next}`);
+    if (!isValidDateStr(next) || next > today || next === selectedDate) return;
+    navigate(next === today && targetBase === "/" ? "/" : `${targetBase}?date=${next}`);
   }
 
   return (
     <div
-      className="flex w-full max-w-full min-w-0 items-center gap-1 rounded-xl border bg-background p-1 lg:w-auto"
+      className={`relative flex w-full max-w-full min-w-0 items-center gap-1 rounded-xl border bg-background p-1 transition-opacity lg:w-auto ${
+        isPending ? "opacity-85" : ""
+      }`}
       role="group"
       aria-label="日期周历切换"
+      aria-busy={isPending}
     >
-      <button
+      <motion.button
         type="button"
+        whileTap={{ scale: 0.9 }}
+        transition={TAP_SPRING}
         onClick={() => goDate(shiftDate(selectedDate, -1))}
         className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
         title="前一天"
         aria-label="切换到前一天"
       >
         <ChevronLeft className="size-4" aria-hidden />
-      </button>
+      </motion.button>
 
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {days.map((d) => {
@@ -94,7 +111,7 @@ function WeekStrip({
           const kcal = calMap.get(d.date);
           const inWindow = d.date >= recentWindowStart && d.date <= today;
           const subText =
-            kcal !== undefined && kcal > 0
+            kcal !== undefined
               ? `${kcal} kcal`
               : inWindow
                 ? d.isToday
@@ -105,24 +122,38 @@ function WeekStrip({
                   : "查看";
 
           return (
-            <button
+            <motion.button
               key={d.date}
               type="button"
+              whileTap={{ scale: 0.96 }}
+              transition={TAP_SPRING}
               onClick={() => goDate(d.date)}
               aria-pressed={active}
-              className={`shrink-0 rounded-lg px-2 py-1 text-left text-[11px] transition-colors sm:px-3 sm:text-xs ${
+              className={`relative shrink-0 rounded-lg px-2 py-1 text-left text-[11px] transition-colors sm:px-3 sm:text-xs ${
                 active
-                  ? "bg-primary font-semibold text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:bg-card hover:text-foreground"
+                  ? "font-semibold text-primary-foreground"
+                  : "text-muted-foreground hover:bg-card/80 hover:text-foreground"
               }`}
             >
-              <div className="font-mono whitespace-nowrap">
+              {active && (
+                <motion.span
+                  layoutId={`week-strip-active-${scope}`}
+                  transition={TAB_SPRING}
+                  className="absolute inset-0 rounded-lg bg-primary shadow-xs"
+                  aria-hidden
+                />
+              )}
+              <div className="relative z-10 font-mono whitespace-nowrap">
                 {d.short} {d.label}
               </div>
-              <div className={`text-[10px] sm:text-[11px] tabular-nums whitespace-nowrap ${active ? "opacity-85" : "opacity-75"}`}>
+              <div
+                className={`relative z-10 text-[10px] sm:text-[11px] tabular-nums whitespace-nowrap ${
+                  active ? "opacity-85" : "opacity-75"
+                }`}
+              >
                 {subText}
               </div>
-            </button>
+            </motion.button>
           );
         })}
 
@@ -135,15 +166,17 @@ function WeekStrip({
             <Lock className="size-3" aria-hidden />
           </span>
         ) : (
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.9 }}
+            transition={TAP_SPRING}
             onClick={() => goDate(shiftDate(selectedDate, 1))}
             className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
             title="后一天"
             aria-label="切换到后一天"
           >
             <ChevronRight className="size-4" aria-hidden />
-          </button>
+          </motion.button>
         )}
       </div>
 
@@ -162,6 +195,13 @@ function WeekStrip({
           className="absolute inset-0 cursor-pointer opacity-0"
         />
       </label>
+
+      {isPending && (
+        <span
+          className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5 animate-pulse rounded-full bg-primary/60"
+          aria-hidden
+        />
+      )}
     </div>
   );
 }
@@ -170,12 +210,20 @@ function WeekStripFallback() {
   return <div className="h-11 w-64 animate-pulse rounded-xl bg-muted" aria-hidden />;
 }
 
+const THEME_OPTIONS = [
+  { id: "light", label: "浅色", icon: Sun },
+  { id: "dark", label: "深色", icon: Moon },
+  { id: "system", label: "跟随系统", icon: Monitor },
+] as const;
+
 export function SiteNav({
   user,
   today,
   foodsCount,
   recentDays,
+  children,
 }: {
+  children: React.ReactNode;
   user: NavUser;
   today: string;
   foodsCount: number;
@@ -183,8 +231,15 @@ export function SiteNav({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [accountOpen, setAccountOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+
+  const [switchingDate, startDateTransition] = useTransition();
+
+  function navigateDate(href: string) {
+    startDateTransition(() => router.push(href));
+  }
 
   const isHome = pathname === "/";
 
@@ -194,6 +249,10 @@ export function SiteNav({
       return;
     }
     router.push(`/?modal=${modal}`);
+  }
+
+  function quickToggleTheme() {
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   }
 
   async function handleLogout() {
@@ -227,25 +286,19 @@ export function SiteNav({
       </a>
 
       <div className="sticky top-0 z-30 mx-auto w-full max-w-[1520px] px-3 pt-3 sm:px-6">
-        <header className="rounded-2xl border bg-card/95 px-4 py-2.5 shadow-xs backdrop-blur-md">
+        <header className="rounded-2xl border bg-card/95 px-4 py-2.5 shadow-[0_4px_20px_-12px_#233e2e2b] backdrop-blur-md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* 左侧：品牌与副标题 / 返回手账 */}
             <div className="flex items-center gap-3">
               <Link href="/" aria-label="BodyTrace 主手账" className="shrink-0">
                 <Brand />
               </Link>
-              {isHome ? (
-                <div className="hidden 2xl:block">
-                  <span className="rounded-full border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    一屏主手账
-                  </span>
-                </div>
-              ) : (
+              {!isHome && (
                 <Link
                   href="/"
-                  className="inline-flex items-center gap-1 rounded-xl border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary"
+                  className="inline-flex items-center gap-1 rounded-xl border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70"
                 >
-                  <ArrowLeft className="size-3.5" aria-hidden />
+                  <ArrowLeft className="size-3.5 text-primary" aria-hidden />
                   返回主手账
                 </Link>
               )}
@@ -254,76 +307,119 @@ export function SiteNav({
             {/* 中央：桌面端胶囊周历 */}
             <div className="hidden lg:block">
               <Suspense fallback={<WeekStripFallback />}>
-                <WeekStrip today={today} recentDays={recentDays} />
+                <WeekStrip today={today} recentDays={recentDays} isPending={switchingDate} navigate={navigateDate} scope="desktop" />
               </Suspense>
             </div>
 
-            {/* 右侧：三个杂志浮层触发器 + 账号按钮 */}
+            {/* 右侧：三个杂志浮层触发器 + 明暗切换 + 账号按钮 */}
             <div className="flex items-center gap-2">
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.96 }}
+                transition={TAP_SPRING}
                 onClick={() => triggerModal("trends")}
                 className={`hidden items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors md:inline-flex ${
                   pathname === "/trends"
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "bg-background text-foreground hover:border-primary"
+                    : "bg-background text-foreground hover:border-primary/40 hover:bg-secondary/70"
                 }`}
               >
-                <ChartNoAxesCombined className="size-3.5" aria-hidden />
+                <ChartNoAxesCombined
+                  className={`size-3.5 ${
+                    pathname === "/trends" ? "text-primary-foreground" : "text-primary"
+                  }`}
+                  aria-hidden
+                />
                 <span>营养 &amp; 体重趋势</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.96 }}
+                transition={TAP_SPRING}
                 onClick={() => triggerModal("library")}
                 className={`hidden items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors md:inline-flex ${
                   pathname === "/foods"
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "bg-background text-foreground hover:border-primary"
+                    : "bg-background text-foreground hover:border-primary/40 hover:bg-secondary/70"
                 }`}
               >
-                <Utensils className="size-3.5" aria-hidden />
+                <Utensils
+                  className={`size-3.5 ${
+                    pathname === "/foods" ? "text-primary-foreground" : "text-primary"
+                  }`}
+                  aria-hidden
+                />
                 <span>我的食物库</span>
                 <span
                   className={`rounded-full border px-1.5 py-0.2 font-mono text-[11px] tabular-nums ${
                     pathname === "/foods"
                       ? "border-white/30 bg-white/15 text-primary-foreground"
-                      : "bg-card text-muted-foreground"
+                      : "border-primary/15 bg-secondary text-secondary-foreground"
                   }`}
                 >
                   {foodsCount}
                 </span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.96 }}
+                transition={TAP_SPRING}
                 onClick={() => triggerModal("settings")}
                 className={`hidden items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors md:inline-flex ${
                   pathname === "/goals" || pathname === "/profile"
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "bg-background text-foreground hover:border-primary"
+                    : "bg-background text-foreground hover:border-primary/40 hover:bg-secondary/70"
                 }`}
               >
-                <Settings2 className="size-3.5" aria-hidden />
+                <Settings2
+                  className={`size-3.5 ${
+                    pathname === "/goals" || pathname === "/profile"
+                      ? "text-primary-foreground"
+                      : "text-primary"
+                  }`}
+                  aria-hidden
+                />
                 <span>目标与数据</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.92 }}
+                transition={TAP_SPRING}
+                onClick={quickToggleTheme}
+                className="flex size-8 items-center justify-center rounded-xl border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 hover:text-primary"
+                title="切换浅色 / 深色模式"
+                aria-label="切换浅色或深色外观"
+              >
+                <Moon className="size-3.5 dark:hidden" aria-hidden />
+                <Sun className="hidden size-3.5 dark:block" aria-hidden />
+              </motion.button>
+
+              <motion.button
+                type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.96 }}
+                transition={TAP_SPRING}
                 onClick={() => setAccountOpen(true)}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-xs transition-opacity hover:opacity-90"
                 aria-label="查看账号与会话"
               >
                 <UserRound className="size-3.5" aria-hidden />
                 <span className="max-w-24 truncate">{user.name}</span>
-              </button>
+              </motion.button>
             </div>
           </div>
 
           {/* 移动端周历条 */}
           <div className="mt-2.5 w-full min-w-0 border-t pt-2.5 lg:hidden">
             <Suspense fallback={<WeekStripFallback />}>
-              <WeekStrip today={today} recentDays={recentDays} />
+              <WeekStrip today={today} recentDays={recentDays} isPending={switchingDate} navigate={navigateDate} scope="mobile" />
             </Suspense>
           </div>
         </header>
@@ -338,7 +434,7 @@ export function SiteNav({
           href="/"
           aria-current={isHome ? "page" : undefined}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${
-            isHome ? "text-foreground font-semibold" : "text-muted-foreground"
+            isHome ? "text-primary font-semibold" : "text-muted-foreground"
           }`}
         >
           <BookOpen className="size-4" aria-hidden />
@@ -348,7 +444,7 @@ export function SiteNav({
           type="button"
           onClick={() => triggerModal("trends")}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${
-            pathname === "/trends" ? "text-foreground font-semibold" : "text-muted-foreground"
+            pathname === "/trends" ? "text-primary font-semibold" : "text-muted-foreground"
           }`}
         >
           <ChartNoAxesCombined className="size-4" aria-hidden />
@@ -358,7 +454,7 @@ export function SiteNav({
           type="button"
           onClick={() => triggerModal("library")}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${
-            pathname === "/foods" ? "text-foreground font-semibold" : "text-muted-foreground"
+            pathname === "/foods" ? "text-primary font-semibold" : "text-muted-foreground"
           }`}
         >
           <Utensils className="size-4" aria-hidden />
@@ -369,7 +465,7 @@ export function SiteNav({
           onClick={() => triggerModal("settings")}
           className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${
             pathname === "/goals" || pathname === "/profile"
-              ? "text-foreground font-semibold"
+              ? "text-primary font-semibold"
               : "text-muted-foreground"
           }`}
         >
@@ -378,13 +474,13 @@ export function SiteNav({
         </button>
       </nav>
 
-      {/* 账号与会话浮层 */}
+      {/* 账号与外观浮层 */}
       <Dialog open={accountOpen} onOpenChange={setAccountOpen}>
         <DialogContent className="sm:max-w-md rounded-3xl p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <UserRound className="size-4" aria-hidden />
-              账号与当前会话
+              <UserRound className="size-4 text-primary" aria-hidden />
+              账号与外观
             </DialogTitle>
             <DialogDescription>
               所有身体指标、饮食记录与照片均严格隔离在当前登录账号下。
@@ -399,9 +495,46 @@ export function SiteNav({
                   {accountIdentity}
                 </div>
               </div>
-              <span className="shrink-0 rounded-full border bg-card px-2.5 py-0.5 font-mono text-[11px] text-foreground">
+              <span className="shrink-0 rounded-full border border-primary/20 bg-secondary px-2.5 py-0.5 font-mono text-[11px] font-medium text-secondary-foreground">
                 已登录
               </span>
+            </div>
+
+            {/* 外观模式切换 */}
+            <div className="space-y-1.5">
+              <p className="font-medium text-muted-foreground">界面外观</p>
+              <div className="grid grid-cols-3 gap-1 rounded-xl border bg-background p-1">
+                {THEME_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const active = (theme ?? "light") === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTheme(opt.id)}
+                      aria-pressed={active}
+                      className={`relative flex items-center justify-center gap-1.5 rounded-lg py-2 font-medium transition-colors ${
+                        active
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="theme-mode-pill"
+                          transition={TAB_SPRING}
+                          className="absolute inset-0 rounded-lg bg-primary"
+                          aria-hidden
+                        />
+                      )}
+                      <span className="relative z-10 inline-flex items-center gap-1.5">
+                        <Icon className="size-3.5" aria-hidden />
+                        {opt.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -421,9 +554,9 @@ export function SiteNav({
                       key={item.href}
                       href={item.href}
                       onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2.5 font-medium transition-colors hover:border-primary"
+                      className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2.5 font-medium transition-colors hover:border-primary/40 hover:bg-secondary/50"
                     >
-                      <Icon className="size-3.5 text-muted-foreground" aria-hidden />
+                      <Icon className="size-3.5 text-primary" aria-hidden />
                       <span>{item.label}</span>
                     </Link>
                   );
@@ -445,6 +578,15 @@ export function SiteNav({
           </div>
         </DialogContent>
       </Dialog>
+
+      <main
+        id="main-content"
+        inert={switchingDate}
+        aria-busy={switchingDate}
+        className="mx-auto w-full min-w-0 max-w-[1520px] px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 lg:pb-10"
+      >
+        {children}
+      </main>
     </>
   );
 }
