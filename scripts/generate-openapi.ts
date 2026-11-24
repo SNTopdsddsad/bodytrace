@@ -119,7 +119,7 @@ const MealEntry = registry.register(
     userId: z.string(),
     date: z.string(),
     mealType: z.enum(MEAL_ORDER),
-    foodId: uuid.nullable().describe("食物删除后为 null，记录仍可改克数、可删除"),
+    foodId: uuid.nullable().describe("一次性快照记餐或原食物删除后为 null，记录仍可改克数、可删除"),
     name: z.string(),
     grams: z.number(),
     calories: z.number(),
@@ -550,7 +550,7 @@ registry.registerPath({
   tags: ["饮食记录"],
   summary: "记一笔饮食",
   description:
-    "只能使用自己食物库里的食物；营养按克数折算后保存为快照，与食物库后续修改无关。",
+    "支持两种方式：1) 传入本人食物库中的 foodId + grams；2) 一次性快照记餐（省略 foodId 或传 null，传入 name、grams 及每 100g 营养基准 calories/protein/carbs/fat，不写入个人食物库）。两种方式均按克数折算并保存营养快照与每 100g 基准，后续改克数不受食物库变更影响。",
   request: { body: { required: true, content: { "application/json": { schema: mealCreateSchema } } } },
   responses: {
     "201": {

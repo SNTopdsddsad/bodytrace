@@ -223,7 +223,9 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 
 ### POST /api/v1/meals
 
-记一笔。只能使用自己食物库里的食物。
+记一笔饮食，支持两种请求形态（均拒绝未来日期）：
+
+**形态 1：从本人食物库记餐**
 
 ```json
 { "date": "2026-10-18", "mealType": "breakfast", "foodId": "0b6b2c6e-6d61-4b0f-9e6f-0b9e6f0b9e6f", "grams": 200 }
@@ -236,7 +238,35 @@ Cookie 认证的写请求应携带可信 `Origin`（协议、主机、端口与�
 | `foodId` | uuid | 必须存在于本人食物库 |
 | `grams` | number | 1–5000 |
 
-成功 `201` 返回 `{ entry }`（营养按克数折算后的快照，不含 `photos`）；食物不存在或非本人返回 `404 {"error":"食物不存在"}`。
+**形态 2：一次性快照记餐（不写入个人食物库）**
+
+适用于外食、AI 估算等无需沉淀进个人食物库的记录；`calories` / `protein` / `carbs` / `fat` 沿用每 100g 基准，服务端按 `grams` 折算并固定每 100g 基准快照（后续 `PATCH /api/v1/meals/:id` 改克数可精确重算）。
+
+```json
+{
+  "date": "2026-10-18",
+  "mealType": "lunch",
+  "foodId": null,
+  "name": "兰州牛肉面（普通碗）",
+  "grams": 450,
+  "calories": 116,
+  "protein": 5,
+  "carbs": 16.4,
+  "fat": 3.2
+}
+```
+
+| 字段 | 类型 | 校验 |
+| --- | --- | --- |
+| `date` | string | 合法日历日期，且不能是未来日期 |
+| `mealType` | enum | `breakfast` / `lunch` / `dinner` / `snack` |
+| `foodId` | `null`（可选） | 省略或 `null`；传非空字符串会触发食物库分支校验 |
+| `name` | string | 1–100 字符（自动 trim） |
+| `grams` | number | 1–5000 |
+| `calories` | number | 0–2000（每 100g 千卡） |
+| `protein` / `carbs` / `fat` | number（可选，默认 0） | 0–200（每 100g 克） |
+
+成功 `201` 返回 `{ entry }`（营养按克数折算后的快照，不含 `photos`；一次性快照记餐的 `foodId` 为 `null`）；使用形态 1 且食物不存在或非本人返回 `404 {"error":"食物不存在"}`。
 
 ### PATCH /api/v1/meals/:id
 

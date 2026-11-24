@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -11,6 +11,7 @@ import {
   ChartNoAxesCombined,
   ChevronLeft,
   ChevronRight,
+  KeyRound,
   Lock,
   LogOut,
   Monitor,
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { authClient } from "@/lib/auth-client";
 import { isValidDateStr, shiftDate } from "@/lib/date";
+import { clearDeepSeekConfig, maskApiKey } from "@/lib/deepseek-client";
 import {
   buildWeekStripDays,
   dispatchOpenModal,
@@ -41,9 +43,15 @@ import {
 } from "@/lib/editorial-events";
 import { maskPhoneNumber } from "@/lib/phone-number";
 import { Brand } from "./brand";
+import {
+  DeepSeekConfigDialog,
+  OPEN_DEEPSEEK_CONFIG_EVENT,
+  useDeepSeekConfig,
+} from "./deepseek-config-dialog";
 import { TAB_SPRING, TAP_SPRING } from "./motion-provider";
 
 export type NavUser = {
+  id: string;
   name: string;
   email: string;
   phoneNumber: string | null;
@@ -233,9 +241,17 @@ export function SiteNav({
   const router = useRouter();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const [accountOpen, setAccountOpen] = useState(false);
+  const [aiConfigOpen, setAiConfigOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const deepSeekConfig = useDeepSeekConfig(user.id);
 
   const [switchingDate, startDateTransition] = useTransition();
+
+  useEffect(() => {
+    const onOpenAiConfig = () => setAiConfigOpen(true);
+    window.addEventListener(OPEN_DEEPSEEK_CONFIG_EVENT, onOpenAiConfig);
+    return () => window.removeEventListener(OPEN_DEEPSEEK_CONFIG_EVENT, onOpenAiConfig);
+  }, []);
 
   function navigateDate(href: string) {
     startDateTransition(() => router.push(href));
@@ -263,7 +279,10 @@ export function SiteNav({
         toast.error("退出登录失败，请重试。");
         return;
       }
+      // 退出登录时同步清除本机保存的 DeepSeek API Key 与 Base URL
+      clearDeepSeekConfig();
       setAccountOpen(false);
+      setAiConfigOpen(false);
       router.push("/login");
       router.refresh();
     } finally {
@@ -385,6 +404,25 @@ export function SiteNav({
                   aria-hidden
                 />
                 <span>目标与数据</span>
+              </motion.button>
+
+              <motion.button
+                type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.96 }}
+                transition={TAP_SPRING}
+                onClick={() => setAiConfigOpen(true)}
+                className="hidden items-center gap-1.5 rounded-xl border bg-background px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-secondary/70 sm:inline-flex"
+                title="配置仅保存在本机的 DeepSeek 官方 API Key 与 Base URL"
+              >
+                <span
+                  className={`size-1.5 rounded-full ${
+                    deepSeekConfig ? "bg-primary" : "bg-chart-3"
+                  }`}
+                  aria-hidden
+                />
+                <KeyRound className="size-3.5 text-primary" aria-hidden />
+                <span>{deepSeekConfig ? "AI 已配置" : "配置 AI"}</span>
               </motion.button>
 
               <motion.button
@@ -564,6 +602,33 @@ export function SiteNav({
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <p className="font-medium text-muted-foreground">AI 营养估算（本地配置）</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountOpen(false);
+                  setAiConfigOpen(true);
+                }}
+                className="flex w-full items-center justify-between gap-2 rounded-xl border bg-background px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-secondary/50"
+              >
+                <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+                  <KeyRound className="size-3.5 shrink-0 text-primary" aria-hidden />
+                  <span className="truncate">
+                    {deepSeekConfig
+                      ? `DeepSeek 官方直连 · ${maskApiKey(deepSeekConfig.apiKey)}`
+                      : "配置 DeepSeek 官方 API Key"}
+                  </span>
+                </span>
+                <span className="shrink-0 font-mono text-[11px] text-primary">
+                  {deepSeekConfig ? "修改" : "去配置"}
+                </span>
+              </button>
+              <p className="text-[11px] text-muted-foreground">
+                密钥仅保存于当前浏览器，退出登录时会自动清除。
+              </p>
+            </div>
+
             <div className="border-t pt-3">
               <Button
                 variant="outline"
@@ -578,6 +643,12 @@ export function SiteNav({
           </div>
         </DialogContent>
       </Dialog>
+
+      <DeepSeekConfigDialog
+        userId={user.id}
+        open={aiConfigOpen}
+        onOpenChange={setAiConfigOpen}
+      />
 
       <main
         id="main-content"

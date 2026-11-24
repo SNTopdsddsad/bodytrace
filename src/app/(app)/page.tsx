@@ -74,6 +74,7 @@ export default async function HomePage({
   return (
     <EditorialJournal
       key={initialModal ?? "journal"}
+      userId={userId}
       date={date}
       today={today}
       defaultMeal={inferDefaultMeal()}

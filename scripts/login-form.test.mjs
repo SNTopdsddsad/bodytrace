@@ -15,6 +15,7 @@ function createLoginForm({ sendOtp = async () => ({ data: { status: true } }), v
   const hooks = [];
   const verifyCalls = [];
   const routeCalls = [];
+  const signedInUsers = [];
   let hookIndex = 0;
   let now = 1_000_000;
   const jsx = (type, props) => ({ type, props });
@@ -42,12 +43,13 @@ function createLoginForm({ sendOtp = async () => ({ data: { status: true } }), v
           sendOtp,
           verify: async args => {
             verifyCalls.push(args);
-            return verify ? verify(args) : { data: { user: { phoneNumberVerified: true, phoneNumber: args.phoneNumber } } };
+            return verify ? verify(args) : { data: { user: { id: "test-user", phoneNumberVerified: true, phoneNumber: args.phoneNumber } } };
           },
         },
         getSession: getSession ?? (async () => ({ data: null })),
       } };
       if (name === "@/lib/phone-number") return { maskPhoneNumber, normalizeMainlandPhoneNumber };
+      if (name === "@/lib/deepseek-client") return { pruneForeignDeepSeekConfig: id => signedInUsers.push(id) };
       if (name === "@/lib/request-timeout") return {
         RequestTimeoutError,
         withRequestTimeout: callback => callback(new AbortController().signal),
@@ -76,6 +78,7 @@ function createLoginForm({ sendOtp = async () => ({ data: { status: true } }), v
     sendButton,
     verifyCalls,
     routeCalls,
+    signedInUsers,
     changePhone: value => input("login-phone").props.onChange({ target: { value } }),
     changeCode: value => input("login-code").props.onChange({ target: { value } }),
     send: () => sendButton().props.onClick(),
@@ -94,6 +97,7 @@ test("刷新后无需本页发码也能填写并验证已有短信", async () =>
   assert.equal(form.verifyCalls[0].phoneNumber, "+8613800000000");
   assert.equal(form.verifyCalls[0].code, "123456");
   assert.equal(form.routeCalls[0], "/");
+  assert.deepEqual(form.signedInUsers, ["test-user"]);
 });
 
 test("刷新后重发被 429 拒绝仍保留已有验证码并使用服务端剩余秒数", async () => {
@@ -191,4 +195,5 @@ test("验证结果未知先核对会话，不重新提交验证码", async () =>
   await form.submit();
   assert.equal(form.verifyCalls.length, 1);
   assert.equal(sessionCalls, 2);
+  assert.deepEqual(form.signedInUsers, []);
 });

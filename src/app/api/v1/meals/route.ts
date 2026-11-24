@@ -1,6 +1,6 @@
 /**
  * GET  /api/v1/meals?date=YYYY-MM-DD  某天的全部饮食记录
- * POST /api/v1/meals                  添加记录 {date, mealType, foodId, grams}
+ * POST /api/v1/meals                  添加记录（按 foodId 或一次性每 100g 营养快照）
  */
 import { getSession, requireSession, unauthorized, invalidBody } from "@/lib/api-auth";
 import { getPhotosForDay } from "@/services/meal-photos";

@@ -281,7 +281,7 @@ components:
             - string
             - "null"
           format: uuid
-          description: 食物删除后为 null，记录仍可改克数、可删除
+          description: 一次性快照记餐或原食物删除后为 null，记录仍可改克数、可删除
         name:
           type: string
         grams:
@@ -1143,35 +1143,82 @@ paths:
       tags:
         - 饮食记录
       summary: 记一笔饮食
-      description: 只能使用自己食物库里的食物；营养按克数折算后保存为快照，与食物库后续修改无关。
+      description: 支持两种方式：1) 传入本人食物库中的 foodId + grams；2) 一次性快照记餐（省略 foodId 或传 null，传入 name、grams 及每 100g 营养基准 calories/protein/carbs/fat，不写入个人食物库）。两种方式均按克数折算并保存营养快照与每 100g 基准，后续改克数不受食物库变更影响。
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                date:
-                  type: string
-                mealType:
-                  type: string
-                  enum:
-                    - breakfast
-                    - lunch
-                    - dinner
-                    - snack
-                foodId:
-                  type: string
-                  format: uuid
-                grams:
-                  type: number
-                  minimum: 1
-                  maximum: 5000
-              required:
-                - date
-                - mealType
-                - foodId
-                - grams
+              anyOf:
+                - type: object
+                  properties:
+                    date:
+                      type: string
+                    mealType:
+                      type: string
+                      enum:
+                        - breakfast
+                        - lunch
+                        - dinner
+                        - snack
+                    foodId:
+                      type: string
+                      format: uuid
+                    grams:
+                      type: number
+                      minimum: 1
+                      maximum: 5000
+                  required:
+                    - date
+                    - mealType
+                    - foodId
+                    - grams
+                - type: object
+                  properties:
+                    date:
+                      type: string
+                    mealType:
+                      type: string
+                      enum:
+                        - breakfast
+                        - lunch
+                        - dinner
+                        - snack
+                    foodId:
+                      type: "null"
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 100
+                    grams:
+                      type: number
+                      minimum: 1
+                      maximum: 5000
+                    calories:
+                      type: number
+                      minimum: 0
+                      maximum: 2000
+                    protein:
+                      type: number
+                      minimum: 0
+                      maximum: 200
+                      default: 0
+                    carbs:
+                      type: number
+                      minimum: 0
+                      maximum: 200
+                      default: 0
+                    fat:
+                      type: number
+                      minimum: 0
+                      maximum: 200
+                      default: 0
+                  required:
+                    - date
+                    - mealType
+                    - name
+                    - grams
+                    - calories
       responses:
         "201":
           description: 创建成功（不含 photos）

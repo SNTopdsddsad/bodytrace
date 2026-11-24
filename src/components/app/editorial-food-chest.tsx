@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, History, Loader2, Plus, Search, Star, Utensils } from "lucide-react";
+import { BookOpen, History, Loader2, Plus, Search, Sparkles, Star, Utensils } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import type { Food, MealEntry } from "@/db/schema";
@@ -18,8 +18,14 @@ import {
   useReferenceFoodSearch,
   type ReferenceFood,
 } from "@/lib/reference-food-client";
+import {
+  AiNutritionPanel,
+  AiPrefillButton,
+} from "./ai-nutrition-panel";
+import { prefillUnchangedField, type AiDraftCommitPayload } from "@/lib/nutrition-drafts";
 import { SOFT_SPRING, TAB_SPRING, TAP_SPRING } from "./motion-provider";
 
+type ChestMode = "library" | "ai";
 type CapsuleTab = "recents" | "favorites" | "all";
 const REF_GRAMS_OPTIONS = [50, 100, 150, 200] as const;
 
@@ -38,29 +44,35 @@ export function useFoodChestWrite() {
   const [loggingKey, setLoggingKey] = useState<string | null>(null);
   const [review, setReview] = useState<WriteReview | null>(null);
 
-  async function run(key: string, action: () => Promise<void>) {
-    if (locked.current) return;
+  async function run<T = void>(key: string, action: () => Promise<T>): Promise<T | null> {
+    if (locked.current) return null;
     locked.current = true;
     setLoggingKey(key);
     try {
-      await action();
+      const value = await action();
+      locked.current = false;
+      return value;
     } catch (error) {
       if (error instanceof UnconfirmedWrite) {
         setReview(error.review);
         router.refresh();
-        return;
+        return null;
       }
+      locked.current = false;
       toast.error(error instanceof Error ? error.message : "保存失败，请重试");
+      return null;
     } finally {
       setLoggingKey(null);
     }
-    locked.current = false;
   }
 
   return { run, loggingKey, review };
 }
 
-type CreatedResource = { entry: Pick<MealEntry, "id" | "name" | "grams">; food: Food };
+type CreatedResource = {
+  entry: Pick<MealEntry, "id" | "name" | "grams" | "calories">;
+  food: Food;
+};
 
 async function postForReview<K extends keyof CreatedResource>(
   path: string, body: object, key: K, review: WriteReview,
@@ -78,6 +90,7 @@ async function postForReview<K extends keyof CreatedResource>(
 }
 
 export function EditorialFoodChest({
+  userId,
   date,
   canRecord,
   write,
@@ -91,6 +104,7 @@ export function EditorialFoodChest({
   embedded = false,
   onLogged,
 }: {
+  userId: string;
   date: string;
   canRecord: boolean;
   write: ReturnType<typeof useFoodChestWrite>;
@@ -106,6 +120,9 @@ export function EditorialFoodChest({
 }) {
   const router = useRouter();
   const favoriteFoods = myFoods.filter((f) => f.isFavorite);
+  const [chestMode, setChestMode] = useState<ChestMode>("library");
+  const [pendingAiPrompt, setPendingAiPrompt] = useState<{ id: number; text: string } | null>(null);
+  const aiPromptSeqRef = useRef(0);
   const [capsuleTab, setCapsuleTab] = useState<CapsuleTab>(() =>
     recentFoods.length > 0 ? "recents" : favoriteFoods.length > 0 ? "favorites" : "all",
   );
@@ -121,7 +138,28 @@ export function EditorialFoodChest({
   const [cfCarb, setCfCarb] = useState("0");
   const [cfFat, setCfFat] = useState("0");
   const [cfServing, setCfServing] = useState("");
+  const [cfAiHint, setCfAiHint] = useState("");
   const creatingFood = loggingKey === "custom";
+
+  const consumePendingAiPrompt = useCallback(() => {
+    setPendingAiPrompt(null);
+  }, []);
+
+  function handoffSearchToAi(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    aiPromptSeqRef.current += 1;
+    setRefQ("");
+    setChestMode("ai");
+    setPendingAiPrompt({ id: aiPromptSeqRef.current, text: `帮我估算一下：${trimmed}` });
+  }
+
+  function fallbackToCustomFood(initialName: string) {
+    setChestMode("library");
+    setCustomOpen(true);
+    setCfName(initialName.trim());
+    setCfAiHint("");
+  }
 
   // 官方参考库搜索与份量档位（使用共用防抖/中止 Hook）
   const [refQ, setRefQ] = useState("");
@@ -142,11 +180,31 @@ export function EditorialFoodChest({
 
   const mealLabel = MEAL_LABELS[targetMeal];
 
-  function recordMeal(food: Food, grams: number) {
+  function recordMeal(food: Pick<Food, "id" | "name">, grams: number) {
     return postForReview(
       "/api/v1/meals", { date, mealType: targetMeal, foodId: food.id, grams }, "entry",
       {
         message: `${date} ${mealLabel}「${food.name}」${grams}g 的保存结果待确认。`,
+        href: `/diary?date=${date}#meal-${targetMeal}`,
+        label: "查看当天餐次并核对",
+      },
+    );
+  }
+
+  function recordMealSnapshot(values: {
+    name: string;
+    grams: number;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  }) {
+    return postForReview(
+      "/api/v1/meals",
+      { date, mealType: targetMeal, foodId: null, ...values },
+      "entry",
+      {
+        message: `${date} ${mealLabel}「${values.name}」${values.grams}g 的保存结果待确认。`,
         href: `/diary?date=${date}#meal-${targetMeal}`,
         label: "查看当天餐次并核对",
       },
@@ -158,6 +216,78 @@ export function EditorialFoodChest({
       message: `「${values.name}」存入食物库的结果待确认，记餐尚未开始。`,
       href: "/foods",
       label: "查看食物库并核对",
+    });
+  }
+
+  async function commitAiDraft(key: string, payload: AiDraftCommitPayload, onFoodSaved: (food: Food) => void): Promise<string | null> {
+    return write.run(key, async () => {
+      // 未来日期：仅允许存入个人食物库
+      if (!canRecord) {
+        if (payload.matchedFoodId) {
+          throw new Error("未来日期不可记录饮食，该食物已在你的个人食物库中");
+        }
+        const saved = await createFood({
+          name: payload.name,
+          brand: null,
+          calories: payload.calories,
+          protein: payload.protein,
+          carbs: payload.carbs,
+          fat: payload.fat,
+          servingGrams: payload.servingGrams,
+        });
+        toast.success(`已存入个人食物库：${saved.name}`);
+        router.refresh();
+        return "已存入我的食物库";
+      }
+
+      if (payload.matchedFoodId) {
+        const entry = await recordMeal({ id: payload.matchedFoodId, name: payload.name }, payload.grams);
+        toast.success(`已记入${mealLabel}：${entry.name} ${entry.grams}g`);
+        onLogged?.();
+        router.refresh();
+        return `已记入${mealLabel} · ${entry.grams}g · ${Math.round(entry.calories)} kcal`;
+      }
+
+      if (payload.saveToLibrary) {
+        const food = await createFood({
+          name: payload.name,
+          brand: null,
+          calories: payload.calories,
+          protein: payload.protein,
+          carbs: payload.carbs,
+          fat: payload.fat,
+          servingGrams: payload.servingGrams,
+        });
+        let entry: CreatedResource["entry"];
+        onFoodSaved(food);
+        try {
+          entry = await recordMeal(food, payload.grams);
+        } catch (error) {
+          if (error instanceof UnconfirmedWrite) throw error;
+          router.refresh();
+          throw new Error(
+            `食物「${food.name}」已存入个人库，记餐失败：${error instanceof Error ? error.message : "请重试"}`,
+          );
+        }
+        toast.success(`已存入食物库并记入${mealLabel}：${entry.name} ${entry.grams}g`);
+        onLogged?.();
+        router.refresh();
+        return `已记入${mealLabel} · ${entry.grams}g · ${Math.round(entry.calories)} kcal`;
+      }
+
+      // 方案 A：一次性快照记餐（foodId = null），不污染个人食物库
+      const entry = await recordMealSnapshot({
+        name: payload.name,
+        grams: payload.grams,
+        calories: payload.calories,
+        protein: payload.protein,
+        carbs: payload.carbs,
+        fat: payload.fat,
+      });
+      toast.success(`已记入${mealLabel}：${entry.name} ${entry.grams}g`);
+      onLogged?.();
+      router.refresh();
+      return `已记入${mealLabel} · ${entry.grams}g · ${Math.round(entry.calories)} kcal`;
     });
   }
 
@@ -233,6 +363,7 @@ export function EditorialFoodChest({
       setCfCarb("0");
       setCfFat("0");
       setCfServing("");
+      setCfAiHint("");
       setCustomOpen(false);
       onLogged?.();
       router.refresh();
@@ -268,22 +399,60 @@ export function EditorialFoodChest({
 
   return (
     <section aria-labelledby={embedded ? undefined : "food-chest-title"} className={containerClass}>
+      {!embedded && (
+        <h3 id="food-chest-title" className="sr-only">
+          食物百宝箱与 AI 估算
+        </h3>
+      )}
       {review && (
         <div role="alert" className="space-y-1 rounded-lg border bg-background p-3 text-sm">
           <p>{review.message}</p>
           <a className="font-medium text-primary underline" href={review.href}>{review.label}</a>
         </div>
       )}
-      {/* 顶部餐次目标选择器 */}
+      {/* 顶部双模式切换（查库入账 / AI 估算）+ 目标餐次选择器 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 id={embedded ? undefined : "food-chest-title"} className="flex items-center gap-1.5 text-sm font-bold">
-            <Utensils className="size-4 text-primary" aria-hidden />
-            <span>食物百宝箱</span>
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            点胶囊一键记入 · 搜索官方库自动转存
-          </p>
+        <div
+          role="tablist"
+          aria-label="记餐方式"
+          className="inline-flex items-center gap-1 rounded-xl border bg-background p-1 text-xs"
+        >
+          {(
+            [
+              { id: "library", label: "查库入账", icon: Utensils },
+              { id: "ai", label: "AI 估算", icon: Sparkles },
+            ] as const
+          ).map((tab) => {
+            const active = chestMode === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setChestMode(tab.id)}
+                className={`relative inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-colors ${
+                  active
+                    ? "font-semibold text-primary-foreground"
+                    : "font-medium text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId={`chest-mode-tab-${scope}`}
+                    transition={TAB_SPRING}
+                    className="absolute inset-0 rounded-lg bg-primary shadow-xs"
+                    aria-hidden
+                  />
+                )}
+                <span className="relative z-10 inline-flex items-center gap-1.5">
+                  <Icon className="size-3.5" aria-hidden />
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-1.5 text-xs">
@@ -305,6 +474,25 @@ export function EditorialFoodChest({
         </div>
       </div>
 
+      {/* AI 估算对话面板（保持挂载以保留切换 Tab 期间的当前对话） */}
+      <div className={chestMode === "ai" ? "block" : "hidden"}>
+        <AiNutritionPanel
+          userId={userId}
+          date={date}
+          canRecord={canRecord}
+          targetMeal={targetMeal}
+          myFoods={myFoods}
+          writeBlocked={writeBlocked}
+          loggingKey={loggingKey}
+          pendingPrompt={pendingAiPrompt}
+          onConsumePendingPrompt={consumePendingAiPrompt}
+          onCommitDraft={commitAiDraft}
+          onFallbackCustomFood={fallbackToCustomFood}
+        />
+      </div>
+
+      {/* 查库入账主区域 */}
+      <div className={chestMode === "library" ? "space-y-4" : "hidden"}>
       {/* 第一区：最近常吃 12 / 我的收藏 / 全部 胶囊云 */}
       <div className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -457,19 +645,38 @@ export function EditorialFoodChest({
                     收起 ✕
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor={`cf-name-${scope}`} className="sr-only">
-                      食物名称
-                    </Label>
-                    <Input
-                      id={`cf-name-${scope}`}
-                      required
-                      placeholder="食物名称 (必填)"
-                      value={cfName}
-                      disabled={creatingFood}
-                      onChange={(e) => setCfName(e.target.value)}
-                      className="h-8 bg-card text-xs"
+                <div className="space-y-2">
+                  <div className="flex gap-1.5">
+                    <div className="min-w-0 flex-1">
+                      <Label htmlFor={`cf-name-${scope}`} className="sr-only">
+                        食物名称
+                      </Label>
+                      <Input
+                        id={`cf-name-${scope}`}
+                        required
+                        placeholder="食物名称 (必填，如：山姆瑞士卷)"
+                        value={cfName}
+                        disabled={creatingFood}
+                        onChange={(e) => {
+                          setCfName(e.target.value);
+                          setCfAiHint("");
+                        }}
+                        className="h-8 bg-card text-xs"
+                      />
+                    </div>
+                    <AiPrefillButton
+                      userId={userId}
+                      foodName={cfName}
+                      brand={cfBrand}
+                      disabled={creatingFood || chestMode !== "library"}
+                      onPrefilled={(values) => {
+                        setCfCal(current => prefillUnchangedField(current, cfCal, values.calories));
+                        setCfPro(current => prefillUnchangedField(current, cfPro, values.protein));
+                        setCfCarb(current => prefillUnchangedField(current, cfCarb, values.carbs));
+                        setCfFat(current => prefillUnchangedField(current, cfFat, values.fat));
+                        setCfServing(current => prefillUnchangedField(current, cfServing, values.servingGrams));
+                        setCfAiHint(`AI 已预填参考值（${values.assumption}），保存前请核对。`);
+                      }}
                     />
                   </div>
                   <div>
@@ -485,6 +692,11 @@ export function EditorialFoodChest({
                       className="h-8 bg-card text-xs"
                     />
                   </div>
+                  {cfAiHint && (
+                    <p className="rounded-lg border border-chart-3/40 bg-chart-3/10 px-2.5 py-1.5 text-[11px] leading-4 text-foreground">
+                      {cfAiHint}
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-5 gap-1.5 font-mono">
                   <label className="space-y-0.5">
@@ -651,9 +863,31 @@ export function EditorialFoodChest({
               )}
 
               {!refSearching && !refSearchError && visibleRefResults.length === 0 && personalMatches.length === 0 && (
-                <p className="py-5 text-center text-xs text-muted-foreground">
-                  未找到匹配食物，可点击上方「+ 自定义食物」快速录入。
-                </p>
+                <div className="space-y-2.5 rounded-2xl border border-dashed border-primary/40 bg-background p-4 text-center text-xs">
+                  <p className="text-muted-foreground">
+                    个人库与《中国食物成分表》中未找到 <strong className="text-foreground">「{refQ.trim()}」</strong>
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handoffSearchToAi(refQ)}
+                      className="h-8 rounded-xl px-3 text-xs font-semibold"
+                    >
+                      <Sparkles className="size-3.5" aria-hidden />
+                      让 DeepSeek 估算「{refQ.trim().slice(0, 12)}」
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fallbackToCustomFood(refQ)}
+                      className="h-8 rounded-xl px-3 text-xs font-medium"
+                    >
+                      手动新建
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {visibleRefResults.length > 0 && (
@@ -730,6 +964,7 @@ export function EditorialFoodChest({
             </>
           )}
         </div>
+      </div>
       </div>
     </section>
   );

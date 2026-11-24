@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { pruneForeignDeepSeekConfig } from "@/lib/deepseek-client";
 import { maskPhoneNumber, normalizeMainlandPhoneNumber } from "@/lib/phone-number";
 import { RequestTimeoutError, withRequestTimeout } from "@/lib/request-timeout";
 import type { SmsCodeSettings } from "@/lib/sms-config";
@@ -56,7 +57,8 @@ export function LoginForm({ smsConfigured, smsSettings }: { smsConfigured: boole
     return () => window.clearInterval(timer);
   }, [resendAvailableAt]);
 
-  function finishLogin() {
+  function finishLogin(userId: string) {
+    pruneForeignDeepSeekConfig(userId);
     router.push("/");
     router.refresh();
   }
@@ -77,21 +79,23 @@ export function LoginForm({ smsConfigured, smsSettings }: { smsConfigured: boole
     }
   }
 
-  async function hasPhoneSession(expectedPhoneNumber: string) {
+  async function getPhoneSessionUser(expectedPhoneNumber: string) {
     const result = await withRequestTimeout(signal => authClient.getSession({
       query: { disableCookieCache: true },
       fetchOptions: { signal, cache: "no-store" },
     }));
     return !result.error
       && result.data?.user.phoneNumberVerified === true
-      && normalizeMainlandPhoneNumber(result.data.user.phoneNumber ?? "") === expectedPhoneNumber;
+      && normalizeMainlandPhoneNumber(result.data.user.phoneNumber ?? "") === expectedPhoneNumber
+      ? result.data.user : null;
   }
 
   async function confirmPhoneLogin(expectedPhoneNumber: string) {
     setNotice("正在核对登录状态…");
     try {
-      if (await hasPhoneSession(expectedPhoneNumber)) {
-        finishLogin();
+      const user = await getPhoneSessionUser(expectedPhoneNumber);
+      if (user) {
+        finishLogin(user.id);
         return;
       }
     } catch {
@@ -207,7 +211,7 @@ export function LoginForm({ smsConfigured, smsSettings }: { smsConfigured: boole
       }
       if (result.data?.user?.phoneNumberVerified === true
         && normalizeMainlandPhoneNumber(result.data.user.phoneNumber ?? "") === normalized) {
-        finishLogin();
+        finishLogin(result.data.user.id);
         return;
       }
       await confirmPhoneLogin(normalized);
@@ -239,7 +243,7 @@ export function LoginForm({ smsConfigured, smsSettings }: { smsConfigured: boole
             : "登录服务暂时不可用，请稍后重试。");
         return;
       }
-      finishLogin();
+      finishLogin(result.data.user.id);
     } catch (error) {
       setLoginError(error instanceof RequestTimeoutError
         ? "登录请求超过 15 秒，请重试。"

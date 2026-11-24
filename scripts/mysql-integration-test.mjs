@@ -133,6 +133,39 @@ try {
   check("旧记录首次编辑时保留现存快照", true);
   assert.equal((await api(b, `/api/v1/meals/${marked.id}`, "DELETE")).status, 200);
 
+  // 一次性快照记餐（方案 A：不写入个人食物库，foodId 为 null，支持改克数精确往返）
+  const foodsBeforeSnapshot = (await api(b, "/api/v1/foods")).json.foods.length;
+  const snapshotCreated = await api(b, "/api/v1/meals", "POST", {
+    date: today,
+    mealType: "lunch",
+    foodId: null,
+    name: "兰州牛肉面（AI 估算）",
+    grams: 450,
+    calories: 116,
+    protein: 5,
+    carbs: 16.4,
+    fat: 3.2,
+  });
+  const snapEntry = snapshotCreated.json.entry;
+  assert.equal(snapshotCreated.status, 201);
+  assert.equal(snapEntry.foodId, null);
+  assert.equal(snapEntry.name, "兰州牛肉面（AI 估算）");
+  assert.equal(snapEntry.calories, 522);
+  assert.equal(snapEntry.protein, 22.5);
+  assert.equal(snapEntry.carbs, 73.8);
+  assert.equal(snapEntry.fat, 14.4);
+  assert.equal((await api(b, "/api/v1/foods")).json.foods.length, foodsBeforeSnapshot);
+  const snapResized = await resize(snapEntry.id, 225);
+  assert.equal(snapResized.foodId, null);
+  assert.equal(snapResized.calories, 261);
+  assert.equal(snapResized.protein, 11.3);
+  assert.equal((await api(a, `/api/v1/meals/${snapEntry.id}`, "PATCH", { grams: 100 })).status, 404);
+  assert.equal((await api(b, "/api/v1/meals", "POST", {
+    date: today, mealType: "lunch", foodId: "not-a-uuid", name: "混入非法ID", grams: 100, calories: 100,
+  })).status, 400);
+  assert.equal((await api(b, `/api/v1/meals/${snapEntry.id}`, "DELETE")).status, 200);
+  check("一次性快照记餐不污染个人食物库，支持改克数、账号隔离且拒绝非法 foodId 混传", true);
+
   // 用单独的合成账号构造超过 200 条重复记录，不影响其他快照与清空数量的断言。
   const recentOwner = await signup();
   const recentFoods = (await api(recentOwner, "/api/v1/foods")).json.foods

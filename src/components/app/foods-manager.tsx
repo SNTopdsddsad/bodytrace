@@ -21,6 +21,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
+import { prefillUnchangedField } from "@/lib/nutrition-drafts";
+import { AiPrefillButton } from "./ai-nutrition-panel";
 
 /** 弹窗表单的初始值（新增时用） */
 const EMPTY_FORM = {
@@ -33,7 +35,13 @@ const EMPTY_FORM = {
   servingGrams: "",
 };
 
-export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
+export function FoodsManager({
+  userId,
+  initialFoods,
+}: {
+  userId: string;
+  initialFoods: Food[];
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
@@ -41,6 +49,7 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
   const [editing, setEditing] = useState<Food | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [aiHint, setAiHint] = useState("");
   const [busy, setBusy] = useState(false);
 
   // 前端本地过滤即可（个人食物库量级很小）
@@ -49,6 +58,7 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
   function openCreate() {
     setEditing(null);
     setForm({ ...EMPTY_FORM });
+    setAiHint("");
     setDialogOpen(true);
   }
 
@@ -63,6 +73,7 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
       fat: String(f.fat),
       servingGrams: f.servingGrams != null ? String(f.servingGrams) : "",
     });
+    setAiHint("");
     setDialogOpen(true);
   }
 
@@ -238,12 +249,41 @@ export function FoodsManager({ initialFoods }: { initialFoods: Food[] }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 space-y-1.5">
               <Label htmlFor="f-name">名称 *</Label>
-              <Input
-                id="f-name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="如：鸡胸肉"
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  id="f-name"
+                  value={form.name}
+                  onChange={(e) => {
+                    setForm({ ...form, name: e.target.value });
+                    setAiHint("");
+                  }}
+                  placeholder="如：鸡胸肉、山姆瑞士卷"
+                  className="flex-1"
+                />
+                <AiPrefillButton
+                  key={editing?.id ?? "new"}
+                  userId={userId}
+                  foodName={form.name}
+                  brand={form.brand}
+                  disabled={!dialogOpen || busy}
+                  onPrefilled={(values) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      calories: prefillUnchangedField(prev.calories, form.calories, values.calories),
+                      protein: prefillUnchangedField(prev.protein, form.protein, values.protein),
+                      carbs: prefillUnchangedField(prev.carbs, form.carbs, values.carbs),
+                      fat: prefillUnchangedField(prev.fat, form.fat, values.fat),
+                      servingGrams: prefillUnchangedField(prev.servingGrams, form.servingGrams, values.servingGrams),
+                    }));
+                    setAiHint(`AI 已预填每 100g 参考值（${values.assumption}），保存前请核对。`);
+                  }}
+                />
+              </div>
+              {aiHint && (
+                <p className="rounded-lg border border-chart-3/40 bg-chart-3/10 px-2.5 py-1.5 text-xs leading-5 text-foreground">
+                  {aiHint}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="f-brand">品牌（可选）</Label>

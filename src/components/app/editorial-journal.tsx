@@ -27,6 +27,7 @@ import { SOFT_SPRING } from "./motion-provider";
 type ModalName = Exclude<EditorialModalName, "auth"> | null;
 
 export function EditorialJournal({
+  userId,
   date,
   today,
   defaultMeal,
@@ -39,6 +40,7 @@ export function EditorialJournal({
   recordCounts,
   initialModal = null,
 }: {
+  userId: string;
   date: string;
   today: string;
   defaultMeal: MealType;
@@ -199,6 +201,7 @@ export function EditorialJournal({
           className="hidden xl:sticky xl:top-24 xl:col-span-4 xl:block"
         >
           <EditorialFoodChest
+            userId={userId}
             write={foodWrite}
             date={date}
             canRecord={canRecord}
@@ -219,10 +222,11 @@ export function EditorialJournal({
           <DialogHeader>
             <DialogTitle>记入{MEAL_LABELS[targetMeal]}</DialogTitle>
             <DialogDescription>
-              点击食物胶囊一键记入，或检索《中国食物成分表》自动转存。
+              点击食物胶囊、检索《中国食物成分表》，或切到「AI 估算」用 DeepSeek 估算营养。
             </DialogDescription>
           </DialogHeader>
           <EditorialFoodChest
+            userId={userId}
             write={foodWrite}
             date={date}
             canRecord={canRecord}
@@ -242,6 +246,7 @@ export function EditorialJournal({
       </Dialog>
 
       <EditorialModals
+        userId={userId}
         activeModal={activeModal}
         onClose={() => setActiveModal(null)}
         trends={trends}

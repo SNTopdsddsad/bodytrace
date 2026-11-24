@@ -22,29 +22,62 @@ function snapshot({ calories, protein, carbs, fat }: MacroLike, grams: number) {
   return { calories, protein, carbs, fat, grams };
 }
 
-/** API 入参校验：zod 会先验证数据形状，不合法直接报错，脏数据进不了数据库。 */
-export const mealCreateSchema = mealSlotSchema.extend({
+const mealCreateByFoodSchema = mealSlotSchema.extend({
   foodId: z.string().uuid(),
   grams: z.number().min(1).max(5000),
 });
+
+/** 一次性快照记餐：不先写入个人食物库，按每 100g 营养基准折算并保存快照。 */
+const mealCreateSnapshotSchema = mealSlotSchema.extend({
+  foodId: z.null().optional(),
+  name: z.string().trim().min(1).max(100),
+  grams: z.number().min(1).max(5000),
+  calories: z.number().min(0).max(2000),
+  protein: z.number().min(0).max(200).default(0),
+  carbs: z.number().min(0).max(200).default(0),
+  fat: z.number().min(0).max(200).default(0),
+});
+
+/** API 入参校验：支持按个人食物库 foodId 记餐，或直接提交一次性每 100g 营养快照。 */
+export const mealCreateSchema = z.union([
+  mealCreateByFoodSchema,
+  mealCreateSnapshotSchema,
+]);
 
 export const mealPatchSchema = z.object({
   grams: z.number().min(1).max(5000),
 });
 
-/** 添加一条饮食记录：查食物 → 按克数折算营养 → 存快照。 */
+/** 添加一条饮食记录：按食物库或一次性每 100g 营养基准折算 → 存快照。 */
 export async function addEntry(
   userId: string,
   input: z.infer<typeof mealCreateSchema>,
 ): Promise<MealEntry | null> {
-  // 只能吃自己食物库里的东西（同时校验归属和数据存在）
-  const [f] = await db
-    .select()
-    .from(food)
-    .where(and(eq(food.id, input.foodId), eq(food.userId, userId)));
-  if (!f) return null;
+  let foodId: string | null = null;
+  let name: string;
+  let basis: MacroLike;
 
-  const macro = scaleMacro(f, input.grams);
+  if (typeof input.foodId === "string") {
+    // 只能吃自己食物库里的东西（同时校验归属和数据存在）
+    const [f] = await db
+      .select()
+      .from(food)
+      .where(and(eq(food.id, input.foodId), eq(food.userId, userId)));
+    if (!f) return null;
+    foodId = f.id;
+    name = f.name;
+    basis = f;
+  } else {
+    name = input.name;
+    basis = {
+      calories: input.calories,
+      protein: input.protein,
+      carbs: input.carbs,
+      fat: input.fat,
+    };
+  }
+
+  const macro = scaleMacro(basis, input.grams);
   const row = await db.transaction(async (tx) => {
     const [{ id }] = await tx
       .insert(mealEntry)
@@ -52,10 +85,10 @@ export async function addEntry(
         userId,
         date: input.date,
         mealType: input.mealType,
-        foodId: f.id,
-        name: f.name,
+        foodId,
+        name,
         grams: input.grams,
-        nutritionBasis: snapshot(f, 100),
+        nutritionBasis: snapshot(basis, 100),
         // 存写入时刻的快照：以后食物库改了/删了，历史记录不变
         calories: macro.calories,
         protein: macro.protein,

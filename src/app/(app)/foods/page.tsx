@@ -15,7 +15,7 @@ export default async function FoodsPage() {
   return (
     <div className="space-y-8">
       <PageHeader eyebrow="熟悉的食物，轻松地记录" title="食物库" description={`共 ${foods.length} 种食物 · 收藏常用食物，下次记录更方便。`} />
-      <FoodsManager initialFoods={foods} />
+      <FoodsManager userId={session.user.id} initialFoods={foods} />
     </div>
   );
 }

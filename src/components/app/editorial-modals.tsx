@@ -37,12 +37,15 @@ import type { Goals } from "@/services/goals";
 import type { RecordCounts } from "@/services/records";
 import type { TrendPoint } from "@/services/trends";
 import { ClearRecordsButton } from "./clear-records-button";
+import { AiPrefillButton } from "./ai-nutrition-panel";
+import { prefillUnchangedField } from "@/lib/nutrition-drafts";
 
 type ActiveModal = "trends" | "library" | "settings" | null;
 
 const GENDERS = Object.keys(GENDER_LABELS) as Gender[];
 
 export function EditorialModals({
+  userId,
   activeModal,
   onClose,
   trends,
@@ -52,6 +55,7 @@ export function EditorialModals({
   myFoods,
   recordCounts,
 }: {
+  userId: string;
   activeModal: ActiveModal;
   onClose: () => void;
   trends: TrendPoint[];
@@ -71,6 +75,7 @@ export function EditorialModals({
         measurementData={measurementData}
       />
       <LibraryModal
+        userId={userId}
         open={activeModal === "library"}
         onOpenChange={(open) => !open && onClose()}
         myFoods={myFoods}
@@ -399,10 +404,12 @@ function TrendsModal({
 /* ==================== 浮层 2：我的个人食物库管理 ==================== */
 
 function LibraryModal({
+  userId,
   open,
   onOpenChange,
   myFoods,
 }: {
+  userId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   myFoods: Food[];
@@ -421,6 +428,7 @@ function LibraryModal({
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
   const [servingGrams, setServingGrams] = useState("");
+  const [aiHint, setAiHint] = useState("");
 
   const filtered = myFoods.filter(
     (f) =>
@@ -438,6 +446,7 @@ function LibraryModal({
     setCarbs("0");
     setFat("0");
     setServingGrams("");
+    setAiHint("");
   }
 
   function startEdit(f: Food) {
@@ -450,6 +459,7 @@ function LibraryModal({
     setCarbs(String(f.carbs));
     setFat(String(f.fat));
     setServingGrams(f.servingGrams != null ? String(f.servingGrams) : "");
+    setAiHint("");
   }
 
   async function handleSaveFood(e: React.FormEvent) {
@@ -597,20 +607,44 @@ function LibraryModal({
                 取消
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Input
-                required
-                placeholder="名称 *"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-8 bg-card text-xs"
-              />
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  required
+                  placeholder="名称 *"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setAiHint("");
+                  }}
+                  className="h-8 flex-1 bg-card text-xs"
+                />
+                <AiPrefillButton
+                  userId={userId}
+                  foodName={name}
+                  brand={brand}
+                  disabled={!open || busyId !== null}
+                  onPrefilled={(values) => {
+                    setCalories(current => prefillUnchangedField(current, calories, values.calories));
+                    setProtein(current => prefillUnchangedField(current, protein, values.protein));
+                    setCarbs(current => prefillUnchangedField(current, carbs, values.carbs));
+                    setFat(current => prefillUnchangedField(current, fat, values.fat));
+                    setServingGrams(current => prefillUnchangedField(current, servingGrams, values.servingGrams));
+                    setAiHint(`AI 已预填每 100g 参考值（${values.assumption}），保存前请核对。`);
+                  }}
+                />
+              </div>
               <Input
                 placeholder="品牌 (可选)"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 className="h-8 bg-card text-xs"
               />
+              {aiHint && (
+                <p className="rounded-lg border border-chart-3/40 bg-chart-3/10 px-2.5 py-1.5 text-[11px] leading-4 text-foreground">
+                  {aiHint}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-5 gap-2 font-mono">
               <label className="space-y-0.5">

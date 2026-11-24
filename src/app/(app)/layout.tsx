@@ -27,7 +27,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppMotionProvider>
       <div className="min-h-svh flex-1 bg-background text-foreground">
         <SiteNav
+          key={session.user.id}
           user={{
+            id: session.user.id,
             name: session.user.name,
             email: session.user.email,
             phoneNumber: session.user.phoneNumber ?? null,
