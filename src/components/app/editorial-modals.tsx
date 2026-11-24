@@ -900,7 +900,10 @@ function SettingsModalBody({
   }
 
   const totalRecords =
-    recordCounts.mealEntries + recordCounts.measurements + recordCounts.mealPhotos;
+    recordCounts.mealEntries +
+    recordCounts.measurements +
+    recordCounts.mealPhotos +
+    recordCounts.supplementIntakes;
 
   return (
     <div className="grid gap-5 md:grid-cols-2">
@@ -1036,14 +1039,15 @@ function SettingsModalBody({
             <span>危险操作 · 清空后无法恢复</span>
           </div>
           <h3 className="text-sm font-bold text-destructive">
-            清空饮食、照片与身体指标记录
+            清空饮食、照片、身体指标与补剂记录
           </h3>
           <p className="leading-relaxed text-muted-foreground">
             同一事务内永久删除当前账号全部饮食记录（{recordCounts.mealEntries} 条）、餐次照片（
-            {recordCounts.mealPhotos} 张）及身体指标（{recordCounts.measurements} 条），无法恢复。
+            {recordCounts.mealPhotos} 张）、身体指标（{recordCounts.measurements} 条）及补剂服用记录（
+            {recordCounts.supplementIntakes} 条），无法恢复。
           </p>
           <p className="text-muted-foreground">
-            个人食物库和每日目标、个人资料会完好保留。
+            个人食物库、补剂库配置、每日目标与个人资料会完好保留。
           </p>
         </div>
 

@@ -26,6 +26,14 @@ import { foodInputSchema, foodPatchSchema } from "@/services/foods";
 import { goalsSchema } from "@/services/goals";
 import { profileSchema } from "@/services/profile";
 import { measurementSchemas } from "@/lib/measurements";
+import {
+  SUPPLEMENT_MODES,
+  SUPPLEMENT_SLOTS,
+  SUPPLEMENT_STATUSES,
+  supplementCreateSchema,
+  supplementIntakeSchemas,
+  supplementPatchSchema,
+} from "@/lib/supplements";
 
 extendZodWithOpenApi(z);
 
@@ -187,6 +195,65 @@ const Profile = registry.register(
     heightCm: z.number().nullable(),
     weightKg: z.number().nullable().describe("有测量时为最新测量体重"),
     targetWeightKg: z.number().nullable(),
+  }),
+);
+
+const SupplementScheduleItem = registry.register(
+  "SupplementScheduleItem",
+  z.object({
+    slot: z.enum(SUPPLEMENT_SLOTS),
+    quantity: z.number(),
+  }),
+);
+
+const Supplement = registry.register(
+  "Supplement",
+  z.object({
+    id: uuid,
+    name: z.string(),
+    defaultQuantity: z.number(),
+    unit: z.string(),
+    spec: z.string().nullable().describe("可选单份规格短文本，不参与成分叠加计算"),
+    mode: z.enum(SUPPLEMENT_MODES),
+    status: z.enum(SUPPLEMENT_STATUSES),
+    schedule: z.array(SupplementScheduleItem),
+    weekdays: z.array(z.number().int().min(0).max(6)).nullable().describe("null 表示每天；0=周一 … 6=周日"),
+    note: z.string().nullable(),
+    startDate: z.string(),
+    sortOrder: z.number().int(),
+    createdAt: dateTime,
+    updatedAt: dateTime,
+  }),
+);
+
+const SupplementIntake = registry.register(
+  "SupplementIntake",
+  z.object({
+    id: uuid,
+    supplementId: uuid.nullable().describe("临时记录或原补剂删除后为 null，快照仍保留"),
+    date: z.string(),
+    slot: z.enum(SUPPLEMENT_SLOTS),
+    takenTime: z.string().regex(/^\d{2}:\d{2}$/).nullable(),
+    timeZone: z.string(),
+    name: z.string(),
+    quantity: z.number(),
+    unit: z.string(),
+    spec: z.string().nullable(),
+    note: z.string().nullable(),
+    isAdhoc: z.boolean(),
+    version: z.number().int().describe("每次修改或删除递增"),
+    createdAt: dateTime,
+    updatedAt: dateTime,
+  }),
+);
+
+const SupplementRecentDay = registry.register(
+  "SupplementRecentDay",
+  z.object({
+    date: z.string(),
+    planned: z.number().int(),
+    completed: z.number().int(),
+    taken: z.number().int(),
   }),
 );
 
@@ -947,6 +1014,175 @@ registry.registerPath({
   },
 });
 
+/* ───────────────────────────── 补剂记录 ───────────────────────────── */
+
+const supplementIntakeDocs = supplementIntakeSchemas(todayStr());
+
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/supplements",
+  operationId: "getSupplementDashboard",
+  tags: ["补剂记录"],
+  summary: "查询补剂库与某日补剂面板",
+  description:
+    "返回用户全部补剂配置（在服与暂停）、指定日期服用记录、近 30 天有效服用记录（供 14/30 天规律点阵使用）与近 15 天周历进度摘要。",
+  request: {
+    query: z.object({
+      date: z.string().optional().describe(`${BUSINESS_DATE}；省略时默认今天`),
+    }),
+  },
+  responses: {
+    "200": {
+      description: "补剂面板数据",
+      content: {
+        "application/json": {
+          schema: z.object({
+            date: z.string(),
+            today: z.string(),
+            timeZone: z.string(),
+            supplements: z.array(Supplement),
+            intakes: z.array(SupplementIntake),
+            windowIntakes: z.array(SupplementIntake),
+            recentDays: z.array(SupplementRecentDay),
+          }),
+        },
+      },
+    },
+    "400": { description: "date 非法", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/supplements",
+  operationId: "createSupplement",
+  tags: ["补剂记录"],
+  summary: "新增补剂到个人补剂库",
+  description:
+    "常规计划至少有一个时段，按需补剂不配置时段和星期。可传 requestId 安全重试创建；同账号同编号同内容返回现有补剂。",
+  request: { body: { required: true, content: { "application/json": { schema: supplementCreateSchema } } } },
+  responses: {
+    "201": { description: "创建成功", content: { "application/json": { schema: z.object({ supplement: Supplement }) } } },
+    "200": { description: "同内容重放", content: { "application/json": { schema: z.object({ supplement: Supplement }) } } },
+    "409": { description: "同编号内容不同或原补剂已删除", content: { "application/json": { schema: ApiError } } },
+    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/v1/supplements/{id}",
+  operationId: "updateSupplement",
+  tags: ["补剂记录"],
+  summary: "更新补剂配置或暂停/恢复",
+  description: "仅影响之后的新记录，不回写历史已保存的服用快照。",
+  request: {
+    params: z.object({ id: uuid }),
+    body: { required: true, content: { "application/json": { schema: supplementPatchSchema } } },
+  },
+  responses: {
+    "200": { description: "更新成功", content: { "application/json": { schema: z.object({ supplement: Supplement }) } } },
+    "400": { description: "编号或参数非法", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+    "404": { description: "不存在或不属于当前用户", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/v1/supplements/{id}",
+  operationId: "deleteSupplement",
+  tags: ["补剂记录"],
+  summary: "从补剂库删除补剂",
+  description: "历史服用记录保留快照（supplementId 置为 null），仍可查看、编辑和删除。",
+  request: { params: z.object({ id: uuid }) },
+  responses: {
+    "200": { description: "删除成功", content: { "application/json": { schema: OkResult } } },
+    "400": { description: "非法 UUID", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+    "404": { description: "不存在或不属于当前用户", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/supplements/intakes",
+  operationId: "createSupplementIntake",
+  tags: ["补剂记录"],
+  summary: "新增一条补剂服用记录",
+  description:
+    "支持两种方式：1) 传入本人补剂库 supplementId（快照写入名称、单位与规格）；2) 临时记录（supplementId 省略或为 null，直接传 name/quantity/unit）。携带 requestId 幂等：首次 201，同内容重放 200，编号冲突或已删除返回 409。拒绝未来日期。",
+  request: { body: { required: true, content: { "application/json": { schema: supplementIntakeDocs.createItem } } } },
+  responses: {
+    "201": { description: "创建成功", content: { "application/json": { schema: z.object({ entry: SupplementIntake }) } } },
+    "200": { description: "幂等重放", content: { "application/json": { schema: z.object({ entry: SupplementIntake }) } } },
+    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+    "404": { description: "引用的补剂不存在或非本人", content: { "application/json": { schema: ApiError } } },
+    "409": { description: "requestId 冲突或对应记录已删除", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/supplements/intakes/batch",
+  operationId: "createSupplementIntakesBatch",
+  tags: ["补剂记录"],
+  summary: "批量新增补剂服用记录（本时段全服）",
+  description: "单事务写入 1–30 条记录，每条自带 requestId 独立幂等。",
+  request: { body: { required: true, content: { "application/json": { schema: supplementIntakeDocs.batchCreate } } } },
+  responses: {
+    "201": { description: "批量创建成功", content: { "application/json": { schema: z.object({ entries: z.array(SupplementIntake) }) } } },
+    "200": { description: "全部为幂等重放", content: { "application/json": { schema: z.object({ entries: z.array(SupplementIntake) }) } } },
+    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+    "404": { description: "引用的补剂不存在或非本人", content: { "application/json": { schema: ApiError } } },
+    "409": { description: "requestId 冲突或对应记录已删除", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/v1/supplements/intakes/{id}",
+  operationId: "updateSupplementIntake",
+  tags: ["补剂记录"],
+  summary: "修改单条补剂服用记录（乐观并发）",
+  description: "可调整数量、时段、日期、服用时间与备注；version 冲突返回 409，丢失响应同内容重试直接返回最新结果。",
+  request: {
+    params: z.object({ id: uuid }),
+    body: { required: true, content: { "application/json": { schema: supplementIntakeDocs.update } } },
+  },
+  responses: {
+    "200": { description: "修改成功", content: { "application/json": { schema: z.object({ entry: SupplementIntake }) } } },
+    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+    "404": { description: "不存在或非本人", content: { "application/json": { schema: ApiError } } },
+    "409": { description: "版本冲突", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/v1/supplements/intakes/{id}",
+  operationId: "deleteSupplementIntake",
+  tags: ["补剂记录"],
+  summary: "软删除一条补剂服用记录",
+  description: "保留删除标记防止旧 requestId 重放；相同 version 重试幂等返回 200，版本冲突返回 409。",
+  request: {
+    params: z.object({ id: uuid }),
+    body: { required: true, content: { "application/json": { schema: supplementIntakeDocs.remove } } },
+  },
+  responses: {
+    "200": { description: "删除成功", content: { "application/json": { schema: OkResult } } },
+    "400": { description: "参数校验失败", content: { "application/json": { schema: ApiError } } },
+    "401": { description: "未登录", content: { "application/json": { schema: ApiError } } },
+    "404": { description: "不存在或非本人", content: { "application/json": { schema: ApiError } } },
+    "409": { description: "版本冲突", content: { "application/json": { schema: ApiError } } },
+  },
+});
+
 /* ───────────────────────────── 数据管理 ───────────────────────────── */
 
 registry.registerPath({
@@ -956,7 +1192,7 @@ registry.registerPath({
   tags: ["数据管理"],
   summary: "一键清空本人全部业务记录",
   description:
-    "同一事务内硬删除全部饮食记录、餐次照片、身体指标（含此前软删除行）。个人食物库、每日目标和个人资料不受影响。重复调用成功；两次之间没有新写入时数量为 0。cleared 含已软删除的行，可能大于界面可见数量。硬删除会清除幂等编号占用：清空后重放旧新增请求可能重新创建记录，客户端应停止上传并刷新状态。",
+    "同一事务内硬删除全部饮食记录、餐次照片、身体指标与补剂服用记录（含此前软删除行）。个人食物库、个人补剂库配置、每日目标和个人资料不受影响。重复调用成功；两次之间没有新写入时数量为 0。cleared 含已软删除的行，可能大于界面可见数量。硬删除会清除幂等编号占用：清空后重放旧新增请求可能重新创建记录，客户端应停止上传并刷新状态。",
   responses: {
     "200": {
       description: "清空结果",
@@ -968,6 +1204,7 @@ registry.registerPath({
               mealEntries: z.number().int(),
               measurements: z.number().int(),
               mealPhotos: z.number().int(),
+              supplementIntakes: z.number().int(),
             }),
           }),
         },
@@ -1032,6 +1269,7 @@ const doc = generator.generateDocument({
     { name: "汇总与趋势", description: "首页 / 日记共用的当日汇总与最近 N 天趋势" },
     { name: "每日目标", description: "每个用户一行每日营养目标，未设置时使用默认值" },
     { name: "身体指标", description: "体重 kg / 体脂率 % / 血压 mmHg；乐观并发（version）与 requestId 幂等" },
+    { name: "补剂记录", description: "个人补剂库（多时段/按星期/按需）与每日服用快照记录，支持批量全服与 requestId 幂等" },
     { name: "个人资料", description: "性别 / 身高 / 体重 / 目标体重，null 表示未填写" },
     { name: "数据管理", description: "一键清空本人全部业务记录" },
   ],

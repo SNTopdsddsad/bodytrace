@@ -7,6 +7,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { MacroLike } from "@/lib/nutrition";
+import type { SupplementScheduleItem } from "@/lib/supplements";
 import { sql } from "drizzle-orm";
 import {
   mysqlTable,
@@ -22,6 +23,8 @@ import {
   index,
   unique,
   check,
+  foreignKey,
+  primaryKey,
   json,
 } from "drizzle-orm/mysql-core";
 
@@ -367,8 +370,117 @@ export const foodReference = mysqlTable(
   (t) => [index("food_reference_name_idx").on(t.name)],
 );
 
+export const supplement = mysqlTable(
+  "bodytrace_supplement",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    defaultQuantity: decimal("default_quantity", { precision: 6, scale: 2 }).notNull(),
+    unit: varchar("unit", { length: 24 }).notNull(),
+    /** 可选单份规格文本（如 "1000mg" 或 "D3 2000IU + K2 100mcg"），不参与成分叠加计算。 */
+    spec: varchar("spec", { length: 100 }),
+    mode: varchar("mode", { length: 16, enum: ["scheduled", "asNeeded"] }).notNull(),
+    status: varchar("status", { length: 16, enum: ["active", "paused"] }).notNull().default("active"),
+    /** 常规计划的每日多时段配置；按需常备为空数组 []。 */
+    schedule: json("schedule").$type<SupplementScheduleItem[]>().notNull(),
+    /** null 表示每天；数组元素 0=周一 … 6=周日。 */
+    weekdays: json("weekdays").$type<number[] | null>(),
+    note: varchar("note", { length: 255 }),
+    /** 补剂建档的业务日期（YYYY-MM-DD），点阵在该日期之前展示为“未开始”。 */
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+    createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    updatedAt: datetime("updated_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+  },
+  (t) => [
+    index("supplement_user_idx").on(t.userId, t.status, t.sortOrder),
+    check(
+      "supplement_values_valid",
+      sql`
+        ${t.defaultQuantity} > 0 AND ${t.defaultQuantity} <= 100
+        AND ${t.mode} IN ('scheduled', 'asNeeded')
+        AND ${t.status} IN ('active', 'paused')
+        AND JSON_TYPE(${t.schedule}) = 'ARRAY'
+      `,
+    ),
+  ],
+);
+
+/**
+ * 每日补剂服用记录：保存写入时刻的名称、数量、单位与规格快照；
+ * 之后修改/暂停/删除补剂库条目不影响历史记录。
+ */
+export const supplementIntake = mysqlTable(
+  "bodytrace_supplement_intake",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().$defaultFn(randomUUID),
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    supplementId: varchar("supplement_id", { length: 36 }),
+    date: date("date", { mode: "string" }).notNull(),
+    slot: varchar("slot", {
+      length: 24,
+      enum: ["morningEmpty", "breakfast", "lunch", "dinner", "workout", "bedtime", "anytime"],
+    }).notNull(),
+    takenTime: varchar("taken_time", { length: 5 }),
+    timeZone: varchar("time_zone", { length: 64 }).notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    quantity: decimal("quantity", { precision: 6, scale: 2 }).notNull(),
+    unit: varchar("unit", { length: 24 }).notNull(),
+    spec: varchar("spec", { length: 100 }),
+    note: varchar("note", { length: 300 }),
+    isAdhoc: boolean("is_adhoc").notNull().default(false),
+    requestId: varchar("request_id", { length: 36 }).notNull(),
+    version: int("version").notNull().default(1),
+    createdAt: datetime("created_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    updatedAt: datetime("updated_at", { mode: "date", fsp: 3 }).notNull().default(sql`CURRENT_TIMESTAMP(3)`),
+    /** 保留请求编号，阻止删除后重放旧的新增请求。 */
+    deletedAt: datetime("deleted_at", { mode: "date", fsp: 3 }),
+  },
+  (t) => [
+    foreignKey({
+      columns: [t.supplementId],
+      foreignColumns: [supplement.id],
+      name: "supplement_intake_supplement_fk",
+    }).onDelete("set null"),
+    unique("supplement_intake_user_request_unique").on(t.userId, t.requestId),
+    index("supplement_intake_user_date_idx").on(t.userId, t.date),
+    index("supplement_intake_user_supplement_date_idx").on(t.userId, t.supplementId, t.date),
+    check(
+      "supplement_intake_values_valid",
+      sql`
+        ${t.quantity} > 0 AND ${t.quantity} <= 100
+        AND ${t.version} > 0
+        AND ${t.slot} IN ('morningEmpty', 'breakfast', 'lunch', 'dinner', 'workout', 'bedtime', 'anytime')
+      `,
+    ),
+  ],
+);
+
+/** 建库请求与补剂分别保存；删除补剂后，迟到的重试仍可识别。 */
+export const supplementCreateRequest = mysqlTable(
+  "bodytrace_supplement_create_request",
+  {
+    userId: varchar("user_id", { length: 255 }).notNull(),
+    requestId: varchar("request_id", { length: 36 }).notNull(),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    supplementId: varchar("supplement_id", { length: 36 }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.requestId] }),
+    foreignKey({ name: "supplement_request_user_fk", columns: [t.userId], foreignColumns: [user.id] }).onDelete("cascade"),
+    foreignKey({ name: "supplement_request_supplement_fk", columns: [t.supplementId], foreignColumns: [supplement.id] }).onDelete("set null"),
+  ],
+);
+
 export type Food = typeof food.$inferSelect;
 export type MealEntry = Omit<typeof mealEntry.$inferSelect, "nutritionBasis">;
 export type DailyGoal = typeof dailyGoal.$inferSelect;
 export type DietPlanItem = typeof dietPlanItem.$inferSelect;
 export type UserProfile = typeof userProfile.$inferSelect;
+export type SupplementRow = typeof supplement.$inferSelect;
+export type SupplementIntakeRow = typeof supplementIntake.$inferSelect;

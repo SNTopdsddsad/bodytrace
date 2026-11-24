@@ -16,6 +16,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  Pill,
   Settings2,
   Sun,
   UserRound,
@@ -42,6 +43,7 @@ import {
   type EditorialModalName,
 } from "@/lib/editorial-events";
 import { maskPhoneNumber } from "@/lib/phone-number";
+import type { SupplementRecentDay } from "@/lib/supplements";
 import { Brand } from "./brand";
 import {
   DeepSeekConfigDialog,
@@ -63,15 +65,24 @@ export type RecentDaySummary = {
   calories: number;
 };
 
+export type NavSupplementSummary = {
+  todayPlanned: number;
+  todayCompleted: number;
+  todayTaken: number;
+  recentDays: SupplementRecentDay[];
+};
+
 function WeekStrip({
   today,
   recentDays,
+  supplementDays,
   scope,
   isPending,
   navigate,
 }: {
   today: string;
   recentDays: RecentDaySummary[];
+  supplementDays: SupplementRecentDay[];
   scope: "desktop" | "mobile";
   isPending: boolean;
   navigate: (href: string) => void;
@@ -81,15 +92,17 @@ function WeekStrip({
 
   const rawDate = searchParams.get("date");
   const selectedDate = rawDate && isValidDateStr(rawDate) ? rawDate : today;
-  const targetBase = pathname === "/diary" ? "/diary" : "/";
+  const isSupplements = pathname === "/supplements";
+  const targetBase = pathname === "/diary" ? "/diary" : isSupplements ? "/supplements" : "/";
 
   const calMap = new Map(recentDays.map((d) => [d.date, Math.round(d.calories)]));
+  const supMap = new Map(supplementDays.map((d) => [d.date, d]));
   const { days, tomorrow, showsToday } = buildWeekStripDays(selectedDate, today);
   const recentWindowStart = shiftDate(today, -14);
 
   function goDate(next: string) {
     if (!isValidDateStr(next) || next > today || next === selectedDate) return;
-    navigate(next === today && targetBase === "/" ? "/" : `${targetBase}?date=${next}`);
+    navigate(next === today && (targetBase === "/" || targetBase === "/supplements") ? targetBase : `${targetBase}?date=${next}`);
   }
 
   return (
@@ -117,17 +130,34 @@ function WeekStrip({
         {days.map((d) => {
           const active = d.date === selectedDate;
           const kcal = calMap.get(d.date);
+          const sup = supMap.get(d.date);
           const inWindow = d.date >= recentWindowStart && d.date <= today;
-          const subText =
-            kcal !== undefined
-              ? `${kcal} kcal`
-              : inWindow
-                ? d.isToday
-                  ? "今日待记"
-                  : "未记录"
-                : d.isToday
-                  ? "今日"
-                  : "查看";
+          let subText: string;
+          if (isSupplements) {
+            if (sup && sup.planned > 0) {
+              subText =
+                sup.completed >= sup.planned
+                  ? `${sup.completed}/${sup.planned} 已服`
+                  : `${sup.completed}/${sup.planned} 次`;
+            } else if (sup && sup.taken > 0) {
+              subText = `已记 ${sup.taken} 次`;
+            } else if (inWindow) {
+              subText = d.isToday ? "今日待记" : "未记录";
+            } else {
+              subText = d.isToday ? "今日" : "查看";
+            }
+          } else {
+            subText =
+              kcal !== undefined
+                ? `${kcal} kcal`
+                : inWindow
+                  ? d.isToday
+                    ? "今日待记"
+                    : "未记录"
+                  : d.isToday
+                    ? "今日"
+                    : "查看";
+          }
 
           return (
             <motion.button
@@ -229,6 +259,7 @@ export function SiteNav({
   today,
   foodsCount,
   recentDays,
+  supplementSummary,
   children,
 }: {
   children: React.ReactNode;
@@ -236,6 +267,7 @@ export function SiteNav({
   today: string;
   foodsCount: number;
   recentDays: RecentDaySummary[];
+  supplementSummary: NavSupplementSummary;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -326,12 +358,49 @@ export function SiteNav({
             {/* 中央：桌面端胶囊周历 */}
             <div className="hidden lg:block">
               <Suspense fallback={<WeekStripFallback />}>
-                <WeekStrip today={today} recentDays={recentDays} isPending={switchingDate} navigate={navigateDate} scope="desktop" />
+                <WeekStrip
+                  today={today}
+                  recentDays={recentDays}
+                  supplementDays={supplementSummary.recentDays}
+                  isPending={switchingDate}
+                  navigate={navigateDate}
+                  scope="desktop"
+                />
               </Suspense>
             </div>
 
-            {/* 右侧：三个杂志浮层触发器 + 明暗切换 + 账号按钮 */}
+            {/* 右侧：补剂独立页 + 三个杂志浮层触发器 + 明暗切换 + 账号按钮 */}
             <div className="flex items-center gap-2">
+              <Link
+                href="/supplements"
+                aria-current={pathname === "/supplements" ? "page" : undefined}
+                className={`hidden items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors md:inline-flex ${
+                  pathname === "/supplements"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "bg-background text-foreground hover:border-primary/40 hover:bg-secondary/70"
+                }`}
+              >
+                <Pill
+                  className={`size-3.5 ${
+                    pathname === "/supplements" ? "text-primary-foreground" : "text-primary"
+                  }`}
+                  aria-hidden
+                />
+                <span>每日补剂</span>
+                {(supplementSummary.todayPlanned > 0 || supplementSummary.todayTaken > 0) && (
+                  <span
+                    className={`rounded-full border px-1.5 py-0.2 font-mono text-[11px] tabular-nums ${
+                      pathname === "/supplements"
+                        ? "border-white/30 bg-white/15 text-primary-foreground"
+                        : "border-primary/15 bg-secondary text-secondary-foreground"
+                    }`}
+                  >
+                    {supplementSummary.todayPlanned > 0
+                      ? `${supplementSummary.todayCompleted}/${supplementSummary.todayPlanned}`
+                      : supplementSummary.todayTaken}
+                  </span>
+                )}
+              </Link>
               <motion.button
                 type="button"
                 whileHover={{ y: -1 }}
@@ -457,7 +526,14 @@ export function SiteNav({
           {/* 移动端周历条 */}
           <div className="mt-2.5 w-full min-w-0 border-t pt-2.5 lg:hidden">
             <Suspense fallback={<WeekStripFallback />}>
-              <WeekStrip today={today} recentDays={recentDays} isPending={switchingDate} navigate={navigateDate} scope="mobile" />
+              <WeekStrip
+                today={today}
+                recentDays={recentDays}
+                supplementDays={supplementSummary.recentDays}
+                isPending={switchingDate}
+                navigate={navigateDate}
+                scope="mobile"
+              />
             </Suspense>
           </div>
         </header>
@@ -466,7 +542,7 @@ export function SiteNav({
       {/* 移动端底部快捷栏 */}
       <nav
         aria-label="移动端快捷导航"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden"
       >
         <Link
           href="/"
@@ -477,6 +553,16 @@ export function SiteNav({
         >
           <BookOpen className="size-4" aria-hidden />
           主手账
+        </Link>
+        <Link
+          href="/supplements"
+          aria-current={pathname === "/supplements" ? "page" : undefined}
+          className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${
+            pathname === "/supplements" ? "text-primary font-semibold" : "text-muted-foreground"
+          }`}
+        >
+          <Pill className="size-4" aria-hidden />
+          补剂
         </Link>
         <button
           type="button"
@@ -496,7 +582,7 @@ export function SiteNav({
           }`}
         >
           <Utensils className="size-4" aria-hidden />
-          食物库 ({foodsCount})
+          食物库
         </button>
         <button
           type="button"
@@ -508,7 +594,7 @@ export function SiteNav({
           }`}
         >
           <Settings2 className="size-4" aria-hidden />
-          目标与数据
+          设置
         </button>
       </nav>
 
@@ -580,6 +666,7 @@ export function SiteNav({
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { href: "/", label: "主手账视图", icon: BookOpen },
+                  { href: "/supplements", label: "每日补剂记录", icon: Pill },
                   { href: "/measurements", label: "完整身体变化", icon: Activity },
                   { href: "/foods", label: "完整食物库", icon: Utensils },
                   { href: "/trends", label: "完整营养趋势", icon: ChartNoAxesCombined },

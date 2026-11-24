@@ -85,6 +85,20 @@
       "when": 1795484507690,
       "tag": "0011_meal_nutrition_basis",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1795530314124,
+      "tag": "0012_supplements",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1795531268841,
+      "tag": "0013_supplement_create_requests",
+      "breakpoints": true
     }
   ]
 }

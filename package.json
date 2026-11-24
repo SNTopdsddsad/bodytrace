@@ -21,6 +21,8 @@
     "test:mysql-pool": "node --test scripts/mysql-pool.test.mjs",
     "test:measurements": "node --test scripts/measurements.test.mjs",
     "test:measurement-integration": "node scripts/measurement-integration-test.mjs",
+    "test:supplements": "node --test scripts/supplements.test.mjs",
+    "test:supplement-integration": "node scripts/supplement-integration-test.mjs",
     "test:test-isolation": "node --test scripts/local-test-app.test.mjs",
     "test:phone-auth": "node --test scripts/phone-number.test.mjs scripts/aliyun-sms.test.mjs scripts/sms-config.test.mjs scripts/sms-rate-limit.test.mjs scripts/login-form.test.mjs",
     "test:phone-auth-integration": "node scripts/phone-auth-integration-test.mjs",

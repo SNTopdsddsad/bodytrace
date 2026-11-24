@@ -10,6 +10,7 @@ import { getSession } from "@/lib/api-auth";
 import { shiftDate, todayStr } from "@/lib/date";
 import { countFoods } from "@/services/foods";
 import { getDailyTotals } from "@/services/meals";
+import { getSupplementNavSummary } from "@/services/supplements";
 import { AppMotionProvider } from "@/components/app/motion-provider";
 import { SiteNav } from "@/components/app/site-nav";
 
@@ -18,9 +19,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login");
 
   const today = todayStr();
-  const [foodsCount, recentTotals] = await Promise.all([
+  const [foodsCount, recentTotals, supplementNav] = await Promise.all([
     countFoods(session.user.id),
     getDailyTotals(session.user.id, shiftDate(today, -14), today),
+    getSupplementNavSummary(session.user.id, today),
   ]);
 
   return (
@@ -38,6 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           today={today}
           foodsCount={foodsCount}
           recentDays={recentTotals.map((t) => ({ date: t.date, calories: t.calories }))}
+          supplementSummary={supplementNav}
         >
           {children}
         </SiteNav>

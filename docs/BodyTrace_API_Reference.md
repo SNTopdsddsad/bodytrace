@@ -551,14 +551,76 @@ curl --request POST "$BASE_URL/api/v1/meal-photos" \
 
 已有测量体重时，提交 `weightKg` 且与最新测量值不同返回 `409`（体重应通过身体指标接口修改）；省略该字段或值一致则正常保存。成功返回 `{ profile }`（读取语义同 GET）。
 
+## 补剂记录（supplements）
+
+管理个人补剂库与每日服用记录。补剂不参与饮食热量/三大营养素统计；每条服用记录保存写入时刻的名称、数量、单位与可选规格快照，后续修改、暂停或删除补剂库条目不影响历史记录。
+
+服用时段（`slot`）取值：`morningEmpty`（晨起空腹）、`breakfast`（随早餐）、`lunch`（随午餐）、`dinner`（随晚餐）、`workout`（训练前后）、`bedtime`（睡前）、`anytime`（随时）。星期索引（`weekdays`）：`0`=周一 … `6`=周日，`null` 表示每天。
+
+### GET /api/v1/supplements?date=YYYY-MM-DD
+
+返回补剂面板数据：`{ date, today, timeZone, supplements, intakes, windowIntakes, recentDays }`。`date` 省略时默认今天，非法日历日期返回 400。`windowIntakes` 返回近 30 天（含今天）有效记录供 14/30 天规律点阵展示。
+
+### POST /api/v1/supplements
+
+新增补剂到个人补剂库，成功返回 `201 { supplement }`。可选的 `requestId` 为 UUID，作用域为当前账号。响应丢失时原样重发相同编号，返回 `200 { supplement }` 和该补剂的当前配置。同一编号改传其他内容或重放已删除的补剂返回 409。省略编号时每次请求都会新建。
+
+```json
+{
+  "name": "甘氨酸镁",
+  "defaultQuantity": 1,
+  "unit": "粒",
+  "spec": "200mg",
+  "mode": "scheduled",
+  "schedule": [
+    { "slot": "breakfast", "quantity": 1 },
+    { "slot": "bedtime", "quantity": 2 }
+  ],
+  "weekdays": null,
+  "note": "晚间助眠"
+}
+```
+
+- `mode`：`scheduled`（常规计划，须至少 1 个不重复时段）或 `asNeeded`（按需常备，`schedule` 为空数组、`weekdays` 为 `null`）。
+- `defaultQuantity` / `schedule[].quantity`：`(0, 100]` 最多两位小数；`unit` 1–16 字；`spec` 可选（≤80 字自由文本，不拆成分计算）。
+
+### PATCH /api/v1/supplements/:id
+
+部分更新补剂配置或切换 `status`（`active` / `paused`）。`:id` 非 UUID 返回 400；不存在或非本人返回 404；返回 `{ supplement }`。
+
+### DELETE /api/v1/supplements/:id
+
+从个人补剂库删除该补剂，返回 `{ "ok": true }`。历史服用记录的 `supplementId` 置为 `null`，快照保留。
+
+### POST /api/v1/supplements/intakes
+
+新增一条补剂服用记录，携带 `requestId`（当前用户内唯一 UUID）实现幂等：首次 201，同内容重放 200，编号冲突或已删除返回 409；`date` 拒绝未来日期。
+
+- **按补剂库记录**：`{ "requestId": "...", "intake": { "supplementId": "...", "date": "2026-11-24", "slot": "breakfast", "quantity": 2, "takenTime": "08:20", "note": null } }`（`quantity` 省略时按对应时段或默认份数；引用不存在或他人补剂返回 404）。
+- **临时记录**：`{ "requestId": "...", "intake": { "supplementId": null, "date": "2026-11-24", "slot": "anytime", "name": "维C泡腾片", "quantity": 1, "unit": "片", "spec": "1000mg", "takenTime": "15:10", "note": null } }`。
+
+成功返回 `{ entry }`。
+
+### POST /api/v1/supplements/intakes/batch
+
+批量新增 1–30 条补剂服用记录，请求体 `{ "items": [ { "requestId": "...", "intake": { ... } } ] }`。每批在一个事务内执行，每条独立幂等。成功返回 `201`，全重放返回 `200`，响应均为 `{ entries }`。网页的“本时段全服”会依次发送最多 30 项的小批次，遇到不确定结果时保留剩余请求及其原编号。
+
+### PATCH /api/v1/supplements/intakes/:id
+
+乐观并发修改单条服用记录。请求体 `{ "version": 1, "intake": { "date": "2026-11-24", "slot": "breakfast", "quantity": 1, "takenTime": "08:30", "note": "减半" } }`。成功返回 `{ entry }`（`version + 1`）；版本冲突返回 409，丢失响应同内容重试直接返回最新结果。
+
+### DELETE /api/v1/supplements/intakes/:id
+
+软删除单条服用记录，请求体 `{ "version": 1 }`。成功返回 `{ "ok": true }`；同 `version` 重试幂等返回 200，版本冲突返回 409。
+
 ## 数据管理（records）
 
 ### DELETE /api/v1/records
 
-一键清空当前用户的**全部饮食记录、餐次照片与身体指标**：同一事务内硬删除，包含此前软删除行。个人食物库、每日目标和个人资料不受影响。重复调用成功；两次之间没有新写入时返回数量 0。清空与照片写入先锁同一用户行，在事务内取得对象 key 并删除记录，COS 对象在事务提交后批量清理；对象清理失败只记录日志，不影响清空结果。
+一键清空当前用户的**全部饮食记录、餐次照片、身体指标与补剂服用记录**：同一事务内硬删除，包含此前软删除行。个人食物库、个人补剂库配置、每日目标和个人资料不受影响。重复调用成功；两次之间没有新写入时返回数量 0。清空与照片写入先锁同一用户行，在事务内取得对象 key 并删除记录，COS 对象在事务提交后批量清理；对象清理失败只记录日志，不影响清空结果。
 
-返回的 `cleared.measurements` / `cleared.mealPhotos` 包括各自已软删除的行，所以可能大于清空前界面可见的指标数。硬删除会清除测量和照片的 `requestId` 占用与删除标记；清空后重放旧新增请求可能重新创建记录，客户端应停止上传、丢弃待重试的旧新增操作并刷新状态。用户行锁只保证事务串行，不会使尚在转码/上传或其他设备保留的旧请求失效；这些请求在清空后提交仍可能创建照片。跨设备阻止恢复需要另外的服务端失效机制。
+返回的 `cleared.measurements` / `cleared.mealPhotos` / `cleared.supplementIntakes` 包括各自已软删除的行，所以可能大于清空前界面可见的记录数。硬删除会清除测量、照片和补剂记录的 `requestId` 占用与删除标记；清空后重放旧新增请求可能重新创建记录，客户端应停止上传、丢弃待重试的旧新增操作并刷新状态。用户行锁只保证事务串行，不会使尚在转码/上传或其他设备保留的旧请求失效；这些请求在清空后提交仍可能创建照片。跨设备阻止恢复需要另外的服务端失效机制。
 
 ```json
-{ "ok": true, "cleared": { "mealEntries": 42, "measurements": 17, "mealPhotos": 8 } }
+{ "ok": true, "cleared": { "mealEntries": 42, "measurements": 17, "mealPhotos": 8, "supplementIntakes": 35 } }
 ```

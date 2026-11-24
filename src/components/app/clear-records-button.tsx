@@ -22,7 +22,11 @@ export function ClearRecordsButton({ counts }: { counts: RecordCounts }) {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [error, setError] = useState("");
-  const total = counts.mealEntries + counts.measurements + counts.mealPhotos;
+  const total =
+    counts.mealEntries +
+    counts.measurements +
+    counts.mealPhotos +
+    counts.supplementIntakes;
 
   async function clear() {
     if (busyRef.current) return;
@@ -34,7 +38,9 @@ export function ClearRecordsButton({ counts }: { counts: RecordCounts }) {
         api<{ ok: true; cleared: RecordCounts }>("/api/v1/records", { method: "DELETE", signal }),
       );
       setOpen(false);
-      toast.success(`已清空 ${cleared.mealEntries} 条饮食记录、${cleared.measurements} 条身体指标、${cleared.mealPhotos} 张餐次照片`);
+      toast.success(
+        `已清空 ${cleared.mealEntries} 条饮食记录、${cleared.measurements} 条身体指标、${cleared.mealPhotos} 张餐次照片、${cleared.supplementIntakes} 条补剂记录`,
+      );
       router.refresh();
     } catch (err) {
       // 清空接口可安全重试：即使刚才超时但实际已成功，重试也只会删到 0 条。
@@ -66,9 +72,9 @@ export function ClearRecordsButton({ counts }: { counts: RecordCounts }) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>清空全部饮食记录、餐次照片和身体指标？</DialogTitle>
+            <DialogTitle>清空全部业务记录？</DialogTitle>
             <DialogDescription>
-              将永久删除你的 {counts.mealEntries} 条饮食记录、{counts.measurements} 条身体指标、{counts.mealPhotos} 张餐次照片，并清理此前已删除的记录，无法恢复。
+              将永久删除你的 {counts.mealEntries} 条饮食记录、{counts.measurements} 条身体指标、{counts.mealPhotos} 张餐次照片、{counts.supplementIntakes} 条补剂服用记录，并清理此前已删除的记录，无法恢复。个人食物库、补剂库配置、每日目标与资料将保留。
               请先停止其他设备的上传并取消待重试操作，避免清空后重新保存。
             </DialogDescription>
           </DialogHeader>

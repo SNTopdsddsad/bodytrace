@@ -230,7 +230,7 @@ try {
     zeroDays.at(-1).calories === 0 && zeroDays.at(-2).hasMealEntries === false && zeroDays.at(-2).calories === 0);
 
   check("公共食物参考库搜索正常", (await api(a, `/api/v1/foods/reference?q=${encodeURIComponent("鸡蛋")}`)).json.foods.length > 0);
-  for (const path of ["/", "/diary", "/foods", "/trends", "/goals", "/profile"]) {
+  for (const path of ["/", "/diary", "/supplements", "/foods", "/trends", "/goals", "/profile"]) {
     check(`${path} 页面正常渲染`, (await api(a, path)).status === 200);
   }
   check("删除记录成功", (await api(a, `/api/v1/meals/${entry.id}`, "DELETE")).status === 200);
@@ -250,9 +250,9 @@ try {
     [trainingId, a.id, today, randomUUID()],
   );
   const cleared = (await api(a, "/api/v1/records", "DELETE")).json;
-  assert.deepEqual(cleared, { ok: true, cleared: { mealEntries: 1, measurements: 1, mealPhotos: 0 } });
+  assert.deepEqual(cleared, { ok: true, cleared: { mealEntries: 1, measurements: 1, mealPhotos: 0, supplementIntakes: 0 } });
   const [legacyTraining] = await pool.execute("SELECT id FROM bodytrace_training_record WHERE user_id = ? AND id = ?", [a.id, trainingId]);
-  check("清空只返回三类计数且保留历史训练", legacyTraining.length === 1);
+  check("清空返回四类计数且保留历史训练", legacyTraining.length === 1);
   check("清空后当日饮食与全部指标为空", (await api(a, `/api/v1/meals?date=${today}`)).json.entries.length === 0 && (await api(a, "/api/v1/measurements?range=all")).json.entries.length === 0);
   check("清空保留目标与个人资料", (await api(a, "/api/v1/goals")).json.goals.calories === 2200 && (await api(a, "/api/v1/profile")).json.profile.heightCm === 175.5);
   check("清空只影响本人记录", (await api(b, "/api/v1/measurements?range=all")).json.entries.length === 1);
@@ -260,7 +260,7 @@ try {
   const [[measureLeft]] = await pool.execute("SELECT COUNT(*) AS count FROM bodytrace_measurement WHERE user_id = ?", [a.id]);
   check("清空为硬删除，软删除测量行一并移除", mealLeft.count === 0 && measureLeft.count === 0);
   const repeat = (await api(a, "/api/v1/records", "DELETE")).json;
-  check("重复清空成功且数量为零", repeat.ok === true && repeat.cleared.mealEntries === 0 && repeat.cleared.measurements === 0 && repeat.cleared.mealPhotos === 0);
+  check("重复清空成功且数量为零", repeat.ok === true && repeat.cleared.mealEntries === 0 && repeat.cleared.measurements === 0 && repeat.cleared.mealPhotos === 0 && repeat.cleared.supplementIntakes === 0);
   check("清空后个人资料页正常渲染", (await api(a, "/profile")).status === 200);
   console.log(`\n${passed} 项 MySQL 集成检查通过。`);
 } finally {

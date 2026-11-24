@@ -116,9 +116,9 @@ export default async function ProfilePage() {
             </CardHeader>
             <CardContent>
               <p className="text-xs leading-6 text-muted-foreground">
-                {recordCounts.mealEntries + recordCounts.measurements + recordCounts.mealPhotos === 0
-                  ? "当前没有饮食记录、餐次照片或身体指标。"
-                  : `当前有 ${recordCounts.mealEntries} 条饮食记录、${recordCounts.measurements} 条身体指标、${recordCounts.mealPhotos} 张餐次照片。清空后无法恢复。`}
+                {recordCounts.mealEntries + recordCounts.measurements + recordCounts.mealPhotos + recordCounts.supplementIntakes === 0
+                  ? "当前没有饮食记录、餐次照片、身体指标或补剂服用记录。"
+                  : `当前有 ${recordCounts.mealEntries} 条饮食记录、${recordCounts.measurements} 条身体指标、${recordCounts.mealPhotos} 张餐次照片、${recordCounts.supplementIntakes} 条补剂记录。清空后无法恢复（保留食物库与补剂库配置）。`}
               </p>
               <div className="mt-4">
                 <ClearRecordsButton counts={recordCounts} />

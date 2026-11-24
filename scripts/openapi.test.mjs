@@ -20,6 +20,12 @@ const requiredBodies = [
   ["post", "/api/v1/measurements"],
   ["patch", "/api/v1/measurements/{id}"],
   ["delete", "/api/v1/measurements/{id}"],
+  ["post", "/api/v1/supplements"],
+  ["patch", "/api/v1/supplements/{id}"],
+  ["post", "/api/v1/supplements/intakes"],
+  ["post", "/api/v1/supplements/intakes/batch"],
+  ["patch", "/api/v1/supplements/intakes/{id}"],
+  ["delete", "/api/v1/supplements/intakes/{id}"],
   ["put", "/api/v1/profile"],
 ];
 
